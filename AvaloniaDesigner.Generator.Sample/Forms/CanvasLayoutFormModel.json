@@ -19,6 +19,7 @@
         "Text": "Top Left Corner",
         "Avalonia.Controls.Canvas.Left": 10, 
         "Avalonia.Controls.Canvas.Top": 10, 
+        "Avalonia.Controls.ToolTip.Tip": "Hello ToolTip", 
         "FontSize": 16,
         "Foreground": "Black"
       }

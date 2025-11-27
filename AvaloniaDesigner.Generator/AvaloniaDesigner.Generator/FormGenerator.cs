@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Immutable;
 using System.IO;
+using System.Linq;
 using System.Text;
 using System.Text.Json;
 using Microsoft.CodeAnalysis;
@@ -47,7 +48,6 @@ namespace AvaloniaDesigner.Generator
                     if (formModel is null)
                         continue;
 
-                    // ИСПРАВЛЕНО: Передаем context в GenerateFormClass
                     string sourceCode = GenerateFormClass(formModel, rootNamespace, compilation, context);
 
                     context.AddSource(
@@ -73,7 +73,7 @@ namespace AvaloniaDesigner.Generator
             FormModel model,
             string rootNamespace,
             Compilation compilation,
-            SourceProductionContext context) // ИСПРАВЛЕНО: Добавлен context
+            SourceProductionContext context)
         {
             string ns = $"{rootNamespace}.{model.NamespaceSuffix}";
             var sb = new StringBuilder();
@@ -107,7 +107,7 @@ namespace AvaloniaDesigner.Generator
 
             var rootTypeSymbol = ResolveType(compilation, rootContainerType);
 
-            // Свойства корня (включая RowDefinitions и ColumnDefinitions)
+            // Свойства корня
             foreach (var prop in model.RootContainer.Properties)
             {
                 IPropertySymbol? propSymbol = rootTypeSymbol is null
@@ -123,6 +123,22 @@ namespace AvaloniaDesigner.Generator
                 sb.AppendLine($"            root.{prop.Key} = {valueExpr};");
             }
 
+            // --- Ключевая логика: Поиск Content-свойства ---
+            var contentPropertySymbol = rootTypeSymbol is null
+                ? null
+                : FindContentProperty(rootTypeSymbol, compilation);
+
+            string contentPropertyName = contentPropertySymbol?.Name ?? "Children"; // Fallback на Children
+            
+            // Если свойство не ContentControl.Content, а коллекция (Panel.Children, ItemsControl.Items),
+            // то мы должны использовать .Add()
+            bool isContentCollection = contentPropertySymbol is not null && 
+                IsCollectionType(contentPropertySymbol.Type, compilation);
+            
+            // Если свойство ContentControl.Content, то мы присваиваем. Если Children, то добавляем.
+            bool useAddMethod = isContentCollection || contentPropertyName.Equals("Children", StringComparison.Ordinal);
+
+
             // Контролы
             foreach (var control in model.Controls)
             {
@@ -135,7 +151,7 @@ namespace AvaloniaDesigner.Generator
                 {
                     string propertyKey = prop.Key;
 
-                    // attached-свойства: "Владелец.Свойство"
+                    // attached-свойства
                     if (propertyKey.Contains("."))
                     {
                         int lastDot = propertyKey.LastIndexOf('.');
@@ -199,7 +215,17 @@ namespace AvaloniaDesigner.Generator
                     }
                 }
 
-                sb.AppendLine($"            root.Children.Add(this.{control.Name});");
+                // --- Динамическое добавление дочернего контрола ---
+                if (useAddMethod)
+                {
+                    sb.AppendLine($"            root.{contentPropertyName}.Add(this.{control.Name});");
+                }
+                else
+                {
+                    // Для ContentControl (Content) - присваиваем. 
+                    // Если контролов несколько, будет присвоен только последний.
+                    sb.AppendLine($"            root.{contentPropertyName} = this.{control.Name};");
+                }
             }
 
             sb.AppendLine("            this.Content = root;");
@@ -210,7 +236,7 @@ namespace AvaloniaDesigner.Generator
             return sb.ToString();
         }
 
-        // --- Roslyn helpers и Value formatting методы (без изменений) ---
+        // ---------------- Roslyn helpers ----------------
 
         private static INamedTypeSymbol? ResolveType(Compilation compilation, string metadataName)
             => compilation.GetTypeByMetadataName(metadataName);
@@ -225,7 +251,6 @@ namespace AvaloniaDesigner.Generator
                         return p;
                 }
             }
-
             return null;
         }
 
@@ -242,9 +267,60 @@ namespace AvaloniaDesigner.Generator
                     return m;
                 }
             }
+            return null;
+        }
+        
+        /// <summary>
+        /// Ищет свойство в иерархии типа, помеченное атрибутом [Content].
+        /// </summary>
+        private static IPropertySymbol? FindContentProperty(INamedTypeSymbol type, Compilation compilation)
+        {
+            var contentAttributeSymbol = compilation.GetTypeByMetadataName("Avalonia.Metadata.ContentAttribute");
+            
+            if (contentAttributeSymbol is null)
+                return null;
+
+            for (var t = type; t is not null; t = t.BaseType)
+            {
+                foreach (var member in t.GetMembers().OfType<IPropertySymbol>())
+                {
+                    foreach (var attributeData in member.GetAttributes())
+                    {
+                        if (SymbolEqualityComparer.Default.Equals(attributeData.AttributeClass, contentAttributeSymbol))
+                        {
+                            return member;
+                        }
+                    }
+                }
+            }
 
             return null;
         }
+
+        /// <summary>
+        /// Проверяет, является ли данный тип коллекцией, реализующей ICollection<T>.
+        /// </summary>
+        private static bool IsCollectionType(ITypeSymbol type, Compilation compilation)
+        {
+            // Упрощенная проверка, ищем ICollection<T>
+            var iCollectionType = compilation.GetTypeByMetadataName("System.Collections.Generic.ICollection`1");
+
+            if (iCollectionType is null) return false;
+
+            // Проверяем, реализует ли тип ICollection<T> (для любого T)
+            if (type is INamedTypeSymbol namedType)
+            {
+                if (namedType.IsGenericType && SymbolEqualityComparer.Default.Equals(namedType.ConstructedFrom, iCollectionType))
+                    return true;
+
+                return namedType.AllInterfaces.Any(iface => 
+                    iface.IsGenericType && SymbolEqualityComparer.Default.Equals(iface.ConstructedFrom, iCollectionType));
+            }
+
+            return false;
+        }
+
+        // ---------------- Value formatting ----------------
 
         private static string FormatValueSemantic(
             JsonElement element,
@@ -257,16 +333,13 @@ namespace AvaloniaDesigner.Generator
                 return FormatValueLegacy(element, propertyNameForLegacy);
             }
 
-            // string
+            // string, bool, числа (оставлены для краткости, не изменены)
             if (targetType.SpecialType == SpecialType.System_String)
             {
                 if (element.ValueKind == JsonValueKind.String)
                     return $"\"{EscapeString(element.GetString() ?? string.Empty)}\"";
-
                 return $"\"{EscapeString(element.ToString())}\"";
             }
-
-            // bool
             if (targetType.SpecialType == SpecialType.System_Boolean)
             {
                 return element.ValueKind switch
@@ -280,8 +353,6 @@ namespace AvaloniaDesigner.Generator
                     _ => "false"
                 };
             }
-
-            // числа (double, int, float, decimal)
             if (targetType.SpecialType is SpecialType.System_Int16
                 or SpecialType.System_Int32
                 or SpecialType.System_Int64
@@ -302,16 +373,15 @@ namespace AvaloniaDesigner.Generator
                         SymbolDisplayFormat.FullyQualifiedFormat);
                     return $"{enumTypeName}.{memberName}";
                 }
-
                 return element.GetRawText();
             }
 
-            // Сложние типы (Thickness, GridLength, RowDefinitions, ColumnDefinitions)
+            // Сложные типы с Parse(string)
             if (element.ValueKind == JsonValueKind.String)
             {
                 string text = element.GetString() ?? string.Empty;
 
-                // 1) Поиск Parse(string) на самом типе (для Thickness, CornerRadius)
+                // 1) Parse(string) на самом типе (Thickness, CornerRadius)
                 var parseOnType = FindParseOnType(targetType);
                 if (parseOnType is not null)
                 {
@@ -320,7 +390,7 @@ namespace AvaloniaDesigner.Generator
                     return $"{typeName}.Parse(\"{EscapeString(text)}\")";
                 }
 
-                // 2) Поиск Parse(string) на совместимом типе (для IBrush <- Brush.Parse)
+                // 2) Parse(string) на совместимом типе (IBrush <- Brush.Parse)
                 var parseForAssignable = FindParseForAssignableType(
                     compilation, targetType, out var parserType);
                 
@@ -331,11 +401,9 @@ namespace AvaloniaDesigner.Generator
                     return $"{parserTypeName}.Parse(\"{EscapeString(text)}\")";
                 }
 
-                // если ничего не нашли – просто строка
                 return $"\"{EscapeString(text)}\"";
             }
 
-            // общий fallback
             return FormatValueLegacy(element, propertyNameForLegacy);
         }
 
@@ -352,7 +420,6 @@ namespace AvaloniaDesigner.Generator
                     return m;
                 }
             }
-
             return null;
         }
 
@@ -363,7 +430,7 @@ namespace AvaloniaDesigner.Generator
         {
             parserType = null;
 
-            // Специальное правило для IBrush / Brush
+            // IBrush / Brush
             var brushInterface = compilation.GetTypeByMetadataName("Avalonia.Media.IBrush");
             if (brushInterface is not null && IsAssignableFrom(brushInterface, targetType))
             {
@@ -384,7 +451,7 @@ namespace AvaloniaDesigner.Generator
                 }
             }
             
-            // Специальное правило для RowDefinitions / ColumnDefinitions
+            // RowDefinitions / ColumnDefinitions
             var rowDefsType = compilation.GetTypeByMetadataName("Avalonia.Controls.RowDefinitionCollection");
             if (rowDefsType is not null && IsAssignableFrom(rowDefsType, targetType))
             {
