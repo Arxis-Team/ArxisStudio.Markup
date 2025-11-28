@@ -33,20 +33,32 @@ namespace AvaloniaDesigner.Generator.Services
 
             if (element is string s)
             {
+                // 🔹 ЧИСЛОВЫЕ ТИПЫ: генерируем литерал, а не Parse(...)
+                if (IsNumeric(targetType))
+                {
+                    // JSON по спецификации уже использует '.', так что это валидный C# литерал
+                    // "0.5" → 0.5   /  "10" → 10
+                    return s;
+                }
+
                 string escapedString = Escape(s);
 
+                // Кисти — через Brush.Parse(...)
                 if (IsBrush(targetType))
                     return $"global::Avalonia.Media.Brush.Parse(\"{escapedString}\")";
 
+                // Общий случай для типов со статическим Parse(string)
                 if (HasStaticParseMethod(targetType))
                     return $"{targetTypeName}.Parse(\"{escapedString}\")";
 
+                // Обычная строка
                 return $"\"{escapedString}\"";
             }
 
             if (targetType.SpecialType == SpecialType.System_Boolean && element is bool b)
                 return b ? "true" : "false";
 
+            // Если это уже число (int, double и т.п.) — просто выводим как есть
             if (IsNumeric(targetType))
             {
                 return element.ToString() ?? "0";
@@ -63,6 +75,13 @@ namespace AvaloniaDesigner.Generator.Services
                 if (token.Type == JTokenType.String)
                 {
                     string tokenString = token.ToString();
+
+                    // Для числовых типов строковый токен также трактуем как литерал
+                    if (IsNumeric(targetType))
+                    {
+                        return tokenString;
+                    }
+
                     string escapedString = Escape(tokenString);
 
                     if (IsBrush(targetType))
@@ -74,6 +93,7 @@ namespace AvaloniaDesigner.Generator.Services
                     return $"\"{escapedString}\"";
                 }
 
+                // Числа/другое — отдадим как есть (будет валидный литерал)
                 return token.ToString();
             }
 
