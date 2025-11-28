@@ -27,67 +27,81 @@ namespace AvaloniaDesigner.Generator.Services
             string propertyName, 
             PropertyModel model)
         {
-            string? assignedVarName = null;
-            
             IPropertySymbol? targetPropSymbol = targetTypeSymbol != null 
                 ? _resolver.FindProperty(targetTypeSymbol, propertyName) 
                 : null;
             ITypeSymbol? valueTypeSymbol = targetPropSymbol?.Type;
 
-            // --- НОВАЯ ЛОГИКА: ОБРАБОТКА СВОЙСТВ-КОЛЛЕКЦИЙ (Children, Items) ---
+            // --- 1. ОБРАБОТКА СВОЙСТВ-КОЛЛЕКЦИЙ (Children, Items) ---
             if (targetPropSymbol != null && _resolver.IsCollectionType(targetPropSymbol.Type))
             {
-                // Имя коллекции, например: "this.MainPanel.Children"
                 string collectionName = $"{targetName}.{propertyName}";
+                _context.ReportDiagnostic(Diagnostic.Create(
+                    new DiagnosticDescriptor("ADG9910", "Code Gen: Collection Block", $"Target {targetName}.{propertyName} recognized as Collection.", "Debug", DiagnosticSeverity.Warning, true), 
+                    Location.None));
+                
+                if (model.Properties == null) return null; 
 
-                // Проходим по элементам коллекции ("0", "1", "2"...)
                 foreach (var elementEntry in model.Properties.OrderBy(e => e.Key))
                 {
                     var elementModel = elementEntry.Value;
                     
-                    // Рекурсивно генерируем сам элемент. 
-                    // targetName = null, т.к. мы не присваиваем его свойству, а добавляем в коллекцию.
-                    // assignedVarName будет this.MyCheckBox или _gen_...
+                    if (string.IsNullOrEmpty(elementModel.Type)) continue;
+                    
+                    // Рекурсивно генерируем сам элемент (this.MyCheckBox)
                     string? elementVarName = GenerateNestedControl(
                         sb, 
                         elementModel, 
                         elementEntry.Key, 
-                        targetTypeSymbol: null); // Присвоение не нужно
+                        targetTypeSymbol: null); 
                     
-                    // 4. Добавляем созданный элемент в коллекцию (если он был создан)
+                    // Добавляем созданный элемент в коллекцию 
                     if (!string.IsNullOrEmpty(elementVarName))
                     {
                         sb.AppendLine($"            {collectionName}.Add({elementVarName});");
+                        _context.ReportDiagnostic(Diagnostic.Create(
+                            new DiagnosticDescriptor("ADG9911", "Code Gen: Collection Add", $"Added {elementVarName} to {collectionName}.", "Debug", DiagnosticSeverity.Warning, true), 
+                            Location.None));
                     }
                 }
-                return null; // Свойству (Children) присваивать нечего, мы работали с коллекцией
+                return null;
             }
             
-            // 1. Обработка вложенного объекта/контрола (Type задан)
+            // --- 2. ОБРАБОТКА ВЛОЖЕННОГО ОБЪЕКТА/КОНТРОЛА (Content, Child, Template) ---
             if (!string.IsNullOrEmpty(model.Type))
             {
-                // Генерируем вложенный контрол как поле или локальную переменную
-                assignedVarName = GenerateNestedControl(sb, model, propertyName, targetTypeSymbol);
+                _context.ReportDiagnostic(Diagnostic.Create(
+                    new DiagnosticDescriptor("ADG9912", "Code Gen: Nested Control Block", $"Generating nested control {propertyName} of type {model.Type} for {targetName}.", "Debug", DiagnosticSeverity.Warning, true), 
+                    Location.None));
+
+                string? assignedVarName = GenerateNestedControl(sb, model, propertyName, targetTypeSymbol);
                 
-                // Присваиваем созданную переменную свойству целевого объекта
                 if (!string.IsNullOrEmpty(assignedVarName))
                 {
                     sb.AppendLine($"            {targetName}.{propertyName} = {assignedVarName};");
                 }
-                return assignedVarName;
+                return assignedVarName; 
             }
             
-            // 2. Обработка примитивного значения (Value задан)
+            // --- 3. ОБРАБОТКА ПРИМИТИВНОГО ЗНАЧЕНИЯ (Width, Height, Name, Attached) ---
             if (model.Value.HasValue)
             {
                 string propertyKey = propertyName;
                 
                 if (propertyKey.Contains("."))
                 {
+                    _context.ReportDiagnostic(Diagnostic.Create(
+                        new DiagnosticDescriptor("ADG9913", "Code Gen: Attached Property", $"Handling attached property {propertyKey} for {targetName}.", "Debug", DiagnosticSeverity.Warning, true), 
+                        Location.None));
+
                     HandleAttachedProperty(sb, targetName, propertyKey, model.Value.Value);
                 }
                 else
                 {
+                    _context.ReportDiagnostic(Diagnostic.Create(
+                        new DiagnosticDescriptor("ADG9914", "Code Gen: Primitive Property", $"Setting primitive property {propertyKey} on {targetName}.", "Debug", DiagnosticSeverity.Warning, true), 
+                        Location.None));
+
                     string valueExpr = _formatter.Format(model.Value.Value, valueTypeSymbol);
                     sb.AppendLine($"            {targetName}.{propertyKey} = {valueExpr};");
                 }
@@ -105,38 +119,43 @@ namespace AvaloniaDesigner.Generator.Services
             string fullTypeName = $"global::{model.Type}";
             string? assignedVarName;
             
-            // Ищем имя внутри свойств (Name=...)
             string? controlName = FindControlName(model);
 
             if (!string.IsNullOrEmpty(controlName)) 
             {
-                // 1. Поле класса
                 assignedVarName = $"this.{controlName}"; 
                 sb.AppendLine($"            {assignedVarName} = new {fullTypeName}();");
+                _context.ReportDiagnostic(Diagnostic.Create(
+                    new DiagnosticDescriptor("ADG9915", "Code Gen: Control Init (Field)", $"Initialized field {assignedVarName}.", "Debug", DiagnosticSeverity.Warning, true), 
+                    Location.None));
             }
             else
             {
-                // 2. Локальная, безымянная переменная
                 assignedVarName = $"_gen_{propertyName}_{Guid.NewGuid().ToString().Replace("-", "").Substring(0, 4)}";
                 sb.AppendLine($"            {fullTypeName} {assignedVarName} = new {fullTypeName}();");
+                _context.ReportDiagnostic(Diagnostic.Create(
+                    new DiagnosticDescriptor("ADG9916", "Code Gen: Control Init (Local)", $"Initialized local {assignedVarName}.", "Debug", DiagnosticSeverity.Warning, true), 
+                    Location.None));
             }
 
-            // Устанавливаем свойства этого нового объекта (рекурсивно)
             var newObjectType = _resolver.ResolveType(model.Type);
-            foreach (var innerPropEntry in model.Properties)
+            
+            if (model.Properties != null) 
             {
-                // Рекурсивный вызов. targetName теперь - это assignedVarName (новый контрол)
-                GeneratePropertyAssignment(
-                    sb, 
-                    targetName: assignedVarName, 
-                    targetTypeSymbol: newObjectType, 
-                    propertyName: innerPropEntry.Key, 
-                    model: innerPropEntry.Value);
+                foreach (var innerPropEntry in model.Properties)
+                {
+                    GeneratePropertyAssignment(
+                        sb, 
+                        targetName: assignedVarName, 
+                        targetTypeSymbol: newObjectType, 
+                        propertyName: innerPropEntry.Key, 
+                        model: innerPropEntry.Value);
+                }
             }
             
             return assignedVarName;
         }
-
+        
         private void HandleAttachedProperty(StringBuilder sb, string targetName, string key, JsonElement value)
         {
             int lastDot = key.LastIndexOf('.');

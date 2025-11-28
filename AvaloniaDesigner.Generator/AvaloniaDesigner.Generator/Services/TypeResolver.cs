@@ -62,36 +62,25 @@ namespace AvaloniaDesigner.Generator.Services
 
         public bool IsCollectionType(ITypeSymbol type)
         {
-            // Простая проверка: если тип реализует System.Collections.Generic.ICollection<T> или имеет метод Add(object).
+            // 1. System.Collections.Generic.ICollection<T> (основной)
             var iCol = _compilation.GetTypeByMetadataName("System.Collections.Generic.ICollection`1");
             if (iCol != null && ImplementsInterface(type, iCol)) return true;
 
-            var iList = _compilation.GetTypeByMetadataName("System.Collections.IList");
-            if (iList != null && ImplementsInterface(type, iList)) return true;
+            // 2. System.Collections.Generic.IList<T> (для коллекций с доступом по индексу)
+            var iListGeneric = _compilation.GetTypeByMetadataName("System.Collections.Generic.IList`1");
+            if (iListGeneric != null && ImplementsInterface(type, iListGeneric)) return true;
             
-            // Проверка на наличие публичного метода Add с одним параметром (как fallback)
+            // 3. System.Collections.ICollection (не-generic)
+            var iColNonGeneric = _compilation.GetTypeByMetadataName("System.Collections.ICollection");
+            if (iColNonGeneric != null && ImplementsInterface(type, iColNonGeneric)) return true;
+
+            // 4. Проверка на наличие публичного метода Add с одним параметром (как fallback)
             if (type.GetMembers("Add").OfType<IMethodSymbol>().Any(m => 
                 m.DeclaredAccessibility == Accessibility.Public && m.Parameters.Length == 1)) return true;
 
             return false;
         }
         
-        // Вспомогательный метод: определяет тип элемента коллекции
-        public ITypeSymbol? FindCollectionElementType(ITypeSymbol collectionType)
-        {
-            // Ищем ICollection<T>
-            var iCol = _compilation.GetTypeByMetadataName("System.Collections.Generic.ICollection`1");
-            if (iCol != null)
-            {
-                var iColInstance = collectionType.AllInterfaces.FirstOrDefault(i => 
-                    i.IsGenericType && SymbolEqualityComparer.Default.Equals(i.ConstructedFrom, iCol));
-                
-                return iColInstance?.TypeArguments.FirstOrDefault();
-            }
-            
-            return null;
-        }
-
         private static bool ImplementsInterface(ITypeSymbol type, INamedTypeSymbol interfaceSymbol)
         {
             if (type is INamedTypeSymbol namedType)

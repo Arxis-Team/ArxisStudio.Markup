@@ -3,25 +3,23 @@
   "NamespaceSuffix": "Forms",
   "ParentClassType": "Avalonia.Controls.UserControl",
   "Properties": {
+    "Width": { "Value": 400 },
+    "Height": { "Value": 200 },
     "Content": {
-      "Type": "Avalonia.Controls.Border",
+      "Type": "Avalonia.Controls.DockPanel",
       "Properties": {
-        "Name": { "Value": "NamedBorder" },
-        "BorderThickness": { "Value": 3 },
-        "BorderBrush": { "Value": "Gray" },
+        "Name": { "Value": "MainPanel" },
+        "LastChildFill": { "Value": false },
 
-        "Background": {
-          "Type": "Avalonia.Media.SolidColorBrush",
-          "Properties": {
-            "Color": { "Value": "LightGreen" },
-            "Opacity": { "Value": 0.5 }
-          }
-        },
-
-        "Child": {
-          "Type": "Avalonia.Controls.TextBlock",
-          "Properties": {
-            "Text": { "Value": "Hello Brush!" }
+        "Children": {
+          "0": {
+            "Type": "Avalonia.Controls.CheckBox",
+            "Properties": {
+              "Name": { "Value": "MyCheckBox" },
+              "Content": { "Value": "Enabled" },
+              "IsChecked": { "Value": true },
+              "Avalonia.Controls.DockPanel.Dock": { "Value": "Bottom" }
+            }
           }
         }
       }

@@ -8,5 +8,6 @@ public partial class MyUserControl
     {
         InitializeComponent();
         DockPanel dockPanel = new DockPanel();
+        
     }
 }

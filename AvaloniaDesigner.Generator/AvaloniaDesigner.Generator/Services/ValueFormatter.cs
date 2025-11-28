@@ -1,7 +1,8 @@
 ﻿using System.Linq;
 using System.Text.Json;
 using Microsoft.CodeAnalysis;
-
+using System;
+using System.Collections.Generic;
 
 namespace AvaloniaDesigner.Generator.Services
 {
@@ -39,10 +40,8 @@ namespace AvaloniaDesigner.Generator.Services
 
             // --- 2. Обработка сложных типов (Thickness, Brush, CornerRadius и т.д.) ---
 
-            // Если входное значение — число или строка (т.е. XAML-подобная строка)
             if (element.ValueKind == JsonValueKind.String || element.ValueKind == JsonValueKind.Number)
             {
-                // Конвертируем JSON-значение в строку для парсинга
                 string stringValue = element.ValueKind switch
                 {
                     JsonValueKind.String => element.GetString() ?? "",
@@ -52,20 +51,17 @@ namespace AvaloniaDesigner.Generator.Services
                 
                 string escapedString = Escape(stringValue);
 
-                // А) Специальная обработка для IBrush/Brush
                 if (IsBrush(targetType))
                 {
                     return $"global::Avalonia.Media.Brush.Parse(\"{escapedString}\")";
                 }
                 
-                // Б) Обнаружение метода Parse с помощью Roslyn для всех остальных сложных типов
                 if (HasStaticParseMethod(targetType))
                 {
                     return $"{targetTypeName}.Parse(\"{escapedString}\")";
                 }
             }
             
-            // Если не смогли преобразовать:
             return FormatLegacy(element);
         }
         
@@ -106,34 +102,24 @@ namespace AvaloniaDesigner.Generator.Services
                    element.ValueKind == JsonValueKind.False ? "false" : element.GetRawText();
         }
 
-        /// <summary>
-        /// Проверяет наличие статического публичного метода Parse(string) на типе.
-        /// </summary>
         private bool HasStaticParseMethod(ITypeSymbol type)
         {
             return type.GetMembers("Parse")
                 .OfType<IMethodSymbol>()
                 .Any(m => 
                     m.IsStatic && 
-                    // ИСПРАВЛЕНО: Используем DeclaredAccessibility для проверки публичности
                     m.DeclaredAccessibility == Accessibility.Public && 
                     m.Parameters.Length == 1 && 
                     m.Parameters[0].Type.SpecialType == SpecialType.System_String
                 );
         }
 
-        /// <summary>
-        /// Проверяет, является ли тип или его интерфейс IBrush/Brush.
-        /// </summary>
         private bool IsBrush(ITypeSymbol type)
         {
             return IsAssignableTo(type, "Avalonia.Media.IBrush") || 
                    IsAssignableTo(type, "Avalonia.Media.Brush");
         }
 
-        /// <summary>
-        /// Проверяет, может ли тип быть назначен указанному интерфейсу/классу по имени.
-        /// </summary>
         private bool IsAssignableTo(ITypeSymbol type, string fullName)
         {
             var targetType = _resolver.ResolveType(fullName);
