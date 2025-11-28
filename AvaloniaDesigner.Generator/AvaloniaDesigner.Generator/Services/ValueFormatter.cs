@@ -1,8 +1,6 @@
 ﻿using System.Linq;
-using System.Text.Json;
 using Microsoft.CodeAnalysis;
-using System;
-using System.Collections.Generic;
+using Newtonsoft.Json.Linq;
 
 namespace AvaloniaDesigner.Generator.Services
 {
@@ -18,50 +16,55 @@ namespace AvaloniaDesigner.Generator.Services
             _resolver = resolver;
         }
 
-        public string Format(JsonElement element, ITypeSymbol? targetType)
+        public string Format(object element, ITypeSymbol? targetType) // ИЗМЕНЕНИЕ: Принимаем object
         {
-            if (targetType is null) return FormatLegacy(element);
+            if (targetType is null || element is null) return FormatLegacy(element);
             
             string targetTypeName = targetType.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat);
             
-            // --- 1. Стандартная обработка примитивов (строки, bool, числа, enum) ---
+            // --- 1. Обработка примитивов (полученных напрямую от Newtonsoft.Json) ---
             
-            if (targetType.SpecialType == SpecialType.System_String)
-                return $"\"{Escape(element.GetString() ?? "")}\"";
-
-            if (targetType.SpecialType == SpecialType.System_Boolean)
-                return GetBoolString(element);
-
-            if (IsNumeric(targetType))
-                return element.GetRawText();
+            if (element is string s)
+            {
+                string escapedString = Escape(s);
+                
+                if (IsBrush(targetType))
+                    return $"global::Avalonia.Media.Brush.Parse(\"{escapedString}\")";
+                if (HasStaticParseMethod(targetType))
+                    return $"{targetTypeName}.Parse(\"{escapedString}\")";
+                
+                return $"\"{escapedString}\"";
+            }
+            
+            if (targetType.SpecialType == SpecialType.System_Boolean && element is bool b)
+                return b ? "true" : "false";
 
             if (targetType.TypeKind == TypeKind.Enum)
                 return FormatEnum(element, targetType);
 
-            // --- 2. Обработка сложных типов (Thickness, Brush, CornerRadius и т.д.) ---
-
-            if (element.ValueKind == JsonValueKind.String || element.ValueKind == JsonValueKind.Number)
+            if (IsNumeric(targetType))
             {
-                string stringValue = element.ValueKind switch
-                {
-                    JsonValueKind.String => element.GetString() ?? "",
-                    JsonValueKind.Number => element.GetRawText(), 
-                    _ => element.ToString() ?? ""
-                };
-                
-                string escapedString = Escape(stringValue);
-
-                if (IsBrush(targetType))
-                {
-                    return $"global::Avalonia.Media.Brush.Parse(\"{escapedString}\")";
-                }
-                
-                if (HasStaticParseMethod(targetType))
-                {
-                    return $"{targetTypeName}.Parse(\"{escapedString}\")";
-                }
+                return element.ToString() ?? "0";
             }
             
+            // --- 2. Обработка JToken (если Newtonsoft.Json не смог десериализовать в примитив) ---
+            if (element is JToken token)
+            {
+                 if (token.Type == JTokenType.String)
+                 {
+                     string tokenString = token.ToString();
+                     string escapedString = Escape(tokenString);
+
+                     if (IsBrush(targetType))
+                         return $"global::Avalonia.Media.Brush.Parse(\"{escapedString}\")";
+                     if (HasStaticParseMethod(targetType))
+                         return $"{targetTypeName}.Parse(\"{escapedString}\")";
+                     
+                     return $"\"{escapedString}\"";
+                 }
+                 return token.ToString();
+            }
+
             return FormatLegacy(element);
         }
         
@@ -71,20 +74,12 @@ namespace AvaloniaDesigner.Generator.Services
         
         private string Escape(string s) => s.Replace("\\", "\\\\").Replace("\"", "\\\"");
 
-        private string GetBoolString(JsonElement el)
+        private string FormatEnum(object el, ITypeSymbol type)
         {
-             if (el.ValueKind == JsonValueKind.True) return "true";
-             if (el.ValueKind == JsonValueKind.False) return "false";
-             if (el.ValueKind == JsonValueKind.String) 
-                 return bool.TryParse(el.GetString(), out var b) && b ? "true" : "false";
-             return "false";
-        }
-
-        private string FormatEnum(JsonElement el, ITypeSymbol type)
-        {
-             if (el.ValueKind == JsonValueKind.String)
-                return $"{type.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat)}.{el.GetString()}";
-             return el.GetRawText();
+             if (el is string s)
+                return $"{type.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat)}.{s}";
+             
+             return el.ToString() ?? "0";
         }
 
         private bool IsNumeric(ITypeSymbol type) 
@@ -95,11 +90,11 @@ namespace AvaloniaDesigner.Generator.Services
                                    SpecialType.System_Single or SpecialType.System_Double or
                                    SpecialType.System_Decimal;
 
-        private string FormatLegacy(JsonElement element)
+        private string FormatLegacy(object? element) //  ИЗМЕНЕНИЕ: Принимаем object
         {
-            if (element.ValueKind == JsonValueKind.String) return $"\"{Escape(element.GetString() ?? "")}\"";
-            return element.ValueKind == JsonValueKind.True ? "true" : 
-                   element.ValueKind == JsonValueKind.False ? "false" : element.GetRawText();
+            if (element is string s) return $"\"{Escape(s)}\"";
+            if (element is bool b) return b ? "true" : "false";
+            return element?.ToString() ?? "null";
         }
 
         private bool HasStaticParseMethod(ITypeSymbol type)

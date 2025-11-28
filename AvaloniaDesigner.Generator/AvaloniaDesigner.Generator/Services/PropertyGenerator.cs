@@ -1,7 +1,6 @@
 ﻿using System.Text;
 using AvaloniaDesigner.Generator.Models;
 using Microsoft.CodeAnalysis;
-using System.Text.Json;
 using System;
 using System.Linq;
 
@@ -48,14 +47,14 @@ namespace AvaloniaDesigner.Generator.Services
                     
                     if (string.IsNullOrEmpty(elementModel.Type)) continue;
                     
-                    // Рекурсивно генерируем сам элемент (this.MyCheckBox)
+                    string elementKey = elementEntry.Key;
+                    
                     string? elementVarName = GenerateNestedControl(
                         sb, 
                         elementModel, 
-                        elementEntry.Key, 
+                        elementKey, 
                         targetTypeSymbol: null); 
                     
-                    // Добавляем созданный элемент в коллекцию 
                     if (!string.IsNullOrEmpty(elementVarName))
                     {
                         sb.AppendLine($"            {collectionName}.Add({elementVarName});");
@@ -84,7 +83,7 @@ namespace AvaloniaDesigner.Generator.Services
             }
             
             // --- 3. ОБРАБОТКА ПРИМИТИВНОГО ЗНАЧЕНИЯ (Width, Height, Name, Attached) ---
-            if (model.Value.HasValue)
+            if (model.Value != null) // 🛑 ИЗМЕНЕНИЕ: Проверка на null
             {
                 string propertyKey = propertyName;
                 
@@ -94,7 +93,7 @@ namespace AvaloniaDesigner.Generator.Services
                         new DiagnosticDescriptor("ADG9913", "Code Gen: Attached Property", $"Handling attached property {propertyKey} for {targetName}.", "Debug", DiagnosticSeverity.Warning, true), 
                         Location.None));
 
-                    HandleAttachedProperty(sb, targetName, propertyKey, model.Value.Value);
+                    HandleAttachedProperty(sb, targetName, propertyKey, model.Value); // 🛑 ИЗМЕНЕНИЕ: Передаем object
                 }
                 else
                 {
@@ -102,7 +101,7 @@ namespace AvaloniaDesigner.Generator.Services
                         new DiagnosticDescriptor("ADG9914", "Code Gen: Primitive Property", $"Setting primitive property {propertyKey} on {targetName}.", "Debug", DiagnosticSeverity.Warning, true), 
                         Location.None));
 
-                    string valueExpr = _formatter.Format(model.Value.Value, valueTypeSymbol);
+                    string valueExpr = _formatter.Format(model.Value, valueTypeSymbol); // 🛑 ИЗМЕНЕНИЕ: Передаем object
                     sb.AppendLine($"            {targetName}.{propertyKey} = {valueExpr};");
                 }
             }
@@ -156,7 +155,7 @@ namespace AvaloniaDesigner.Generator.Services
             return assignedVarName;
         }
         
-        private void HandleAttachedProperty(StringBuilder sb, string targetName, string key, JsonElement value)
+        private void HandleAttachedProperty(StringBuilder sb, string targetName, string key, object value) // 🛑 ИЗМЕНЕНИЕ: object value
         {
             int lastDot = key.LastIndexOf('.');
             string ownerName = key.Substring(0, lastDot);
@@ -168,7 +167,7 @@ namespace AvaloniaDesigner.Generator.Services
             if (ownerType != null && setter != null)
             {
                 var valType = setter.Parameters[1].Type;
-                string valueExpr = _formatter.Format(value, valType);
+                string valueExpr = _formatter.Format(value, valType); 
                 sb.AppendLine($"            global::{ownerName}.{setter.Name}({targetName}, {valueExpr});");
             }
             else
@@ -181,11 +180,11 @@ namespace AvaloniaDesigner.Generator.Services
         
         private string? FindControlName(PropertyModel model)
         {
-            if (model.Properties.TryGetValue("Name", out PropertyModel? nameProp) && nameProp.Value.HasValue)
+            if (model.Properties.TryGetValue("Name", out PropertyModel? nameProp) && nameProp.Value != null)
             {
-                if (nameProp.Value.Value.ValueKind == JsonValueKind.String)
+                if (nameProp.Value is string name)
                 {
-                    return nameProp.Value.Value.GetString();
+                    return name;
                 }
             }
             return null;

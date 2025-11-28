@@ -1,5 +1,4 @@
 ﻿using System.Collections.Generic;
-using System.Text.Json;
 
 namespace AvaloniaDesigner.Generator.Models
 {
@@ -23,14 +22,10 @@ namespace AvaloniaDesigner.Generator.Models
         /// </summary>
         public string Type { get; set; } = ""; 
         
-        // 🛑 УДАЛЕНО: public string Name { get; set; } = "";
-        // Это поле было избыточным, так как имя контрола должно находиться 
-        // в словаре Properties как ключ "Name". Его присутствие могло сбить с толку десериализатор.
-        
         /// <summary>
-        /// Значение свойства, если это примитивный тип или enum.
+        /// Значение свойства (примитив, enum, строка). Используем object для совместимости с Newtonsoft.Json.
         /// </summary>
-        public JsonElement? Value { get; set; } 
+        public object? Value { get; set; } // 🛑 ИЗМЕНЕНИЕ: object вместо JsonElement
         
         /// <summary>
         /// Словарь, содержащий вложенные свойства или элементы коллекции (с ключами "0", "1", ...).
