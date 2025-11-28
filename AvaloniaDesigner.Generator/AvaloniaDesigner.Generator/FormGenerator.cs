@@ -103,7 +103,7 @@ namespace AvaloniaDesigner.Generator
             sb.AppendLine("        public void InitializeComponent()");
             sb.AppendLine("        {");
 
-            // --- 1. Определение режима генерации (Режим A или Режим B) ---
+            // --- 1. Определение режима генерации (Всегда Режим A) ---
             var parentTypeSymbol = ResolveType(compilation, model.ParentClassType);
             var parentContentProperty = parentTypeSymbol is null
                 ? null
@@ -112,36 +112,17 @@ namespace AvaloniaDesigner.Generator
             // Получаем имя свойства [Content] родительской формы для финального присвоения
             string parentContentPropertyName = parentContentProperty?.Name ?? "Content"; 
             
-            // Является ли родительский класс коллекционным контейнером?
-            bool parentIsCollectionContainer = parentContentProperty is not null && IsCollectionType(parentContentProperty.Type, compilation);
-            
-            // Должны ли мы использовать `this` как корневой контейнер (Режим B)?
-            // (Сработает для Canvas, Grid, ListBox, если они совпадают с RootContainer.Type)
-            bool reuseThisAsRoot = model.ParentClassType.Equals(model.RootContainer.Type, StringComparison.Ordinal) && parentIsCollectionContainer;
+            string rootVarName = "root";
+            string targetVarName = rootVarName; // Цель для свойств и дочерних элементов всегда 'root'
 
             
-            string rootVarName = "root";
-            string targetVarName = "this";
-            
-            // 2. Создание или использование корневого контейнера
-            if (reuseThisAsRoot)
-            {
-                // Режим B: Используем `this` как корневой контейнер.
-                rootVarName = "this";
-                targetVarName = "this";
-            }
-            else
-            {
-                // Режим A: Создаем отдельный корневой контейнер.
-                string rootContainerType = model.RootContainer.Type;
-                sb.AppendLine($"            global::{rootContainerType} {rootVarName} = new global::{rootContainerType}();");
-                targetVarName = rootVarName;
-            }
+            // 2. Создание отдельного корневого контейнера (Единственный Режим)
+            string rootContainerType = model.RootContainer.Type;
+            sb.AppendLine($"            global::{rootContainerType} {rootVarName} = new global::{rootContainerType}();");
+
 
             // 3. Присвоение свойств корневого контейнера
-            var rootTypeSymbol = reuseThisAsRoot 
-                ? parentTypeSymbol 
-                : ResolveType(compilation, model.RootContainer.Type);
+            var rootTypeSymbol = ResolveType(compilation, model.RootContainer.Type);
             
             foreach (var prop in model.RootContainer.Properties)
             {
@@ -155,11 +136,11 @@ namespace AvaloniaDesigner.Generator
                     compilation,
                     prop.Key);
 
-                // Применяем свойства либо к 'this', либо к 'root'
+                // Свойства всегда применяются к 'root'
                 sb.AppendLine($"            {targetVarName}.{prop.Key} = {valueExpr};"); 
             }
             
-            // --- 4. Логика добавления дочерних элементов в Target (root или this) ---
+            // --- 4. Логика добавления дочерних элементов в Target (root) ---
             var contentPropertySymbol = rootTypeSymbol is null
                 ? null
                 : FindContentProperty(rootTypeSymbol, compilation);
@@ -256,7 +237,7 @@ namespace AvaloniaDesigner.Generator
                     }
                 }
 
-                // Добавление дочернего контрола в целевой контейнер (root или this)
+                // Добавление дочернего контрола в целевой контейнер (всегда 'root')
                 if (useAddMethodForTarget)
                 {
                     // Для Panel, Grid, Canvas (Children/Items)
@@ -269,31 +250,27 @@ namespace AvaloniaDesigner.Generator
                 }
             }
 
-            // 6. Установка корневого контейнера в форму (только если не Режим B)
-            if (!reuseThisAsRoot)
+            // 6. Установка корневого контейнера в форму 
+            
+            bool parentContentIsCollectionWithoutSetter = false;
+            if (parentContentProperty is not null)
             {
-                // --- НОВАЯ ЛОГИКА: Определение способа добавления 'root' в 'this' ---
-                
-                bool parentContentIsCollectionWithoutSetter = false;
-                if (parentContentProperty is not null)
-                {
-                    bool parentPropertyHasNoSetter = parentContentProperty.SetMethod is null;
-                    bool parentIsCollection = IsCollectionType(parentContentProperty.Type, compilation);
-                    parentContentIsCollectionWithoutSetter = parentPropertyHasNoSetter && parentIsCollection;
-                }
-                
-                // Имя свойства уже определено в Шаге 1: parentContentPropertyName
+                bool parentPropertyHasNoSetter = parentContentProperty.SetMethod is null;
+                bool parentIsCollection = IsCollectionType(parentContentProperty.Type, compilation);
+                parentContentIsCollectionWithoutSetter = parentPropertyHasNoSetter && parentIsCollection;
+            }
+            
+            // Имя свойства уже определено в Шаге 1: parentContentPropertyName
 
-                if (parentContentIsCollectionWithoutSetter)
-                {
-                    // Сработает для ListBox.Items, TabControl.Items, т.к. нет сеттера.
-                    sb.AppendLine($"            this.{parentContentPropertyName}.Add({rootVarName});");
-                }
-                else
-                {
-                    // Сработает для UserControl.Content, Window.Content.
-                    sb.AppendLine($"            this.{parentContentPropertyName} = {rootVarName};");
-                }
+            if (parentContentIsCollectionWithoutSetter)
+            {
+                // Сработает для ListBox.Items, TabControl.Items, т.к. нет сеттера.
+                sb.AppendLine($"            this.{parentContentPropertyName}.Add({rootVarName});");
+            }
+            else
+            {
+                // Сработает для UserControl.Content, Window.Content.
+                sb.AppendLine($"            this.{parentContentPropertyName} = {rootVarName};");
             }
 
             sb.AppendLine("        }");

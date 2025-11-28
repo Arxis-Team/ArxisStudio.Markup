@@ -1,8 +1,6 @@
-﻿using Avalonia.Controls;
+﻿namespace AvaloniaDesigner.Generator.Sample.Forms;
 
-namespace AvaloniaDesigner.Generator.Sample.Forms;
-
-public partial class CanvasLayoutForm : Panel
+public partial class CanvasLayoutForm
 {
     public CanvasLayoutForm()
     {

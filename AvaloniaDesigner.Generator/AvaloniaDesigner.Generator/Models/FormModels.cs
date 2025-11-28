@@ -9,23 +9,22 @@ namespace AvaloniaDesigner.Generator.Models
         public string FormName { get; set; } = "GeneratedForm";
         public string NamespaceSuffix { get; set; } = "Forms";
         
-        // НОВОЕ СВОЙСТВО: Базовый класс для генерируемого partial класса
-        public string ParentClassType { get; set; } = "Avalonia.Controls.UserControl"; 
+        public string ParentClassType { get; set; } = ""; 
         
-        public RootContainerModel RootContainer { get; set; } = new RootContainerModel();
-        public List<ControlModel> Controls { get; set; } = new List<ControlModel>();
+        public RootContainerModel RootContainer { get; set; } = new();
+        public List<ControlModel> Controls { get; set; } = new();
     }
 
     public class RootContainerModel
     {
         public string Type { get; set; } = ""; // Полное имя типа (e.g., Avalonia.Controls.Grid)
-        public Dictionary<string, JsonElement> Properties { get; set; } = new Dictionary<string, JsonElement>();
+        public Dictionary<string, JsonElement> Properties { get; set; } = new();
     }
 
     public class ControlModel
     {
         public string Type { get; set; } = ""; // Полное имя типа (e.g., Avalonia.Controls.Button)
         public string Name { get; set; } = ""; // Имя контрола
-        public Dictionary<string, JsonElement> Properties { get; set; } = new Dictionary<string, JsonElement>();
+        public Dictionary<string, JsonElement> Properties { get; set; } = new();
     }
 }

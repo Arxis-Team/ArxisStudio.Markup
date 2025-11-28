@@ -1,0 +1,66 @@
+﻿{
+  "FormName": "MenuLayoutForm",
+  "NamespaceSuffix": "Forms",
+  "ParentClassType": "Avalonia.Controls.Window",
+  "Properties": {
+    "Width": 800,
+    "Height": 450,
+    "Name": "StackPanel1"
+  },
+  "RootContainer": {
+    "Type": "Avalonia.Controls.StackPanel",
+    "Properties": {
+      "Width": 800,
+      "Height": 450,
+      "Spacing": 5,
+      "Name": "StackPanel1"
+    },
+    "Children": [
+      {
+        "Type": "Avalonia.Controls.Panel",
+        "Properties": {
+          "Name": "Panel1",
+          "Background": "LightGray"
+        },
+        "Children": [
+          {
+            "Type": "Avalonia.Controls.Button",
+            "Properties": {
+              "Name": "Button1",
+              "Background": "Blue",
+              "Content": "SuperButton"
+            }
+          },
+          {
+            "Type": "Avalonia.Controls.ContentControl",
+            "Properties": {
+              "Name": "ContentControl1",
+              "Content": {
+                "Type": "Avalonia.Controls.TextBlock",
+                "Properties": {
+                  "Name": "TextBlock1",
+                  "Text": "Hello World!"
+                }
+              }
+            }
+          },
+          {
+            "Type": "Avalonia.Controls.ListBox",
+            "Properties": {
+              "Name": "ListBox1"
+            },
+            "Items": [
+              {
+                "Type": "Avalonia.Controls.TextBlock",
+                "Properties": {
+                  "Name": "TextBlock2",
+                  "Text": "Hello Text!"
+                }
+              }
+            ]
+          }
+        ]
+      }
+    ]
+  }
+}
