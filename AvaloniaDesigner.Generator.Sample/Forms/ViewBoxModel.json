@@ -1,4 +1,4 @@
-{
+﻿{
   "FormName": "ViewBoxControl",
   "NamespaceSuffix": "Forms",
   "ParentClassType": "Avalonia.Controls.UserControl",
@@ -10,14 +10,14 @@
       "Type": "Avalonia.Controls.Viewbox",
       "Properties": {
         "Name": { "Value": "Scaler" },
-        "Stretch": { "Value": "Uniform" },
 
         "Child": {
           "Type": "Avalonia.Controls.TextBlock",
           "Properties": {
             "Name": { "Value": "ScaleText" },
             "Text": { "Value": "Scale Me!" },
-            "Foreground": { "Value": "Red" }
+            "Foreground": { "Value": "Red" },
+            "HorizontalAlignment": { "Value": "Right" }
           }
         }
       }

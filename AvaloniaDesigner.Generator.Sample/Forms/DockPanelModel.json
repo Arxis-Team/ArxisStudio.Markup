@@ -1,0 +1,132 @@
+{
+  "FormName": "DockPanelControl",
+  "NamespaceSuffix": "Forms",
+  "ParentClassType": "Avalonia.Controls.UserControl",
+  "Properties": {
+    "Width": { "Value": 800 },
+    "Height": { "Value": 600 },
+
+    "Content": {
+      "Type": "Avalonia.Controls.DockPanel",
+      "Properties": {
+        "Name": { "Value": "RootDock" },
+        "LastChildFill": { "Value": true },
+        "Children": {
+          "Properties": {
+            "0": {
+              "Type": "Avalonia.Controls.Border",
+              "Properties": {
+                "Name": { "Value": "TopBorder" },
+                "Background": { "Value": "#FFDDDDDD" },
+                "Height": { "Value": 40 },
+                "Avalonia.Controls.DockPanel.Dock": { "Value": "Top" },
+                "Child": {
+                  "Type": "Avalonia.Controls.TextBlock",
+                  "Properties": {
+                    "Name": { "Value": "HeaderText" },
+                    "Text": { "Value": "Header Area" },
+                    "HorizontalAlignment": { "Value": "Center" },
+                    "VerticalAlignment": { "Value": "Center" },
+                    "Foreground": { "Value": "#FF333333" },
+                    "FontSize": { "Value": 18 }
+                  }
+                }
+              }
+            },
+
+            "1": {
+              "Type": "Avalonia.Controls.Border",
+              "Properties": {
+                "Name": { "Value": "LeftBorder" },
+                "Background": { "Value": "#FFEFEFEF" },
+                "Width": { "Value": 180 },
+                "Avalonia.Controls.DockPanel.Dock": { "Value": "Left" },
+                "Child": {
+                  "Type": "Avalonia.Controls.StackPanel",
+                  "Properties": {
+                    "Name": { "Value": "LeftPanel" },
+                    "Margin": { "Value": "8" },
+                    "Children": {
+                      "Properties": {
+                        "0": {
+                          "Type": "Avalonia.Controls.TextBlock",
+                          "Properties": {
+                            "Name": { "Value": "MenuTitle" },
+                            "Text": { "Value": "Menu" },
+                            "FontWeight": { "Value": "Bold" },
+                            "Margin": { "Value": "0,0,0,8" }
+                          }
+                        },
+                        "1": {
+                          "Type": "Avalonia.Controls.ListBox",
+                          "Properties": {
+                            "Name": { "Value": "SideMenu" },
+                            "MinHeight": { "Value": 200 }
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            },
+
+            "2": {
+              "Type": "Avalonia.Controls.Border",
+              "Properties": {
+                "Name": { "Value": "RightBorder" },
+                "Background": { "Value": "#FFF5F5F5" },
+                "Width": { "Value": 200 },
+                "Avalonia.Controls.DockPanel.Dock": { "Value": "Right" },
+                "Child": {
+                  "Type": "Avalonia.Controls.StackPanel",
+                  "Properties": {
+                    "Name": { "Value": "RightPanel" },
+                    "Margin": { "Value": "8" },
+                    "Children": {
+                      "Properties": {
+                        "0": {
+                          "Type": "Avalonia.Controls.Button",
+                          "Properties": {
+                            "Name": { "Value": "ActionButton1" },
+                            "Content": { "Value": "Action 1" },
+                            "Margin": { "Value": "0,0,0,4" }
+                          }
+                        },
+                        "1": {
+                          "Type": "Avalonia.Controls.Button",
+                          "Properties": {
+                            "Name": { "Value": "ActionButton2" },
+                            "Content": { "Value": "Action 2" },
+                            "Margin": { "Value": "0,4,0,0" }
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            },
+
+            "3": {
+              "Type": "Avalonia.Controls.Border",
+              "Properties": {
+                "Name": { "Value": "ContentBorder" },
+                "Background": { "Value": "#FFFFFFFF" },
+                "Child": {
+                  "Type": "Avalonia.Controls.TextBlock",
+                  "Properties": {
+                    "Name": { "Value": "ContentText" },
+                    "Text": { "Value": "Main content goes here" },
+                    "Margin": { "Value": "16" },
+                    "TextWrapping": { "Value": "Wrap" }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}

@@ -19,6 +19,7 @@
             "Padding": { "Value": "20" },
             "BorderBrush": { "Value": "Yellow" },
             "BorderThickness": { "Value": "5" },
+            "HorizontalAlignment": { "Value": "Right" },
 
             "Child": {
               "Type": "Avalonia.Controls.TextBlock",

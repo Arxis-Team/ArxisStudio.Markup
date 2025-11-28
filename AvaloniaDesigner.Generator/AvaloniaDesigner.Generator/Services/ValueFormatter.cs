@@ -16,73 +16,92 @@ namespace AvaloniaDesigner.Generator.Services
             _resolver = resolver;
         }
 
-        public string Format(object element, ITypeSymbol? targetType) // ИЗМЕНЕНИЕ: Принимаем object
+        public string Format(object element, ITypeSymbol? targetType)
         {
-            if (targetType is null || element is null) return FormatLegacy(element);
-            
+            if (targetType is null || element is null)
+                return FormatLegacy(element);
+
             string targetTypeName = targetType.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat);
-            
-            // --- 1. Обработка примитивов (полученных напрямую от Newtonsoft.Json) ---
-            
+
+            // --- 0. СНАЧАЛА: ENUM ---
+            if (targetType.TypeKind == TypeKind.Enum)
+            {
+                // Enum нужно обрабатывать до любых специальных случаев со строками/Parse
+                return FormatEnum(element, targetType);
+            }
+
+            // --- 1. ОБРАБОТКА ПРИМИТИВОВ (полученных напрямую от Newtonsoft.Json) ---
+
             if (element is string s)
             {
                 string escapedString = Escape(s);
-                
+
                 if (IsBrush(targetType))
                     return $"global::Avalonia.Media.Brush.Parse(\"{escapedString}\")";
+
                 if (HasStaticParseMethod(targetType))
                     return $"{targetTypeName}.Parse(\"{escapedString}\")";
-                
+
                 return $"\"{escapedString}\"";
             }
-            
+
             if (targetType.SpecialType == SpecialType.System_Boolean && element is bool b)
                 return b ? "true" : "false";
-
-            if (targetType.TypeKind == TypeKind.Enum)
-                return FormatEnum(element, targetType);
 
             if (IsNumeric(targetType))
             {
                 return element.ToString() ?? "0";
             }
-            
-            // --- 2. Обработка JToken (если Newtonsoft.Json не смог десериализовать в примитив) ---
+
+            // --- 2. ОБРАБОТКА JToken (если Newtonsoft.Json не десериализовал в примитив) ---
             if (element is JToken token)
             {
-                 if (token.Type == JTokenType.String)
-                 {
-                     string tokenString = token.ToString();
-                     string escapedString = Escape(tokenString);
+                // На всякий случай повторно проверим enum + JToken (если прилетело именно так)
+                if (targetType.TypeKind == TypeKind.Enum)
+                {
+                    if (token.Type == JTokenType.String)
+                        return FormatEnum(token.ToString(), targetType);
 
-                     if (IsBrush(targetType))
-                         return $"global::Avalonia.Media.Brush.Parse(\"{escapedString}\")";
-                     if (HasStaticParseMethod(targetType))
-                         return $"{targetTypeName}.Parse(\"{escapedString}\")";
-                     
-                     return $"\"{escapedString}\"";
-                 }
-                 return token.ToString();
+                    return FormatEnum(token.ToString(), targetType);
+                }
+
+                if (token.Type == JTokenType.String)
+                {
+                    string tokenString = token.ToString();
+                    string escapedString = Escape(tokenString);
+
+                    if (IsBrush(targetType))
+                        return $"global::Avalonia.Media.Brush.Parse(\"{escapedString}\")";
+
+                    if (HasStaticParseMethod(targetType))
+                        return $"{targetTypeName}.Parse(\"{escapedString}\")";
+
+                    return $"\"{escapedString}\"";
+                }
+
+                // Числа/другое — отдадим как есть
+                return token.ToString();
             }
 
+            // --- 3. Фоллбек ---
             return FormatLegacy(element);
         }
-        
+
         // =================================================================
         //                      ВСПОМОГАТЕЛЬНЫЕ МЕТОДЫ
         // =================================================================
-        
+
         private string Escape(string s) => s.Replace("\\", "\\\\").Replace("\"", "\\\"");
 
         private string FormatEnum(object el, ITypeSymbol type)
         {
-             if (el is string s)
+            if (el is string s)
                 return $"{type.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat)}.{s}";
-             
-             return el.ToString() ?? "0";
+
+            return el.ToString() ?? "0";
         }
 
-        private bool IsNumeric(ITypeSymbol type) 
+        private bool IsNumeric(ITypeSymbol type)
             => type.SpecialType is SpecialType.System_SByte or SpecialType.System_Byte or
                                    SpecialType.System_Int16 or SpecialType.System_UInt16 or
                                    SpecialType.System_Int32 or SpecialType.System_UInt32 or
@@ -90,7 +109,7 @@ namespace AvaloniaDesigner.Generator.Services
                                    SpecialType.System_Single or SpecialType.System_Double or
                                    SpecialType.System_Decimal;
 
-        private string FormatLegacy(object? element) //  ИЗМЕНЕНИЕ: Принимаем object
+        private string FormatLegacy(object? element)
         {
             if (element is string s) return $"\"{Escape(s)}\"";
             if (element is bool b) return b ? "true" : "false";
@@ -101,17 +120,17 @@ namespace AvaloniaDesigner.Generator.Services
         {
             return type.GetMembers("Parse")
                 .OfType<IMethodSymbol>()
-                .Any(m => 
-                    m.IsStatic && 
-                    m.DeclaredAccessibility == Accessibility.Public && 
-                    m.Parameters.Length == 1 && 
+                .Any(m =>
+                    m.IsStatic &&
+                    m.DeclaredAccessibility == Accessibility.Public &&
+                    m.Parameters.Length == 1 &&
                     m.Parameters[0].Type.SpecialType == SpecialType.System_String
                 );
         }
 
         private bool IsBrush(ITypeSymbol type)
         {
-            return IsAssignableTo(type, "Avalonia.Media.IBrush") || 
+            return IsAssignableTo(type, "Avalonia.Media.IBrush") ||
                    IsAssignableTo(type, "Avalonia.Media.Brush");
         }
 
@@ -119,8 +138,8 @@ namespace AvaloniaDesigner.Generator.Services
         {
             var targetType = _resolver.ResolveType(fullName);
             if (targetType == null) return false;
-            
-            return SymbolEqualityComparer.Default.Equals(type, targetType) || 
+
+            return SymbolEqualityComparer.Default.Equals(type, targetType) ||
                    type.AllInterfaces.Any(i => SymbolEqualityComparer.Default.Equals(i, targetType));
         }
     }

@@ -16,6 +16,6 @@
         <vm:MainWindowViewModel/>
     </Design.DataContext>
 
-   <forms:MyUserControl />
+   <forms:DockPanelControl />
 
 </Window>
