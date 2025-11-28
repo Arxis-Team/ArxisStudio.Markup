@@ -1,10 +1,9 @@
 ﻿namespace AvaloniaDesigner.Generator.Sample.Forms;
 
-public partial class DockPanelControl
+public partial class SolidColorBrush
 {
-    public DockPanelControl()
+    public SolidColorBrush()
     {
         InitializeComponent();
-        
     }
 }

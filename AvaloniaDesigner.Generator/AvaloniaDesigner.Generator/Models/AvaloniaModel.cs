@@ -1,4 +1,6 @@
 ﻿using System.Collections.Generic;
+using Newtonsoft.Json;
+using Newtonsoft.Json.Linq;
 
 namespace AvaloniaDesigner.Generator.Models
 {
@@ -15,24 +17,31 @@ namespace AvaloniaDesigner.Generator.Models
     /// <summary>
     /// Класс для представления свойства (примитив, вложенный объект или элемент коллекции).
     /// </summary>
+    [JsonConverter(typeof(PropertyModelConverter))]
     public class PropertyModel
     {
         /// <summary>
         /// Полное имя типа, если это вложенный контрол (например, "Avalonia.Controls.Button").
         /// </summary>
-        public string Type { get; set; } = ""; 
-        
+        public string Type { get; set; } = "";
+
         /// <summary>
-        /// Значение свойства (примитив, enum, строка). Используем object для совместимости с Newtonsoft.Json.
+        /// Значение свойства (примитив, enum, строка).
         /// </summary>
-        public object? Value { get; set; } // 🛑 ИЗМЕНЕНИЕ: object вместо JsonElement
-        
+        public object? Value { get; set; }
+
         /// <summary>
-        /// Словарь, содержащий вложенные свойства или элементы коллекции (с ключами "0", "1", ...).
+        /// Словарь, содержащий вложенные свойства (Width, Height, Content, Child, Name, и т.п.).
+        /// В старом формате сюда также попадали элементы коллекций с ключами "0","1",...
         /// </summary>
         public Dictionary<string, PropertyModel> Properties { get; set; } = new();
+
+        /// <summary>
+        /// Элементы коллекции (новый формат: Children: [ {...}, {...} ]).
+        /// </summary>
+        public List<PropertyModel>? Items { get; set; }
     }
-    
+
     /// <summary>
     /// Основная модель, представляющая UserControl/Window.
     /// </summary>
@@ -40,11 +49,11 @@ namespace AvaloniaDesigner.Generator.Models
     {
         public string FormName { get; set; } = "GeneratedView";
         public string NamespaceSuffix { get; set; } = "Views";
-        public string ParentClassType { get; set; } = ""; 
-        
+        public string ParentClassType { get; set; } = "";
+
         /// <summary>
         /// Словарь свойств корневого элемента (Width, Height, Content).
         /// </summary>
-        public Dictionary<string, PropertyModel> Properties { get; set; } = new(); 
+        public Dictionary<string, PropertyModel> Properties { get; set; } = new();
     }
 }

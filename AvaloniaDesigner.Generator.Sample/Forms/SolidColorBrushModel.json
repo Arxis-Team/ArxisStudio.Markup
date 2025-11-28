@@ -1,0 +1,30 @@
+﻿{
+  "FormName": "SolidColorBrush",
+  "NamespaceSuffix": "Forms",
+  "ParentClassType": "Avalonia.Controls.UserControl",
+  "Properties": {
+    "Content": {
+      "Type": "Avalonia.Controls.Border",
+      "Properties": {
+        "Name": { "Value": "NamedBorder" },
+        "BorderThickness": { "Value": "3" },
+        "BorderBrush": { "Value": "Gray" },
+
+        "Background": {
+          "Type": "Avalonia.Media.SolidColorBrush",
+          "Properties": {
+            "Color": { "Value": "LightGreen" },
+            "Opacity": { "Value": "0.5" }
+          }
+        },
+
+        "Child": {
+          "Type": "Avalonia.Controls.TextBlock",
+          "Properties": {
+            "Text": { "Value": "Hello Brush!" }
+          }
+        }
+      }
+    }
+  }
+}

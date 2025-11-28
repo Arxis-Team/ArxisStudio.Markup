@@ -26,7 +26,6 @@ namespace AvaloniaDesigner.Generator.Services
             // --- 0. СНАЧАЛА: ENUM ---
             if (targetType.TypeKind == TypeKind.Enum)
             {
-                // Enum нужно обрабатывать до любых специальных случаев со строками/Parse
                 return FormatEnum(element, targetType);
             }
 
@@ -56,12 +55,8 @@ namespace AvaloniaDesigner.Generator.Services
             // --- 2. ОБРАБОТКА JToken (если Newtonsoft.Json не десериализовал в примитив) ---
             if (element is JToken token)
             {
-                // На всякий случай повторно проверим enum + JToken (если прилетело именно так)
                 if (targetType.TypeKind == TypeKind.Enum)
                 {
-                    if (token.Type == JTokenType.String)
-                        return FormatEnum(token.ToString(), targetType);
-
                     return FormatEnum(token.ToString(), targetType);
                 }
 
@@ -79,7 +74,6 @@ namespace AvaloniaDesigner.Generator.Services
                     return $"\"{escapedString}\"";
                 }
 
-                // Числа/другое — отдадим как есть
                 return token.ToString();
             }
 

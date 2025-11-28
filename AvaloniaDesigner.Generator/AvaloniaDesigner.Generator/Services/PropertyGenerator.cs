@@ -1,8 +1,9 @@
-﻿using System.Text;
+﻿using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Text;
 using AvaloniaDesigner.Generator.Models;
 using Microsoft.CodeAnalysis;
-using System;
-using System.Linq;
 
 namespace AvaloniaDesigner.Generator.Services
 {
@@ -31,7 +32,7 @@ namespace AvaloniaDesigner.Generator.Services
                 : null;
             ITypeSymbol? valueTypeSymbol = targetPropSymbol?.Type;
 
-            // --- 1. ОБРАБОТКА СВОЙСТВ-КОЛЛЕКЦИЙ (Children, Items) ---
+            // --- 1. ОБРАБОТКА СВОЙСТВ-КОЛЛЕКЦИЙ (Children, Items, и т.п.) ---
             if (targetPropSymbol != null && _resolver.IsCollectionType(targetPropSymbol.Type))
             {
                 string collectionName = $"{targetName}.{propertyName}";
@@ -39,15 +40,36 @@ namespace AvaloniaDesigner.Generator.Services
                     new DiagnosticDescriptor("ADG9910", "Code Gen: Collection Block", $"Target {targetName}.{propertyName} recognized as Collection.", "Debug", DiagnosticSeverity.Warning, true), 
                     Location.None));
                 
-                if (model.Properties == null) return null; 
+                // НОВОЕ: поддерживаем два формата:
+                // - новый: model.Items (Children: [ {...}, {...} ])
+                // - старый: model.Properties["0"],"1"... (словарь)
+                IEnumerable<PropertyModel> elements;
 
-                foreach (var elementEntry in model.Properties.OrderBy(e => e.Key))
+                if (model.Items != null && model.Items.Count > 0)
                 {
-                    var elementModel = elementEntry.Value;
+                    elements = model.Items;
+                }
+                else if (model.Properties != null && model.Properties.Any())
+                {
+                    elements = model.Properties
+                        .OrderBy(e => e.Key)
+                        .Select(e => e.Value);
+                }
+                else
+                {
+                    return null;
+                }
+
+                int index = 0;
+                foreach (var elementModel in elements)
+                {
+                    if (string.IsNullOrEmpty(elementModel.Type))
+                    {
+                        index++;
+                        continue;
+                    }
                     
-                    if (string.IsNullOrEmpty(elementModel.Type)) continue;
-                    
-                    string elementKey = elementEntry.Key;
+                    string elementKey = $"{propertyName}_{index}";
                     
                     string? elementVarName = GenerateNestedControl(
                         sb, 
@@ -62,7 +84,10 @@ namespace AvaloniaDesigner.Generator.Services
                             new DiagnosticDescriptor("ADG9911", "Code Gen: Collection Add", $"Added {elementVarName} to {collectionName}.", "Debug", DiagnosticSeverity.Warning, true), 
                             Location.None));
                     }
+
+                    index++;
                 }
+
                 return null;
             }
             
@@ -83,7 +108,7 @@ namespace AvaloniaDesigner.Generator.Services
             }
             
             // --- 3. ОБРАБОТКА ПРИМИТИВНОГО ЗНАЧЕНИЯ (Width, Height, Name, Attached) ---
-            if (model.Value != null) // 🛑 ИЗМЕНЕНИЕ: Проверка на null
+            if (model.Value != null)
             {
                 string propertyKey = propertyName;
                 
@@ -93,7 +118,7 @@ namespace AvaloniaDesigner.Generator.Services
                         new DiagnosticDescriptor("ADG9913", "Code Gen: Attached Property", $"Handling attached property {propertyKey} for {targetName}.", "Debug", DiagnosticSeverity.Warning, true), 
                         Location.None));
 
-                    HandleAttachedProperty(sb, targetName, propertyKey, model.Value); // 🛑 ИЗМЕНЕНИЕ: Передаем object
+                    HandleAttachedProperty(sb, targetName, propertyKey, model.Value);
                 }
                 else
                 {
@@ -101,7 +126,7 @@ namespace AvaloniaDesigner.Generator.Services
                         new DiagnosticDescriptor("ADG9914", "Code Gen: Primitive Property", $"Setting primitive property {propertyKey} on {targetName}.", "Debug", DiagnosticSeverity.Warning, true), 
                         Location.None));
 
-                    string valueExpr = _formatter.Format(model.Value, valueTypeSymbol); // 🛑 ИЗМЕНЕНИЕ: Передаем object
+                    string valueExpr = _formatter.Format(model.Value, valueTypeSymbol);
                     sb.AppendLine($"            {targetName}.{propertyKey} = {valueExpr};");
                 }
             }
@@ -155,7 +180,7 @@ namespace AvaloniaDesigner.Generator.Services
             return assignedVarName;
         }
         
-        private void HandleAttachedProperty(StringBuilder sb, string targetName, string key, object value) // 🛑 ИЗМЕНЕНИЕ: object value
+        private void HandleAttachedProperty(StringBuilder sb, string targetName, string key, object value)
         {
             int lastDot = key.LastIndexOf('.');
             string ownerName = key.Substring(0, lastDot);

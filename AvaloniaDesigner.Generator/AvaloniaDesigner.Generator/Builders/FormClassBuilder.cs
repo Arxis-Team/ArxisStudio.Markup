@@ -94,7 +94,7 @@ namespace AvaloniaDesigner.Generator.Builders
                     ? _resolver.FindProperty(parentType, propertyName) 
                     : null;
 
-                // 1. Обработка обычного свойства, содержащего контрол (Content, Child)
+                // 1. Обработка обычного свойства, содержащего контрол (Content, Child и т.п.)
                 if (!string.IsNullOrEmpty(prop.Type))
                 {
                     string? controlName = FindControlName(prop);
@@ -115,45 +115,46 @@ namespace AvaloniaDesigner.Generator.Builders
                     CollectFieldsFromProperties(prop.Properties, childType, controls);
                 }
                 
-                // 2. Обработка свойства-коллекции (Children, Items)
+                // 2. Обработка свойства-коллекции (Children, Items, и т.п.)
                 else if (targetPropSymbol != null && _resolver.IsCollectionType(targetPropSymbol.Type))
                 {
                     _context.ReportDiagnostic(Diagnostic.Create(
                         new DiagnosticDescriptor("ADG9902", "Collection Found", $"Processing collection: {propertyName} on type {parentType?.Name}", "Debug", DiagnosticSeverity.Warning, true), 
                         Location.None));
 
-                    // 🛑 ИСПРАВЛЕНИЕ: Разбиваем ADG9906/ADG9907 для точной диагностики
-                    if (prop.Properties == null) 
+                    // НОВОЕ: поддерживаем два формата:
+                    // - новый: prop.Items (Children: [ {...}, {...} ])
+                    // - старый: prop.Properties["0"],"1"... (словарь)
+                    IEnumerable<PropertyModel> elements;
+
+                    if (prop.Items != null && prop.Items.Count > 0)
                     {
-                         _context.ReportDiagnostic(Diagnostic.Create(
-                            new DiagnosticDescriptor("ADG9906", "Collection Null", 
-                            $"Collection {propertyName} on type {parentType?.Name} is null after parsing.", 
-                            "Debug", DiagnosticSeverity.Warning, true), 
-                            Location.None));
-                        continue; 
+                        elements = prop.Items;
                     }
-                    
-                    if (!prop.Properties.Any()) 
+                    else if (prop.Properties != null && prop.Properties.Any())
+                    {
+                        elements = prop.Properties
+                            .OrderBy(e => e.Key)
+                            .Select(e => e.Value);
+                    }
+                    else
                     {
                         _context.ReportDiagnostic(Diagnostic.Create(
                             new DiagnosticDescriptor("ADG9907", "Collection Empty Check", 
-                            $"Collection {propertyName} on type {parentType?.Name} is empty (Count=0).", 
+                            $"Collection {propertyName} on type {parentType?.Name} has no elements.", 
                             "Debug", DiagnosticSeverity.Warning, true), 
                             Location.None));
-                        continue; 
+                        continue;
                     }
                     
-                    foreach (var collectionElementEntry in prop.Properties.OrderBy(e => e.Key))
+                    foreach (var elementModel in elements)
                     {
-                        var elementModel = collectionElementEntry.Value;
-                        
                         if (!string.IsNullOrEmpty(elementModel.Type))
                         {
                             string? controlName = FindControlName(elementModel);
                             
-                            // Трассировка для проверки, что цикл выполнился и видит элемент
                             _context.ReportDiagnostic(Diagnostic.Create(
-                                new DiagnosticDescriptor("ADG9904", "Find Name Check", $"Check for element {collectionElementEntry.Key}: FindControlName returned '{controlName}'", "Debug", DiagnosticSeverity.Warning, true), 
+                                new DiagnosticDescriptor("ADG9904", "Find Name Check", $"Check for element in collection {propertyName}: FindControlName returned '{controlName}'", "Debug", DiagnosticSeverity.Warning, true), 
                                 Location.None));
                                 
                             if (!string.IsNullOrEmpty(controlName))
@@ -164,7 +165,7 @@ namespace AvaloniaDesigner.Generator.Builders
                                     Name = controlName 
                                 });
                                 _context.ReportDiagnostic(Diagnostic.Create(
-                                    new DiagnosticDescriptor("ADG9903", "Collection Item Field Found", $"Found field in collection: {controlName} ({elementModel.Type})", "Debug", DiagnosticSeverity.Warning, true), 
+                                    new DiagnosticDescriptor("ADG9903", "Collection Item Field Found", $"Found field in collection {propertyName}: {controlName} ({elementModel.Type})", "Debug", DiagnosticSeverity.Warning, true), 
                                     Location.None));
                             }
                             
@@ -180,7 +181,7 @@ namespace AvaloniaDesigner.Generator.Builders
         {
             if (model.Properties.TryGetValue("Name", out PropertyModel? nameProp) && nameProp.Value != null)
             {
-                if (nameProp.Value is string name) // Проверяем, что Value десериализовано как string
+                if (nameProp.Value is string name)
                 {
                     _context.ReportDiagnostic(Diagnostic.Create(
                         new DiagnosticDescriptor("ADG9905", "Name Found Value", $"Found Name='{name}' in properties.", "Debug", DiagnosticSeverity.Warning, true), 
