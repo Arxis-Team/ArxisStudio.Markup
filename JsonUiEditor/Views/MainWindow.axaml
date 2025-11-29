@@ -29,8 +29,7 @@
 
             <Border Grid.Column="2" 
                     BorderBrush="Gray" 
-                    BorderThickness="1" 
-                    Background="White">
+                    BorderThickness="1">
                 <ContentControl Content="{Binding RenderedContent}" 
                                 HorizontalContentAlignment="Stretch"
                                 VerticalContentAlignment="Stretch"/>
@@ -39,8 +38,7 @@
 
         <Border Grid.Row="1" 
                 BorderBrush="Red" 
-                BorderThickness="0,2,0,0" 
-                Background="#FFF0F0">
+                BorderThickness="0,2,0,0" >
             <TextBox Text="{Binding ErrorMessage}"
                      IsReadOnly="True"
                      Foreground="Red"

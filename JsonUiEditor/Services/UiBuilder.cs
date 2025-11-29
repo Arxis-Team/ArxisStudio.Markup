@@ -36,16 +36,37 @@ namespace JsonUiEditor.Services
 
         private static void ApplyProperty(Control control, string propName, object value)
         {
+            object? convertedValue = null; 
+            
             try
             {
-                // 1. УНИВЕРСАЛЬНАЯ ОБРАБОТКА КОЛЛЕКЦИЙ (Children, Items, RowDefinitions)
+                // 1. ПОИСК И УСТАНОВКА ATTACHED СВОЙСТВ (используя статический метод Set*)
+                if (propName.Contains("."))
+                {
+                    var setMethod = FindAttachedPropertySetMethod(propName);
+                    if (setMethod != null)
+                    {
+                         // Тип для конвертации берется из второго параметра метода Set* (SetTop(Control, double value))
+                         Type targetType = setMethod.GetParameters()[1].ParameterType; 
+                         convertedValue = ConvertPrimitive(value, targetType); 
+                         
+                         if (convertedValue != null)
+                         {
+                             // Вызываем Canvas.SetTop(control, convertedValue)
+                             setMethod.Invoke(null, new object[] { control, convertedValue });
+                             return; 
+                         }
+                    }
+                }
+                
+                // 2. ОБРАБОТКА КОЛЛЕКЦИЙ
                 if (value is JArray jArray)
                 {
                     ApplyCollectionProperty(control, propName, jArray);
                     return; 
                 }
                 
-                // 2. ОБРАБОТКА СЛОЖНЫХ ОБЪЕКТОВ И ВЛОЖЕННЫХ КОНТРОЛОВ (JObject)
+                // 3. ОБРАБОТКА СЛОЖНЫХ ОБЪЕКТОВ И ВЛОЖЕННЫХ КОНТРОЛОВ (JObject)
                 if (value is JObject jObject)
                 {
                     var nestedModel = jObject.ToObject<ControlModel>();
@@ -58,23 +79,24 @@ namespace JsonUiEditor.Services
                     return;
                 }
                 
-                // 3. ОБРАБОТКА ПРИМИТИВНЫХ СВОЙСТВ (Text, Width, BorderThickness)
+                // 4. ОБРАБОТКА СТАНДАРТНЫХ СВОЙСТВ 
                 
                 var avaloniaProp = AvaloniaPropertyRegistry.Instance.FindRegistered(control, propName);
                 
-                Type targetType;
+                Type avaloniaPropPropertyType;
                 if (avaloniaProp != null)
                 {
-                    targetType = avaloniaProp.PropertyType;
+                    avaloniaPropPropertyType = avaloniaProp.PropertyType;
                 }
                 else
                 {
                     var propInfo = control.GetType().GetProperty(propName);
                     if (propInfo == null || !propInfo.CanWrite) return;
-                    targetType = propInfo.PropertyType;
+                    avaloniaPropPropertyType = propInfo.PropertyType;
                 }
                 
-                object? convertedValue = ConvertPrimitive(value, targetType);
+                convertedValue = ConvertPrimitive(value, avaloniaPropPropertyType); 
+                
                 if (convertedValue != null)
                 {
                     if (avaloniaProp != null)
@@ -88,35 +110,64 @@ namespace JsonUiEditor.Services
                 // Логгирование
             }
         }
-        
+
         /// <summary>
-        /// Универсально находит свойство-коллекцию и добавляет в него элементы из JArray.
+        /// Ищет статический метод Set* для Attached Property (например, Canvas.SetLeft).
+        /// Требуется полное имя владельца.
         /// </summary>
-        private static void ApplyCollectionProperty(Control control, string propName, JArray jArray)
+        private static MethodInfo? FindAttachedPropertySetMethod(string propName)
         {
-            // 1. Найти свойство-коллекцию по имени (например, ListBox.Items или Grid.RowDefinitions)
-            var collectionProp = control.GetType().GetProperty(propName);
+            int lastDotIndex = propName.LastIndexOf('.');
+            if (lastDotIndex == -1) return null;
+
+            string ownerTypeNameFull = propName.Substring(0, lastDotIndex);
+            string propertyName = propName.Substring(lastDotIndex + 1);
+            string setMethodName = "Set" + propertyName; // SetLeft
+
+            // 1. Ищем класс-владелец (например, Avalonia.Controls.Canvas)
+            Type? ownerType = FindType(ownerTypeNameFull); 
+            
+            if (ownerType == null) return null;
+
+            // 2. Ищем статический метод Set* с сигнатурой (Control, TValue)
+            var setMethod = ownerType.GetMethod(
+                setMethodName, 
+                BindingFlags.Public | BindingFlags.Static,
+                null, 
+                new Type[] { typeof(AvaloniaObject), typeof(object) }, // Ищем метод с двумя параметрами
+                null
+            );
+
+            // Так как мы не знаем точный тип TValue (double, int, bool), 
+            // ищем по имени и статичности, а затем проверяем параметры.
+            var candidateMethods = ownerType.GetMethods(BindingFlags.Public | BindingFlags.Static)
+                .Where(m => m.Name == setMethodName)
+                .Where(m => m.GetParameters().Length == 2)
+                .Where(m => typeof(AvaloniaObject).IsAssignableFrom(m.GetParameters()[0].ParameterType))
+                .FirstOrDefault();
+
+            return candidateMethods;
+        }
+
+        // --- (Остальные методы ApplyCollectionProperty, CreateComplexObject, SetComplexProperty, ConvertPrimitive и FindType остаются без изменений) ---
+
+        private static void ApplyCollectionProperty(object parentObject, string propName, JArray jArray)
+        {
+            var collectionProp = parentObject.GetType().GetProperty(propName);
             if (collectionProp == null) return;
 
-            // 2. Получить экземпляр коллекции
-            var collection = collectionProp.GetValue(control);
+            var collection = collectionProp.GetValue(parentObject);
             if (collection == null) return;
 
-            // 3. Найти метод Add() в коллекции через Reflection
             var addMethod = collection.GetType().GetMethod("Add");
             if (addMethod == null) return;
             
-            // Определяем, что за элемент ждет коллекция (ControlModel или примитив)
-            var collectionType = addMethod.GetParameters().FirstOrDefault()?.ParameterType;
-
-            // 4. Построить и добавить каждый элемент
             foreach (var jToken in jArray)
             {
                 object? builtItem = null;
                 
                 if (jToken is JObject)
                 {
-                    // Если элемент — сложный объект (Control, GradientStop и т.д.)
                     var childModel = jToken.ToObject<ControlModel>();
                     if (childModel != null)
                     {
@@ -125,13 +176,12 @@ namespace JsonUiEditor.Services
                 }
                 else
                 {
-                    // Если элемент — примитив (например, ItemsSource = ["a", "b"])
-                    builtItem = ConvertPrimitive(jToken.Value<object>()!, collectionType ?? typeof(object));
+                    var collectionType = addMethod.GetParameters().FirstOrDefault()?.ParameterType ?? typeof(object);
+                    builtItem = ConvertPrimitive(jToken.Value<object>()!, collectionType);
                 }
 
                 if (builtItem != null)
                 {
-                    // Вызвать collection.Add(builtItem)
                     addMethod.Invoke(collection, new[] { builtItem });
                 }
             }
@@ -139,24 +189,27 @@ namespace JsonUiEditor.Services
 
         private static object? CreateComplexObject(ControlModel model)
         {
-            // Если это контрол, вызываем главную функцию рекурсивно
             if (typeof(Control).IsAssignableFrom(FindType(model.Type)))
             {
                 return Build(model);
             }
 
-            // Если это сложный тип (Brush, Thickness, GradientStop)
             var complexType = FindType(model.Type);
             if (complexType == null) return null;
             
             var complexObject = Activator.CreateInstance(complexType);
             if (complexObject == null) return null;
             
-            // Устанавливаем свойства ComplexObject (Color, Opacity, StartPoint)
             if (model.Properties != null)
             {
                 foreach(var nestedProp in model.Properties)
                 {
+                    if (nestedProp.Value is JArray jArray)
+                    {
+                        ApplyCollectionProperty(complexObject, nestedProp.Key, jArray);
+                        continue;
+                    }
+                    
                     var objPropInfo = complexObject.GetType().GetProperty(nestedProp.Key);
                     if (objPropInfo != null && objPropInfo.CanWrite)
                     {
@@ -210,19 +263,41 @@ namespace JsonUiEditor.Services
         {
             if (_typeCache.TryGetValue(typeName, out var type)) return type;
 
-            string normalizedName = typeName;
-            if (!normalizedName.Contains("."))
-                normalizedName = "Avalonia.Controls." + typeName;
+            Type? typeFound = null;
 
+            // 1. Сначала пытаемся найти тип по его EXACT имени (для полных имен, типа Avalonia.Controls.Canvas)
             foreach (var asm in AppDomain.CurrentDomain.GetAssemblies())
             {
-                var typeFound = asm.GetType(normalizedName);
+                typeFound = asm.GetType(typeName);
                 if (typeFound != null)
                 {
                     _typeCache[typeName] = typeFound;
                     return typeFound;
                 }
             }
+
+            // 2. Если не найдено, пробуем добавить общие префиксы Avalonia (для коротких имен)
+            string[] commonPrefixes = 
+            {
+                "Avalonia.Controls.",
+                "Avalonia.Controls.Shapes.",
+                "Avalonia.Media."
+            };
+
+            foreach (var prefix in commonPrefixes)
+            {
+                string prefixedName = prefix + typeName;
+                foreach (var asm in AppDomain.CurrentDomain.GetAssemblies())
+                {
+                    typeFound = asm.GetType(prefixedName);
+                    if (typeFound != null)
+                    {
+                        _typeCache[typeName] = typeFound;
+                        return typeFound;
+                    }
+                }
+            }
+            
             return null;
         }
     }

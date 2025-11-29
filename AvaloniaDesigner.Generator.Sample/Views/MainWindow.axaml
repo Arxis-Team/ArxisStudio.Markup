@@ -16,6 +16,6 @@
         <vm:MainWindowViewModel/>
     </Design.DataContext>
 
-   <forms:SettingsPanel />
+   <forms:GradientCardControl />
 
 </Window>
