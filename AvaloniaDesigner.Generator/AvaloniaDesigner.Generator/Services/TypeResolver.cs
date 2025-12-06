@@ -103,7 +103,6 @@ namespace AvaloniaDesigner.Generator.Services
             if (type is INamedTypeSymbol namedType)
             {
                 if (SymbolEqualityComparer.Default.Equals(namedType.ConstructedFrom, interfaceSymbol)) return true;
-                
                 return namedType.AllInterfaces.Any(i => 
                     SymbolEqualityComparer.Default.Equals(i.ConstructedFrom, interfaceSymbol) ||
                     (i.IsGenericType && SymbolEqualityComparer.Default.Equals(i.ConstructedFrom, interfaceSymbol)));

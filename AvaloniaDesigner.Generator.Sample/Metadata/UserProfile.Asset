@@ -1,6 +1,12 @@
 ﻿{
   "AssetType": "UserControl",
   "Properties": {
+    "Avalonia.Controls.Design.Width": 800,
+    "Avalonia.Controls.Design.Height": 600,
+    "DataContext": {
+      "Type": "AvaloniaDesigner.Generator.Sample.ViewModels.UserProfileViewModel"
+    },
+
     "Content": {
       "Type": "Avalonia.Controls.Grid",
       "Properties": {

@@ -1,6 +1,7 @@
 ﻿using System.CodeDom.Compiler;
 using System.Collections.Generic;
 using System.IO;
+using System.Linq;
 using AvaloniaDesigner.Generator.Models;
 using AvaloniaDesigner.Generator.Services;
 using AvaloniaDesigner.Generator.Utility;
@@ -72,7 +73,7 @@ namespace AvaloniaDesigner.Generator.Builders
 
             if (parentType == null)
             {
-                 // Warning, если базовый класс не найден (может быть кастомным и не скомпилированным)
+                 // Warning: базовый класс не найден
                  return; 
             }
 

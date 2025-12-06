@@ -5,7 +5,6 @@ using Newtonsoft.Json.Linq;
 
 namespace AvaloniaDesigner.Generator.Models
 {
-    // Тип ассета для будущих расширений
     public enum AssetType
     {
         UserControl,
@@ -14,6 +13,14 @@ namespace AvaloniaDesigner.Generator.Models
         ResourceDictionary,
         CustomControl,
         Unknown
+    }
+
+    public class RelativeSourceModel
+    {
+        public string Mode { get; set; } = "FindAncestor"; 
+        public string? AncestorType { get; set; } 
+        public int? AncestorLevel { get; set; }
+        public string? Tree { get; set; } 
     }
 
     public record ControlInfo(string Type, string Name);
@@ -33,6 +40,7 @@ namespace AvaloniaDesigner.Generator.Models
         public object? BindingFallbackValue { get; set; }
         public object? BindingTargetNullValue { get; set; }
         public object? BindingConverterParameter { get; set; }
+        public RelativeSourceModel? BindingRelativeSource { get; set; }
         
         // --- Ресурсы и Ассеты ---
         public string? ResourceKey { get; set; }
@@ -60,9 +68,7 @@ namespace AvaloniaDesigner.Generator.Models
 
     public class AvaloniaModel : IEquatable<AvaloniaModel>
     {
-        // Метаданные теперь берутся из C#, здесь только тип
         public AssetType AssetType { get; set; } = AssetType.UserControl;
-        
         public Dictionary<string, PropertyModel> Properties { get; set; } = new();
 
         public bool Equals(AvaloniaModel? other)
@@ -111,6 +117,9 @@ namespace AvaloniaDesigner.Generator.Models
                     if (obj.TryGetValue("FallbackValue", out var fb)) result.BindingFallbackValue = fb.ToObject<object>();
                     if (obj.TryGetValue("TargetNullValue", out var tn)) result.BindingTargetNullValue = tn.ToObject<object>();
                     if (obj.TryGetValue("ConverterParameter", out var cp)) result.BindingConverterParameter = cp.ToObject<object>();
+
+                    if (obj.TryGetValue("RelativeSource", out var rsToken) && rsToken.Type == JTokenType.Object)
+                        result.BindingRelativeSource = rsToken.ToObject<RelativeSourceModel>(serializer);
 
                     return result;
                 }

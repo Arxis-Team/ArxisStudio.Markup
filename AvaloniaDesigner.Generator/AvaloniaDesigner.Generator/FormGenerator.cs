@@ -71,7 +71,6 @@ namespace AvaloniaDesigner.Generator
                 }
                 if (input.Asset is null) continue;
 
-                // Поиск парного C# файла (Имя.cs или Имя.asset.cs)
                 string baseName = Path.GetFileNameWithoutExtension(input.FileName);
                 string targetCs = $"{baseName}.cs";
                 string targetAssetCs = $"{baseName}.asset.cs";

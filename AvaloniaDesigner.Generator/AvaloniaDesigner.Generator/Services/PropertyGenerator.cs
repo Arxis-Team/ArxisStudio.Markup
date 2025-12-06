@@ -48,7 +48,6 @@ namespace AvaloniaDesigner.Generator.Services
                 return;
             }
 
-            // 2. Поиск свойства
             IPropertySymbol? targetPropSymbol = _resolver.FindProperty(targetTypeSymbol, propertyName);
             
             if (targetPropSymbol == null)
@@ -83,6 +82,25 @@ namespace AvaloniaDesigner.Generator.Services
                     if (model.BindingTargetNullValue != null)
                         initializers.Add($"TargetNullValue = {_formatter.Format(model.BindingTargetNullValue, targetPropSymbol?.Type)}");
 
+                    if (model.BindingRelativeSource != null)
+                    {
+                        var rs = model.BindingRelativeSource;
+                        string rsCode = $"new global::Avalonia.Data.RelativeSource(global::Avalonia.Data.RelativeSourceMode.{rs.Mode})";
+                        var rsProps = new List<string>();
+                        if (!string.IsNullOrEmpty(rs.AncestorType))
+                        {
+                            var ancType = _resolver.ResolveType(rs.AncestorType!);
+                            string typeString = ancType != null 
+                                ? ancType.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat)
+                                : $"global::{rs.AncestorType}"; 
+                            rsProps.Add($"AncestorType = typeof({typeString})");
+                        }
+                        if (rs.AncestorLevel.HasValue) rsProps.Add($"AncestorLevel = {rs.AncestorLevel}");
+                        if (!string.IsNullOrEmpty(rs.Tree)) rsProps.Add($"Tree = global::Avalonia.VisualTree.TreeType.{rs.Tree}");
+                        if (rsProps.Count > 0) rsCode += " { " + string.Join(", ", rsProps) + " }";
+                        initializers.Add($"RelativeSource = {rsCode}");
+                    }
+
                     if (initializers.Count > 0) bindingCode += " { " + string.Join(", ", initializers) + " }";
 
                     writer.WriteLine($"{targetName}.Bind({propField}, {bindingCode});");
@@ -97,7 +115,6 @@ namespace AvaloniaDesigner.Generator.Services
                 if (avaloniaProp != null)
                 {
                     string propField = $"{targetTypeSymbol.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat)}.{avaloniaProp.Name}";
-                    // Используем this.GetResourceObservable без приведения (работает, т.к. UserControl : IResourceHost)
                     writer.WriteLine($"{targetName}.Bind({propField}, this.GetResourceObservable(\"{model.ResourceKey}\"));");
                 }
                 else if (targetPropSymbol != null)
@@ -171,7 +188,6 @@ namespace AvaloniaDesigner.Generator.Services
                 }
                 else
                 {
-                    // Обработка Classes (ReadOnly collection + Parse)
                     bool handled = false;
                     if (targetPropSymbol != null && targetPropSymbol.SetMethod == null)
                     {
@@ -253,7 +269,14 @@ namespace AvaloniaDesigner.Generator.Services
             {
                 var valType = setter.Parameters[1].Type;
                 string valueExpr = _formatter.Format(value, valType);
+
+                // Design-Time оптимизация
+                bool isDesignTime = ownerType.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat) == "global::Avalonia.Controls.Design";
+                if (isDesignTime) writer.WriteLine("#if DEBUG");
+
                 writer.WriteLine($"global::{ownerName}.{setter.Name}({targetName}, {valueExpr});");
+
+                if (isDesignTime) writer.WriteLine("#endif");
             }
             else
             {
