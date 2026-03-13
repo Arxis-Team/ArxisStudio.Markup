@@ -1,0 +1,133 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:vm="using:ArxisStudio.Markup.Json.Loader.ViewModels"
+        xmlns:m="using:ArxisStudio.Markup.Json.Loader.Models"
+        xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+        xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+        xmlns:j="using:Newtonsoft.Json.Linq"
+        mc:Ignorable="d" d:DesignWidth="1400" d:DesignHeight="800"
+        x:Class="ArxisStudio.Markup.Json.Loader.Views.MainWindow"
+        x:DataType="vm:MainWindowViewModel"
+        Icon="/Assets/avalonia-logo.ico"
+        Title="JSON UI Designer"
+        MinHeight="600" MinWidth="1000">
+
+    <Design.DataContext>
+        <vm:MainWindowViewModel/>
+    </Design.DataContext>
+
+    <Grid RowDefinitions="*, 80" Margin="5">
+        
+        <Grid Grid.Row="0" ColumnDefinitions="200, 5, 250, 5, 4*, 5, 250">
+            
+            <StackPanel Grid.Column="0" Orientation="Vertical">
+                <TextBlock Text="Toolbox" Margin="5,0,0,5" FontWeight="Bold"/>
+                <Border BorderBrush="#1E90FF" BorderThickness="1" Padding="5" Height="300">
+                    <ListBox ItemsSource="{Binding AvailableControls}"
+                             SelectionMode="Single"
+                             SelectionChanged="ToolboxListBox_SelectionChanged">
+                        <ListBox.ItemTemplate>
+                            <DataTemplate x:DataType="j:JObject">
+                                <TextBlock Text="{Binding [TypeName]}" 
+                                           ToolTip.Tip="Select to add to the chosen container"/>
+                            </DataTemplate>
+                        </ListBox.ItemTemplate>
+                    </ListBox>
+                </Border>
+
+                <TextBlock Text="Control Tree" Margin="5,10,0,5" FontWeight="Bold"/>
+                <Border BorderBrush="LightGray" BorderThickness="1" Padding="2" VerticalAlignment="Stretch"> 
+                    <TreeView ItemsSource="{Binding ControlTreeRoot.Children}" 
+                              SelectedItem="{Binding SelectedNode, Mode=TwoWay}">
+                        <TreeView.DataTemplates>
+                            <TreeDataTemplate x:DataType="m:ControlNode" 
+                                              ItemsSource="{Binding Children}">
+                                <StackPanel Orientation="Horizontal">
+                                    <TextBlock Text="{Binding DisplayName}" Margin="3,0"/>
+                                </StackPanel>
+                            </TreeDataTemplate>
+                        </TreeView.DataTemplates>
+                    </TreeView>
+                </Border>
+            </StackPanel>
+
+            <GridSplitter Grid.Column="1" Background="Gray" ResizeDirection="Columns"/>
+
+            <Grid Grid.Column="2" RowDefinitions="Auto, *, Auto">
+                <TextBlock Grid.Row="0" Text="JSON Model (Source)" Margin="5,0,0,5" FontWeight="Bold"/>
+                <TextBox Grid.Row="1"
+                         Text="{Binding JsonText}"
+                         AcceptsReturn="True"
+                         AcceptsTab="True"
+                         FontFamily="Consolas, Monospace"
+                         FontSize="12"
+                         VerticalAlignment="Stretch"/> <Button Grid.Row="2" Content="Delete Selected" 
+                        Command="{Binding DeleteSelectedControlCommand}" 
+                        Margin="0,5,0,0"
+                        HorizontalAlignment="Stretch"/>
+            </Grid>
+            
+            <GridSplitter Grid.Column="3" Background="Gray" ResizeDirection="Columns"/>
+
+            <Grid Grid.Column="4" RowDefinitions="Auto, *">
+                <TextBlock Grid.Row="0" Text="Rendered UI (Preview)" Margin="5,0,0,5" FontWeight="Bold"/>
+                <Border Grid.Row="1" BorderBrush="#1E90FF" 
+                        BorderThickness="3" 
+                        Padding="10" 
+                        Background="#F5F5F5"
+                        VerticalAlignment="Stretch"
+                        HorizontalAlignment="Stretch"
+                        ClipToBounds="True">
+                    <ContentControl Content="{Binding RenderedContent}" 
+                                    HorizontalContentAlignment="Stretch"
+                                    VerticalContentAlignment="Stretch"/>
+                </Border>
+            </Grid>
+            
+            <GridSplitter Grid.Column="5" Background="Gray" ResizeDirection="Columns"/>
+
+            <Grid Grid.Column="6" RowDefinitions="Auto, *">
+                <TextBlock Grid.Row="0" Text="Properties" Margin="5,0,0,5" FontWeight="Bold"/>
+                <Border Grid.Row="1" BorderBrush="LightGray" BorderThickness="1" Padding="5">
+                    <ScrollViewer VerticalScrollBarVisibility="Auto" VerticalAlignment="Stretch">
+                        <ItemsControl ItemsSource="{Binding EditableProperties}">
+                            <ItemsControl.ItemTemplate>
+                                <DataTemplate x:DataType="m:PropertyItem">
+                                    <Grid ColumnDefinitions="120, *" Margin="0, 3">
+                                        <TextBlock Grid.Column="0" 
+                                                   Text="{Binding Name}" 
+                                                   FontWeight="SemiBold"
+                                                   VerticalAlignment="Center"/>
+                                        
+                                        <TextBox Grid.Column="1" 
+                                                 Text="{Binding Value, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                                                 Watermark="{Binding Name}"
+                                                 VerticalContentAlignment="Center"/>
+                                    </Grid>
+                                </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+                    </ScrollViewer>
+                </Border>
+            </Grid>
+        </Grid>
+
+        <Border Grid.Row="1" 
+                BorderBrush="Red" 
+                BorderThickness="0,2,0,0" 
+                Padding="5">
+            <StackPanel Orientation="Horizontal">
+                <TextBlock Text="Errors: " FontWeight="Bold" Foreground="Red" VerticalAlignment="Center"/>
+                <TextBox Text="{Binding ErrorMessage}"
+                         IsReadOnly="True"
+                         Foreground="Red"
+                         FontWeight="SemiBold"
+                         TextWrapping="Wrap"
+                         BorderThickness="0"
+                         Background="Transparent"
+                         VerticalAlignment="Center"
+                         HorizontalAlignment="Stretch"/>
+            </StackPanel>
+        </Border>
+    </Grid>
+</Window>

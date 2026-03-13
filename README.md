@@ -1,11 +1,11 @@
-# SourceGenerationExample
+# ArxisStudio.Markup
 
-`AvaloniaDesigner.Generator` is not a general replacement for XAML. It is infrastructure for a visual Avalonia form designer where UI is stored as an editable object tree and then compiled into C# at build time.
+`ArxisStudio.Markup.Json.Generator` is not a general replacement for XAML. It is infrastructure for a visual Avalonia form designer where UI is stored as an editable object tree and then compiled into C# at build time.
 
 The core idea is:
 
 - XAML is a text markup language optimized for authoring views by hand.
-- `.Asset` files in this repository are a serialized UI model optimized for tooling.
+- `.arxui` files in this repository are a serialized UI model optimized for tooling.
 - A designer can add, remove, reorder, and update controls by mutating structured data instead of rewriting markup text.
 - The source generator turns that model into `InitializeComponent()` code for the target partial class.
 
@@ -20,22 +20,25 @@ This makes the format suitable for:
 
 ## Repository Layout
 
-- `AvaloniaDesigner.Generator/`
-  Incremental Roslyn source generator. Reads `.Asset` files from `AdditionalFiles`, resolves types and properties through Roslyn, and emits C# code that constructs the Avalonia visual tree.
+- `ArxisStudio.Markup.Json`
+  Contracts and serialization for the `.arxui` JSON document model.
 
-- `AvaloniaDesigner.Generator.Sample/`
-  Sample Avalonia application that consumes the generator. It demonstrates the intended workflow: a partial class plus a matching `.Asset` description.
+- `ArxisStudio.Markup.Json.Generator`
+  Incremental Roslyn source generator. Reads `.arxui` files from `AdditionalFiles`, resolves types and properties through Roslyn, and emits C# code that constructs the Avalonia visual tree.
 
-- `JsonUiEditor/`
+- `ArxisStudio.Markup.Sample`
+  Sample Avalonia application that consumes the generator. It demonstrates the intended workflow: a partial class plus a matching `.arxui` description.
+
+- `ArxisStudio.Markup.Json.Loader`
   Experimental visual editor / previewer. It edits the JSON model as a tree and renders the result at runtime using reflection. This project demonstrates why the model is useful for tooling even outside build-time generation.
 
-- `AvaloniaDesigner.Generator.Tests/`
-  Tests for generator behavior. At the moment they lag behind the current `.Asset` schema and need to be updated.
+- `ArxisStudio.Markup.Json.Generator.Tests`
+  Tests for generator behavior around the current `.arxui` schema.
 
 ## How It Works
 
 1. A view is declared as a normal partial Avalonia class.
-2. A matching `.Asset` file describes the control tree and property values.
+2. A matching `.arxui` file describes the control tree and property values.
 3. The generator finds the matching partial class by file name.
 4. The generator emits a partial class implementation with `InitializeComponent()`.
 5. The generated code instantiates controls, assigns properties, binds Avalonia properties, and wires nested objects/collections.
@@ -56,7 +59,7 @@ That is a much better fit for a visual constructor than raw XAML text.
 
 ## Current Model Capabilities
 
-The current `.Asset` format supports the essentials needed for a form designer:
+The current `.arxui` format supports the essentials needed for a form designer:
 
 - object creation by CLR type name
 - nested controls and object graphs
@@ -100,4 +103,4 @@ If those goals are met, this approach can be more practical than XAML for intera
 - The solution builds successfully.
 - The sample app demonstrates the intended generator usage.
 - The editor project demonstrates live tree/property manipulation.
-- The test project needs alignment with the current `.Asset` schema.
+- The test project covers the current `.arxui` schema.
