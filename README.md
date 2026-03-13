@@ -1,106 +1,163 @@
 # ArxisStudio.Markup
 
-`ArxisStudio.Markup.Json.Generator` is not a general replacement for XAML. It is infrastructure for a visual Avalonia form designer where UI is stored as an editable object tree and then compiled into C# at build time.
+`ArxisStudio.Markup.Json.Generator` не пытается заменить XAML целиком. Это инфраструктура для визуального конструктора форм на Avalonia, где интерфейс хранится как редактируемое дерево объектов, а на этапе сборки превращается в C#-код.
 
-The core idea is:
+Основная идея такая:
 
-- XAML is a text markup language optimized for authoring views by hand.
-- `.arxui` files in this repository are a serialized UI model optimized for tooling.
-- A designer can add, remove, reorder, and update controls by mutating structured data instead of rewriting markup text.
-- The source generator turns that model into `InitializeComponent()` code for the target partial class.
+- XAML это текстовая разметка, удобная для ручного написания представлений.
+- `.arxui` в этом репозитории это сериализованная модель UI, удобная для инструментов.
+- Визуальный редактор может добавлять, удалять, переставлять и менять контролы, работая со структурированными данными, а не переписывая текст разметки.
+- Source generator преобразует эту модель в `InitializeComponent()` для целевого `partial`-класса.
 
-This makes the format suitable for:
+Из-за этого формат хорошо подходит для:
 
-- visual tree editing
-- property inspector workflows
-- drag-and-drop composition
-- serialization/deserialization
-- designer-time transformations
-- code generation during build
+- визуального редактирования дерева контролов
+- инспектора свойств
+- drag-and-drop компоновки
+- сериализации и десериализации
+- трансформаций на стороне дизайнера
+- генерации кода во время сборки
 
-## Repository Layout
+## Структура репозитория
 
-- `ArxisStudio.Markup.Json`
-  Contracts and serialization for the `.arxui` JSON document model.
+- `Arxui.Contracts`  
+  Контракты и сериализация JSON-модели `.arxui`.
 
-- `ArxisStudio.Markup.Json.Generator`
-  Incremental Roslyn source generator. Reads `.arxui` files from `AdditionalFiles`, resolves types and properties through Roslyn, and emits C# code that constructs the Avalonia visual tree.
+- `Arxui.Generator/Arxui.Generator`  
+  Инкрементальный Roslyn source generator. Читает `.arxui` из `AdditionalFiles`, разрешает типы и свойства через Roslyn и генерирует C#-код, который строит визуальное дерево Avalonia.
 
-- `ArxisStudio.Markup.Sample`
-  Sample Avalonia application that consumes the generator. It demonstrates the intended workflow: a partial class plus a matching `.arxui` description.
+- `Arxui.Sample`  
+  Пример Avalonia-приложения, использующего генератор. Показывает ожидаемый сценарий: `partial`-класс плюс соответствующее описание в `.arxui`.
 
-- `ArxisStudio.Markup.Json.Loader`
-  Experimental visual editor / previewer. It edits the JSON model as a tree and renders the result at runtime using reflection. This project demonstrates why the model is useful for tooling even outside build-time generation.
+- `Arxui.Editor`  
+  Экспериментальный визуальный редактор и превьюер. Он редактирует JSON-модель как дерево и рендерит результат во время выполнения через reflection. Этот проект показывает, почему такая модель удобна для инструментов даже вне build-time генерации.
 
-- `ArxisStudio.Markup.Json.Generator.Tests`
-  Tests for generator behavior around the current `.arxui` schema.
+- `Arxui.Tests`  
+  Тесты поведения генератора для текущей схемы `.arxui`.
 
-## How It Works
+## Как это работает
 
-1. A view is declared as a normal partial Avalonia class.
-2. A matching `.arxui` file describes the control tree and property values.
-3. The generator finds the matching partial class by file name.
-4. The generator emits a partial class implementation with `InitializeComponent()`.
-5. The generated code instantiates controls, assigns properties, binds Avalonia properties, and wires nested objects/collections.
+1. Представление объявляется как обычный `partial`-класс Avalonia.
+2. Отдельный `.arxui`-файл описывает дерево контролов и значения свойств.
+3. Генератор находит подходящий `partial`-класс по имени файла.
+4. Генератор создаёт реализацию `partial`-класса с методом `InitializeComponent()`.
+5. Сгенерированный код создаёт контролы, присваивает свойства, настраивает Avalonia-свойства, вложенные объекты и коллекции.
 
-## Why This Exists
+## Зачем это нужно
 
-The value of this approach is not "support every XAML feature".
+Ценность подхода не в том, чтобы "поддержать все возможности XAML".
 
-The value is that the UI becomes a manipulable model:
+Ценность в том, что UI становится управляемой моделью:
 
-- each control is a node
-- each property is structured data
-- the tree can be diffed and transformed
-- tools can operate on it directly
-- the model can later be compiled into normal application code
+- каждый контрол это узел
+- каждое свойство это структурированные данные
+- дерево можно сравнивать, модифицировать и преобразовывать
+- инструменты могут работать с ним напрямую
+- модель потом компилируется в обычный код приложения
 
-That is a much better fit for a visual constructor than raw XAML text.
+Для визуального конструктора это заметно удобнее, чем сырой текст XAML.
 
-## Current Model Capabilities
+## Текущие возможности модели
 
-The current `.arxui` format supports the essentials needed for a form designer:
+Текущий формат `.arxui` покрывает базовые сценарии, нужные для конструктора форм:
 
-- object creation by CLR type name
-- nested controls and object graphs
-- scalar property assignment
-- collection properties such as `Children`
-- attached properties such as `Grid.Row` and `Canvas.Left`
-- resource references through `$resource`
-- bindings through `$binding`
-- asset loading through `$asset`
+- создание объектов по CLR-имени типа
+- вложенные контролы и графы объектов
+- присваивание скалярных свойств
+- свойства-коллекции, например `Children`
+- attached properties, например `Grid.Row` и `Canvas.Left`
+- ссылки на ресурсы через `$resource`
+- привязки через `$binding`
+- загрузку ассетов через `$asset`
 
-In practice this is enough for many layout- and form-oriented screens.
+На практике этого уже достаточно для многих экранов, ориентированных на формы и layout.
 
-## What It Does Not Try To Be
+## Чем проект не является
 
-This project is not currently a full XAML implementation. It does not aim to mirror the entire Avalonia XAML language surface.
+Сейчас это не полная реализация XAML и не цель полностью повторить весь язык Avalonia XAML.
 
-Compared with XAML, the current model is intentionally narrower:
+По сравнению с XAML модель намеренно уже:
 
-- no general markup extension system
-- no full template/style/animation coverage
-- no XAML namespace/prefix model
-- no full parity with Avalonia XAML compiler behavior
-- only the features explicitly implemented in the generator are supported
+- нет общей системы markup extensions
+- нет полного покрытия template/style/animation
+- нет модели XAML namespace/prefix
+- нет полного паритета с поведением Avalonia XAML compiler
+- поддерживаются только те возможности, которые явно реализованы в генераторе
 
-That tradeoff is acceptable for a designer-oriented DSL, as long as the model remains easy to edit and compile predictably.
+Для DSL, ориентированного на дизайнер, это нормальный компромисс, если модель остаётся простой в редактировании и предсказуемой при компиляции.
 
-## Design Direction
+## Направление дизайна
 
-The right success criteria for this project are:
+Хорошие критерии успеха для этого проекта такие:
 
-- can the designer represent the controls it needs
-- can tools mutate the tree safely
-- can the model round-trip cleanly
-- can the generator produce deterministic code
-- can preview and build-time generation stay aligned
+- может ли дизайнер выразить нужные ему контролы
+- могут ли инструменты безопасно менять дерево
+- может ли модель чисто проходить round-trip
+- может ли генератор выдавать детерминированный код
+- совпадает ли поведение runtime-превью и build-time генерации
 
-If those goals are met, this approach can be more practical than XAML for interactive form-building workflows.
+Если эти требования выполняются, такой подход в интерактивном конструкторе форм может быть практичнее XAML.
 
-## Current Status
+## Пример
 
-- The solution builds successfully.
-- The sample app demonstrates the intended generator usage.
-- The editor project demonstrates live tree/property manipulation.
-- The test project covers the current `.arxui` schema.
+`partial`-класс:
+
+```csharp
+public partial class SolidColorBrush : ContentControl
+{
+    public SolidColorBrush()
+    {
+        InitializeComponent();
+    }
+}
+```
+
+Соответствующий `.arxui`:
+
+```json
+{
+  "SchemaVersion": 1,
+  "Kind": "UserControl",
+  "Root": {
+    "TypeName": "Avalonia.Controls.UserControl",
+    "Properties": {
+      "Width": 400,
+      "Height": 250,
+      "Content": {
+        "TypeName": "Avalonia.Controls.Border",
+        "Properties": {
+          "Name": "NamedBorder",
+          "BorderThickness": "3",
+          "BorderBrush": "Gray"
+        }
+      }
+    }
+  }
+}
+```
+
+Во время сборки генератор превращает это описание в C#-код, который создаёт дерево контролов и вызывает его из `InitializeComponent()`.
+
+## Сборка и запуск
+
+Требования:
+
+- .NET SDK 9.0
+
+Команды:
+
+```bash
+dotnet build ArxisStudio.Markup.sln
+dotnet test ArxisStudio.Markup.sln
+dotnet run --project Arxui.Sample/ArxisStudio.Markup.Sample.csproj
+dotnet run --project Arxui.Editor/ArxisStudio.Markup.Json.Loader.csproj
+```
+
+`Arxui.Sample` показывает сценарий использования генератора в приложении, а `Arxui.Editor` демонстрирует редактирование модели и runtime-превью.
+
+## Текущий статус
+
+- решение успешно собирается
+- примерное приложение демонстрирует целевой сценарий использования генератора
+- редактор показывает живое редактирование дерева и свойств
+- тестовый проект покрывает текущую схему `.arxui`
