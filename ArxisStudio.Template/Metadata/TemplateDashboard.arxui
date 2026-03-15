@@ -93,7 +93,7 @@
                                 {
                                   "TypeName": "Avalonia.Controls.Button",
                                   "Properties": {
-                                    "Classes": "primary-action",
+                                    "Classes": "secondary-action",
                                     "MinWidth": 160,
                                     "HorizontalAlignment": "Left",
                                     "Content": "Просмотреть JSON"
@@ -111,6 +111,20 @@
                                     "MinWidth": 170,
                                     "HorizontalAlignment": "Left",
                                     "Content": "Просмотреть preview"
+                                  },
+                                  "$design": {
+                                    "IgnorePreviewInput": true,
+                                    "AllowMove": true,
+                                    "AllowResize": false
+                                  }
+                                },
+                                {
+                                  "TypeName": "Avalonia.Controls.Button",
+                                  "Properties": {
+                                    "Classes": "primary-action",
+                                    "MinWidth": 140,
+                                    "HorizontalAlignment": "Left",
+                                    "Content": "Открыть проект"
                                   },
                                   "$design": {
                                     "IgnorePreviewInput": true,

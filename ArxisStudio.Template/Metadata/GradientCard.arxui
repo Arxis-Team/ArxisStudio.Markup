@@ -10,9 +10,9 @@
         "TypeName": "Avalonia.Controls.Border",
         "Properties": {
           "Name": "GradientBorder1",
-          "BorderThickness": "5",
-          "CornerRadius": "20",
-          "Padding": "0",
+          "BorderThickness": "7",
+          "CornerRadius": "43",
+          "Padding": "30",
           "BorderBrush": {
             "TypeName": "Avalonia.Media.LinearGradientBrush",
             "Properties": {
