@@ -58,7 +58,12 @@ namespace ArxisStudio.Markup.Json.Generator.Services
             return FormatLegacy(element);
         }
 
-        private string Escape(string s) => s.Replace("\\", "\\\\").Replace("\"", "\\\"");
+        private string Escape(string s)
+            => s.Replace("\\", "\\\\")
+                .Replace("\"", "\\\"")
+                .Replace("\r", "\\r")
+                .Replace("\n", "\\n")
+                .Replace("\t", "\\t");
 
         private string FormatEnum(object el, ITypeSymbol type)
         {

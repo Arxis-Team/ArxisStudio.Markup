@@ -48,7 +48,7 @@ public static class ArxuiSerializer
             return null;
         }
 
-        return new UiDocument(schemaVersion, kind, className, rootNode);
+        return new UiDocument(schemaVersion, kind, className, rootNode, ReadDocumentDesign(root["$design"] as JObject));
     }
 
     public static string Serialize(UiDocument document)
@@ -63,6 +63,12 @@ public static class ArxuiSerializer
         if (!string.IsNullOrWhiteSpace(document.Class))
         {
             root["Class"] = document.Class;
+        }
+
+        var design = WriteDocumentDesign(document.Design);
+        if (design != null)
+        {
+            root["$design"] = design;
         }
 
         return root.ToString(Formatting.Indented);
@@ -83,7 +89,8 @@ public static class ArxuiSerializer
             typeName,
             properties,
             ReadStyles(nodeObject["Styles"] as JArray),
-            ReadResources(nodeObject["Resources"] as JObject));
+            ReadResources(nodeObject["Resources"] as JObject),
+            ReadNodeDesign(nodeObject["$design"] as JObject));
     }
 
     private static IReadOnlyDictionary<string, UiValue> ReadProperties(JObject propertiesObject)
@@ -174,7 +181,8 @@ public static class ArxuiSerializer
             "System.Object",
             nestedProperties,
             ReadStyles(obj["Styles"] as JArray),
-            ReadResources(obj["Resources"] as JObject)));
+            ReadResources(obj["Resources"] as JObject),
+            ReadNodeDesign(obj["$design"] as JObject)));
     }
 
     private static UiStyles? ReadStyles(JArray? stylesArray)
@@ -300,6 +308,12 @@ public static class ArxuiSerializer
         if (node.Resources != null)
         {
             obj["Resources"] = WriteResources(node.Resources);
+        }
+
+        var design = WriteNodeDesign(node.Design);
+        if (design != null)
+        {
+            obj["$design"] = design;
         }
 
         return obj;
@@ -453,5 +467,61 @@ public static class ArxuiSerializer
             UiDocumentKind.ResourceDictionary => "Avalonia.Controls.ResourceDictionary",
             _ => "Avalonia.Controls.UserControl"
         };
+    }
+
+    private static UiDocumentDesign? ReadDocumentDesign(JObject? obj)
+    {
+        if (obj == null)
+        {
+            return null;
+        }
+
+        return new UiDocumentDesign(
+            obj["SurfaceWidth"]?.Value<double?>(),
+            obj["SurfaceHeight"]?.Value<double?>());
+    }
+
+    private static UiNodeDesign? ReadNodeDesign(JObject? obj)
+    {
+        if (obj == null)
+        {
+            return null;
+        }
+
+        return new UiNodeDesign(
+            obj["Locked"]?.Value<bool?>(),
+            obj["Hidden"]?.Value<bool?>(),
+            obj["IgnorePreviewInput"]?.Value<bool?>(),
+            obj["AllowMove"]?.Value<bool?>(),
+            obj["AllowResize"]?.Value<bool?>());
+    }
+
+    private static JObject? WriteDocumentDesign(UiDocumentDesign? design)
+    {
+        if (design == null)
+        {
+            return null;
+        }
+
+        var obj = new JObject();
+        WriteOptional(obj, "SurfaceWidth", design.SurfaceWidth);
+        WriteOptional(obj, "SurfaceHeight", design.SurfaceHeight);
+        return obj.HasValues ? obj : null;
+    }
+
+    private static JObject? WriteNodeDesign(UiNodeDesign? design)
+    {
+        if (design == null)
+        {
+            return null;
+        }
+
+        var obj = new JObject();
+        WriteOptional(obj, "Locked", design.Locked);
+        WriteOptional(obj, "Hidden", design.Hidden);
+        WriteOptional(obj, "IgnorePreviewInput", design.IgnorePreviewInput);
+        WriteOptional(obj, "AllowMove", design.AllowMove);
+        WriteOptional(obj, "AllowResize", design.AllowResize);
+        return obj.HasValues ? obj : null;
     }
 }

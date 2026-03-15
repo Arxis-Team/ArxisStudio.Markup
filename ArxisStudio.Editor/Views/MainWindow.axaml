@@ -1,57 +1,58 @@
 <Window xmlns="https://github.com/avaloniaui"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-        xmlns:vm="using:ArxisStudio.Markup.Json.Loader.ViewModels"
-        xmlns:m="using:ArxisStudio.Markup.Json.Loader.Models"
+        xmlns:vm="using:ArxisStudio.Editor.ViewModels"
+        xmlns:m="using:ArxisStudio.Editor.Models"
         xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
         xmlns:j="using:Newtonsoft.Json.Linq"
-        mc:Ignorable="d" d:DesignWidth="1580" d:DesignHeight="920"
-        x:Class="ArxisStudio.Markup.Json.Loader.Views.MainWindow"
+        mc:Ignorable="d"
+        d:DesignWidth="1580"
+        d:DesignHeight="920"
+        x:Class="ArxisStudio.Editor.Views.MainWindow"
         x:DataType="vm:MainWindowViewModel"
         Icon="/Assets/avalonia-logo.ico"
         Title="ArxisStudio Editor"
         MinHeight="720"
         MinWidth="1280"
-        Background="#0E1318">
+        Background="#1F2125">
 
     <Window.Resources>
-        <SolidColorBrush x:Key="PageBackgroundBrush">#0E1318</SolidColorBrush>
-        <SolidColorBrush x:Key="SurfaceBrush">#151C24</SolidColorBrush>
-        <SolidColorBrush x:Key="SurfaceRaisedBrush">#1B242E</SolidColorBrush>
-        <SolidColorBrush x:Key="SurfaceMutedBrush">#111820</SolidColorBrush>
-        <SolidColorBrush x:Key="StrokeBrush">#273240</SolidColorBrush>
-        <SolidColorBrush x:Key="StrokeStrongBrush">#3D536A</SolidColorBrush>
-        <SolidColorBrush x:Key="AccentBrush">#6EC6FF</SolidColorBrush>
-        <SolidColorBrush x:Key="AccentSoftBrush">#17344B</SolidColorBrush>
-        <SolidColorBrush x:Key="DangerBrush">#FF6B6B</SolidColorBrush>
-        <SolidColorBrush x:Key="TextPrimaryBrush">#EAF2F8</SolidColorBrush>
-        <SolidColorBrush x:Key="TextSecondaryBrush">#96A7B8</SolidColorBrush>
+        <SolidColorBrush x:Key="AppBackgroundBrush">#1F2125</SolidColorBrush>
+        <SolidColorBrush x:Key="ChromeBrush">#2A2D31</SolidColorBrush>
+        <SolidColorBrush x:Key="PanelBrush">#25282C</SolidColorBrush>
+        <SolidColorBrush x:Key="PanelRaisedBrush">#2B2E33</SolidColorBrush>
+        <SolidColorBrush x:Key="EditorBrush">#1E1F22</SolidColorBrush>
+        <SolidColorBrush x:Key="EditorAltBrush">#23252A</SolidColorBrush>
+        <SolidColorBrush x:Key="CanvasBrush">#111214</SolidColorBrush>
+        <SolidColorBrush x:Key="CanvasGridBrush">#26364A</SolidColorBrush>
+        <SolidColorBrush x:Key="StrokeBrush">#3B3F45</SolidColorBrush>
+        <SolidColorBrush x:Key="StrokeStrongBrush">#4A596A</SolidColorBrush>
+        <SolidColorBrush x:Key="AccentBrush">#4EA1F3</SolidColorBrush>
+        <SolidColorBrush x:Key="AccentSoftBrush">#203246</SolidColorBrush>
+        <SolidColorBrush x:Key="SuccessBrush">#61D095</SolidColorBrush>
+        <SolidColorBrush x:Key="DangerBrush">#E06C75</SolidColorBrush>
+        <SolidColorBrush x:Key="TextPrimaryBrush">#D7DAE0</SolidColorBrush>
+        <SolidColorBrush x:Key="TextSecondaryBrush">#9CA3AF</SolidColorBrush>
+        <SolidColorBrush x:Key="TextMutedBrush">#6F7782</SolidColorBrush>
     </Window.Resources>
 
     <Window.Styles>
         <Style Selector="Border.panel">
-            <Setter Property="Background" Value="{StaticResource SurfaceBrush}" />
+            <Setter Property="Background" Value="{StaticResource PanelBrush}" />
             <Setter Property="BorderBrush" Value="{StaticResource StrokeBrush}" />
             <Setter Property="BorderThickness" Value="1" />
-            <Setter Property="Padding" Value="12" />
         </Style>
 
         <Style Selector="Border.panel.raised">
-            <Setter Property="Background" Value="{StaticResource SurfaceRaisedBrush}" />
+            <Setter Property="Background" Value="{StaticResource PanelRaisedBrush}" />
             <Setter Property="BorderBrush" Value="{StaticResource StrokeStrongBrush}" />
+            <Setter Property="BorderThickness" Value="1" />
         </Style>
 
         <Style Selector="TextBlock.section-title">
-            <Setter Property="FontSize" Value="15" />
+            <Setter Property="FontSize" Value="13" />
             <Setter Property="FontWeight" Value="SemiBold" />
             <Setter Property="Foreground" Value="{StaticResource TextPrimaryBrush}" />
-        </Style>
-
-        <Style Selector="TextBlock.panel-kicker">
-            <Setter Property="FontSize" Value="11" />
-            <Setter Property="FontWeight" Value="Bold" />
-            <Setter Property="Foreground" Value="{StaticResource AccentBrush}" />
-            <Setter Property="LetterSpacing" Value="0.8" />
         </Style>
 
         <Style Selector="TextBlock.helper">
@@ -59,101 +60,178 @@
             <Setter Property="FontSize" Value="12" />
         </Style>
 
+        <Style Selector="TextBlock.kicker">
+            <Setter Property="Foreground" Value="{StaticResource TextMutedBrush}" />
+            <Setter Property="FontSize" Value="11" />
+            <Setter Property="FontWeight" Value="SemiBold" />
+        </Style>
+
+        <Style Selector="Button.chrome">
+            <Setter Property="Background" Value="Transparent" />
+            <Setter Property="Foreground" Value="{StaticResource TextSecondaryBrush}" />
+            <Setter Property="BorderBrush" Value="Transparent" />
+            <Setter Property="BorderThickness" Value="0" />
+            <Setter Property="Padding" Value="6,4" />
+            <Setter Property="MinWidth" Value="30" />
+        </Style>
+
+        <Style Selector="Button.sidebar">
+            <Setter Property="Background" Value="Transparent" />
+            <Setter Property="Foreground" Value="{StaticResource TextSecondaryBrush}" />
+            <Setter Property="BorderBrush" Value="Transparent" />
+            <Setter Property="BorderThickness" Value="0" />
+            <Setter Property="Padding" Value="0" />
+            <Setter Property="Height" Value="34" />
+            <Setter Property="MinWidth" Value="34" />
+            <Setter Property="HorizontalContentAlignment" Value="Center" />
+        </Style>
+
+        <Style Selector="Border.mode-tab">
+            <Setter Property="Background" Value="{StaticResource EditorBrush}" />
+            <Setter Property="BorderBrush" Value="{StaticResource StrokeBrush}" />
+            <Setter Property="BorderThickness" Value="1,1,1,0" />
+            <Setter Property="Padding" Value="12,7" />
+        </Style>
+
+        <Style Selector="Border.mode-tab.active">
+            <Setter Property="Background" Value="{StaticResource PanelBrush}" />
+        </Style>
+
+        <Style Selector="TextBlock.mode-tab">
+            <Setter Property="Foreground" Value="{StaticResource TextSecondaryBrush}" />
+            <Setter Property="FontSize" Value="12" />
+            <Setter Property="FontWeight" Value="SemiBold" />
+        </Style>
+
+        <Style Selector="Border.mode-tab.active TextBlock.mode-tab">
+            <Setter Property="Foreground" Value="{StaticResource TextPrimaryBrush}" />
+        </Style>
+
         <Style Selector="TextBox.editor">
-            <Setter Property="Background" Value="{StaticResource SurfaceMutedBrush}" />
+            <Setter Property="Background" Value="{StaticResource EditorBrush}" />
             <Setter Property="BorderBrush" Value="{StaticResource StrokeBrush}" />
             <Setter Property="Foreground" Value="{StaticResource TextPrimaryBrush}" />
             <Setter Property="Padding" Value="8" />
         </Style>
 
-        <Style Selector="ListBox.slim">
-            <Setter Property="Background" Value="{StaticResource SurfaceMutedBrush}" />
+        <Style Selector="ListBox.ide-list">
+            <Setter Property="Background" Value="{StaticResource EditorBrush}" />
             <Setter Property="BorderBrush" Value="{StaticResource StrokeBrush}" />
             <Setter Property="BorderThickness" Value="1" />
             <Setter Property="Padding" Value="4" />
         </Style>
 
-        <Style Selector="TreeView.slim">
-            <Setter Property="Background" Value="{StaticResource SurfaceMutedBrush}" />
+        <Style Selector="TreeView.ide-tree">
+            <Setter Property="Background" Value="{StaticResource EditorBrush}" />
             <Setter Property="BorderBrush" Value="{StaticResource StrokeBrush}" />
             <Setter Property="BorderThickness" Value="1" />
             <Setter Property="Padding" Value="6" />
         </Style>
+
+        <Style Selector="TreeView.ide-tree TreeViewItem">
+            <Setter Property="IsExpanded" Value="True" />
+        </Style>
     </Window.Styles>
 
     <Design.DataContext>
-        <vm:MainWindowViewModel/>
+        <vm:MainWindowViewModel />
     </Design.DataContext>
 
-    <Grid RowDefinitions="Auto, *, Auto" Margin="20">
+    <Grid RowDefinitions="36, *, 160">
         <Border Grid.Row="0"
-                Classes="panel raised"
-                Padding="18"
-                Margin="0,0,0,16">
-            <Grid RowDefinitions="Auto, Auto" RowSpacing="14">
-                <Grid Grid.Row="0" ColumnDefinitions="*, 360">
-                    <StackPanel Spacing="4">
-                        <TextBlock Classes="panel-kicker" Text="Design Workspace" />
-                        <TextBlock Text="ArxisStudio Editor"
-                                   FontSize="30"
-                                   FontWeight="Bold"
-                                   Foreground="{StaticResource TextPrimaryBrush}" />
-                        <TextBlock Text="Open a project, inspect .arxui documents and preview the UI without running user code."
-                                   Classes="helper"
-                                   TextWrapping="Wrap"
-                                   MaxWidth="720" />
-                    </StackPanel>
+                Background="{StaticResource ChromeBrush}"
+                BorderBrush="{StaticResource StrokeBrush}"
+                BorderThickness="0,0,0,1"
+                Padding="10,0">
+            <Grid ColumnDefinitions="Auto,Auto,Auto,Auto,*,Auto,Auto,Auto" VerticalAlignment="Center">
+                <TextBlock Grid.Column="0"
+                           Text="RD"
+                           FontSize="11"
+                           FontWeight="Bold"
+                           Foreground="#F26D6D"
+                           VerticalAlignment="Center"
+                           Margin="0,0,12,0" />
+                <Button Grid.Column="1" Classes="chrome" Content="☰" />
+                <Button Grid.Column="2" Classes="chrome" Content="←" />
+                <Button Grid.Column="3" Classes="chrome" Content="→" />
 
-                    <Border Grid.Column="1"
-                            Background="{StaticResource AccentSoftBrush}"
-                            BorderBrush="{StaticResource StrokeStrongBrush}"
-                            BorderThickness="1"
-                            Padding="14">
-                        <StackPanel Spacing="6">
-                            <TextBlock Classes="panel-kicker" Text="Project Summary" />
-                            <TextBlock Text="{Binding ProjectSummary}"
-                                       Foreground="{StaticResource TextPrimaryBrush}"
-                                       TextWrapping="Wrap" />
-                        </StackPanel>
-                    </Border>
-                </Grid>
+                <StackPanel Grid.Column="5" Orientation="Horizontal" Spacing="12" VerticalAlignment="Center">
+                    <TextBlock Text="ArxisStudio.Editor"
+                               Foreground="{StaticResource TextSecondaryBrush}"
+                               VerticalAlignment="Center" />
+                    <Button Classes="chrome"
+                            Content="▶"
+                            Command="{Binding RunProjectCommand}"
+                            IsEnabled="{Binding CanRunProject}" />
+                    <Button Classes="chrome"
+                            Content="■"
+                            Command="{Binding StopProjectCommand}"
+                            IsEnabled="{Binding CanStopProject}" />
+                </StackPanel>
 
-                <Grid Grid.Row="1" ColumnDefinitions="*, Auto, Auto" ColumnSpacing="10">
-                    <TextBox Grid.Column="0"
-                             Classes="editor"
-                             Text="{Binding ProjectPathInput, Mode=TwoWay}"
-                             Watermark="Path to .csproj or .sln"
-                             VerticalContentAlignment="Center" />
-                    <Button Grid.Column="1"
-                            Content="Load Project"
-                            Command="{Binding LoadProjectCommand}"
-                            MinWidth="120" />
-                    <Button Grid.Column="2"
-                            Content="Open Selected .arxui"
-                            Command="{Binding OpenSelectedProjectFileCommand}"
-                            MinWidth="150" />
-                </Grid>
+                <Button Grid.Column="6" Classes="chrome" Content="⚙" />
+                <Button Grid.Column="7" Classes="chrome" Content="⋮" />
             </Grid>
         </Border>
 
-        <Grid Grid.Row="1" ColumnDefinitions="320, 420, *, 320" ColumnSpacing="14">
-            <Grid Grid.Column="0" RowDefinitions="300, *" RowSpacing="14">
-                <Border Grid.Row="0" Classes="panel">
-                    <Grid RowDefinitions="Auto, *" RowSpacing="12">
-                        <StackPanel>
-                            <TextBlock Classes="panel-kicker" Text="Project" />
-                            <TextBlock Classes="section-title" Text="Document Explorer" />
-                            <TextBlock Classes="helper"
-                                       Text="Double-click a .arxui file to load it into the designer."
-                                       TextWrapping="Wrap" />
-                        </StackPanel>
+        <Grid Grid.Row="1" ColumnDefinitions="44, 380, 10, *, 320">
+            <Border Grid.Column="0"
+                    Background="{StaticResource EditorBrush}"
+                    BorderBrush="{StaticResource StrokeBrush}"
+                    BorderThickness="0,0,1,0">
+                <StackPanel Spacing="6" Margin="0,10,0,10">
+                    <Button Classes="sidebar" Content="≡" />
+                    <Button Classes="sidebar" Content="⊙" />
+                    <Button Classes="sidebar" Content="◧" />
+                    <Button Classes="sidebar" Content="⋯" />
+                </StackPanel>
+            </Border>
 
-                        <Grid Grid.Row="1" RowDefinitions="Auto, *" RowSpacing="10">
-                            <TextBlock Text=".arxui Files"
-                                       Foreground="{StaticResource TextSecondaryBrush}"
+            <Border Grid.Column="1"
+                    Background="{StaticResource EditorAltBrush}"
+                    BorderBrush="{StaticResource StrokeBrush}"
+                    BorderThickness="0,0,1,0">
+                <Grid RowDefinitions="34, *, 220">
+                    <Border Grid.Row="0"
+                            Background="{StaticResource ChromeBrush}"
+                            BorderBrush="{StaticResource StrokeBrush}"
+                            BorderThickness="0,0,0,1"
+                            Padding="12,0">
+                        <Grid ColumnDefinitions="*,Auto">
+                            <TextBlock Text="Solution"
+                                       Foreground="{StaticResource TextPrimaryBrush}"
+                                       VerticalAlignment="Center"
                                        FontWeight="SemiBold" />
+                            <TextBlock Grid.Column="1"
+                                       Text="{Binding ProjectSummary}"
+                                       Foreground="{StaticResource TextMutedBrush}"
+                                       VerticalAlignment="Center"
+                                       TextTrimming="CharacterEllipsis"
+                                       MaxWidth="180" />
+                        </Grid>
+                    </Border>
+
+                    <Grid Grid.Row="1" RowDefinitions="Auto,Auto,*" Margin="10">
+                        <TextBox Grid.Row="0"
+                                 Classes="editor"
+                                 Text="{Binding ProjectPathInput, Mode=TwoWay}"
+                                 Watermark="Path to .csproj or .sln"
+                                 VerticalContentAlignment="Center" />
+
+                        <Grid Grid.Row="1" ColumnDefinitions="*,8,*" Margin="0,10,0,10">
+                            <Button Grid.Column="0"
+                                    Content="Load Project"
+                                    Command="{Binding LoadProjectCommand}" />
+                            <Button Grid.Column="2"
+                                    Content="Open Selected"
+                                    Command="{Binding OpenSelectedProjectFileCommand}" />
+                        </Grid>
+
+                        <Grid Grid.Row="2" RowDefinitions="Auto,*" RowSpacing="8">
+                            <TextBlock Text=".arxui Files"
+                                       Classes="section-title" />
                             <ListBox Grid.Row="1"
-                                     Classes="slim"
+                                     Classes="ide-list"
                                      ItemsSource="{Binding ProjectArxuiFiles}"
                                      SelectedItem="{Binding SelectedProjectFile, Mode=TwoWay}"
                                      DoubleTapped="ProjectFilesListBox_DoubleTapped">
@@ -170,132 +248,394 @@
                             </ListBox>
                         </Grid>
                     </Grid>
-                </Border>
 
-                <Border Grid.Row="1" Classes="panel">
-                    <Grid RowDefinitions="Auto, Auto, *, Auto" RowSpacing="12">
-                        <StackPanel>
-                            <TextBlock Classes="panel-kicker" Text="Structure" />
-                            <TextBlock Classes="section-title" Text="Toolbox and Control Tree" />
-                            <TextBlock Classes="helper"
-                                       Text="Add controls from the toolbox, then inspect the generated tree below."
-                                       TextWrapping="Wrap" />
-                        </StackPanel>
-
-                        <TextBlock Grid.Row="1"
-                                   Text="Toolbox"
-                                   Foreground="{StaticResource TextSecondaryBrush}"
-                                   FontWeight="SemiBold" />
-
-                        <ListBox Grid.Row="2"
-                                 Classes="slim"
-                                 ItemsSource="{Binding AvailableControls}"
-                                 SelectionMode="Single"
-                                 SelectionChanged="ToolboxListBox_SelectionChanged"
-                                 Height="190">
-                            <ListBox.ItemTemplate>
-                                <DataTemplate x:DataType="j:JObject">
-                                    <TextBlock Text="{Binding [TypeName]}"
-                                               Margin="4"
-                                               Foreground="{StaticResource TextPrimaryBrush}"
-                                               ToolTip.Tip="Select to add to the chosen container"/>
-                                </DataTemplate>
-                            </ListBox.ItemTemplate>
-                        </ListBox>
-
-                        <Grid Grid.Row="3" RowDefinitions="Auto, *" RowSpacing="10">
-                            <TextBlock Text="Control Tree"
-                                       Foreground="{StaticResource TextSecondaryBrush}"
-                                       FontWeight="SemiBold" />
-                            <TreeView Grid.Row="1"
-                                      Classes="slim"
-                                      ItemsSource="{Binding ControlTreeRoot.Children}"
-                                      SelectedItem="{Binding SelectedNode, Mode=TwoWay}">
-                                <TreeView.DataTemplates>
-                                    <TreeDataTemplate x:DataType="m:ControlNode"
-                                                      ItemsSource="{Binding Children}">
-                                        <TextBlock Text="{Binding DisplayName}"
-                                                   Margin="4,2"
-                                                   Foreground="{StaticResource TextPrimaryBrush}" />
-                                    </TreeDataTemplate>
-                                </TreeView.DataTemplates>
-                            </TreeView>
+                    <Border Grid.Row="2"
+                            Background="{StaticResource PanelBrush}"
+                            BorderBrush="{StaticResource StrokeBrush}"
+                            BorderThickness="0,1,0,0"
+                            Padding="10">
+                        <Grid RowDefinitions="Auto,*" RowSpacing="8">
+                            <TextBlock Text="Toolbox"
+                                       Classes="section-title" />
+                            <ListBox Grid.Row="1"
+                                     Classes="ide-list"
+                                     ItemsSource="{Binding AvailableControls}"
+                                     SelectionMode="Single"
+                                     SelectionChanged="ToolboxListBox_SelectionChanged">
+                                <ListBox.ItemTemplate>
+                                    <DataTemplate x:DataType="j:JObject">
+                                        <TextBlock Text="{Binding [TypeName]}"
+                                                   Margin="4"
+                                                   Foreground="{StaticResource TextPrimaryBrush}"
+                                                   ToolTip.Tip="Select to add to the chosen container" />
+                                    </DataTemplate>
+                                </ListBox.ItemTemplate>
+                            </ListBox>
                         </Grid>
-                    </Grid>
-                </Border>
-            </Grid>
-
-            <Border Grid.Column="1" Classes="panel">
-                <Grid RowDefinitions="Auto, *, Auto" RowSpacing="12">
-                    <StackPanel>
-                        <TextBlock Classes="panel-kicker" Text="Document" />
-                        <TextBlock Classes="section-title" Text="JSON Source" />
-                        <TextBlock Classes="helper"
-                                   Text="The designer persists changes back into the opened .arxui file."
-                                   TextWrapping="Wrap" />
-                    </StackPanel>
-
-                    <TextBox Grid.Row="1"
-                             Classes="editor"
-                             Text="{Binding JsonText}"
-                             AcceptsReturn="True"
-                             AcceptsTab="True"
-                             FontFamily="Consolas, Cascadia Code, Menlo, Monaco"
-                             FontSize="12.5"
-                             TextWrapping="NoWrap" />
-
-                    <Button Grid.Row="2"
-                            Content="Delete Selected Control"
-                            Command="{Binding DeleteSelectedControlCommand}"
-                            HorizontalAlignment="Stretch" />
-                </Grid>
-            </Border>
-
-            <Border Grid.Column="2" Classes="panel raised">
-                <Grid RowDefinitions="Auto, *" RowSpacing="12">
-                    <StackPanel>
-                        <TextBlock Classes="panel-kicker" Text="Preview" />
-                        <TextBlock Classes="section-title" Text="Rendered UI" />
-                        <TextBlock Classes="helper"
-                                   Text="Preview is built from the .arxui model and project styles/resources, without executing user event code."
-                                   TextWrapping="Wrap"
-                                   MaxWidth="640" />
-                    </StackPanel>
-
-                    <Border Grid.Row="1"
-                            Background="#E9EEF3"
-                            BorderBrush="{StaticResource StrokeStrongBrush}"
-                            BorderThickness="1"
-                            Padding="18"
-                            ClipToBounds="True">
-                        <ContentControl Content="{Binding RenderedContent}"
-                                        HorizontalContentAlignment="Stretch"
-                                        VerticalContentAlignment="Stretch" />
                     </Border>
                 </Grid>
             </Border>
 
-            <Border Grid.Column="3" Classes="panel">
-                <Grid RowDefinitions="Auto, *" RowSpacing="12">
-                    <StackPanel>
-                        <TextBlock Classes="panel-kicker" Text="Inspector" />
-                        <TextBlock Classes="section-title" Text="Properties" />
-                        <TextBlock Classes="helper"
-                                   Text="Edit scalar values of the currently selected node."
-                                   TextWrapping="Wrap" />
-                    </StackPanel>
+            <GridSplitter Grid.Column="2"
+                          Background="{StaticResource StrokeBrush}"
+                          ResizeDirection="Columns"
+                          Width="10" />
 
-                    <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto">
+            <Grid Grid.Column="3" RowDefinitions="36,*">
+                <Border Grid.Row="0"
+                        Background="{StaticResource ChromeBrush}"
+                        BorderBrush="{StaticResource StrokeBrush}"
+                        BorderThickness="0,0,0,1">
+                    <Grid ColumnDefinitions="Auto,Auto,Auto,16,Auto,*" Margin="8,0">
+                        <Button Grid.Column="0"
+                                Classes="chrome"
+                                Content="Designer"
+                                Command="{Binding SetWorkspaceModeCommand}"
+                                CommandParameter="Designer" />
+                        <Button Grid.Column="1"
+                                Classes="chrome"
+                                Content="Source"
+                                Command="{Binding SetWorkspaceModeCommand}"
+                                CommandParameter="Source" />
+                        <Button Grid.Column="2"
+                                Classes="chrome"
+                                Content="Split"
+                                Command="{Binding SetWorkspaceModeCommand}"
+                                CommandParameter="Split" />
+                        <Border Grid.Column="4"
+                                Classes="mode-tab"
+                                Padding="10,7"
+                                Margin="0">
+                            <TextBlock Classes="mode-tab" Text="MainWindow.arxui" />
+                        </Border>
+                    </Grid>
+                </Border>
+
+                <Grid Grid.Row="1">
+                    <Grid IsVisible="{Binding IsDesignerMode}" ColumnDefinitions="280, *, 18">
+                        <Border Grid.Column="0"
+                                Classes="panel"
+                                BorderThickness="0,0,1,1">
+                            <Grid RowDefinitions="36,*">
+                                <Border Grid.Row="0"
+                                        Background="{StaticResource ChromeBrush}"
+                                        BorderBrush="{StaticResource StrokeBrush}"
+                                        BorderThickness="0,0,0,1"
+                                        Padding="12,0">
+                                    <TextBlock Text="Document Outline"
+                                               Foreground="{StaticResource TextPrimaryBrush}"
+                                               VerticalAlignment="Center"
+                                               FontWeight="SemiBold" />
+                                </Border>
+
+                                <TreeView Grid.Row="1"
+                                          Classes="ide-tree"
+                                          Margin="8"
+                                          ItemsSource="{Binding ControlTreeRoot.Children}"
+                                          SelectedItem="{Binding SelectedNode, Mode=TwoWay}">
+                                    <TreeView.DataTemplates>
+                                        <TreeDataTemplate x:DataType="m:ControlNode"
+                                                          ItemsSource="{Binding Children}">
+                                            <TextBlock Text="{Binding DisplayName}"
+                                                       Margin="4,2"
+                                                       Foreground="{StaticResource TextPrimaryBrush}" />
+                                        </TreeDataTemplate>
+                                    </TreeView.DataTemplates>
+                                </TreeView>
+                            </Grid>
+                        </Border>
+
+                        <Border Grid.Column="1"
+                                Background="{StaticResource CanvasBrush}"
+                                BorderBrush="{StaticResource StrokeBrush}"
+                                BorderThickness="0,0,0,1">
+                            <Grid RowDefinitions="38, *, 38">
+                                <Border Grid.Row="0"
+                                        Background="{StaticResource ChromeBrush}"
+                                        BorderBrush="{StaticResource StrokeBrush}"
+                                        BorderThickness="0,0,0,1"
+                                        Padding="12,0">
+                                    <Grid ColumnDefinitions="Auto,*,Auto,Auto,Auto,Auto" VerticalAlignment="Center">
+                                        <TextBlock Text="ArxisStudio.Markup.Template"
+                                                   Foreground="{StaticResource SuccessBrush}"
+                                                   VerticalAlignment="Center" />
+                                        <Button Grid.Column="2" Classes="chrome" Content="−" Command="{Binding ZoomOutCommand}" />
+                                        <Button Grid.Column="3" Classes="chrome" Content="↺" Command="{Binding ResetZoomCommand}" />
+                                        <Button Grid.Column="4" Classes="chrome" Content="+" Command="{Binding ZoomInCommand}" />
+                                        <TextBlock Grid.Column="5"
+                                                   Text="{Binding PreviewZoomPercent}"
+                                                   Foreground="{StaticResource TextSecondaryBrush}"
+                                                   VerticalAlignment="Center"
+                                                   Margin="12,0,0,0" />
+                                    </Grid>
+                                </Border>
+
+                                <Border Grid.Row="1"
+                                        Margin="0"
+                                        Background="{StaticResource CanvasBrush}">
+                                    <Grid ShowGridLines="False">
+                                        <Canvas>
+                                            <Rectangle Width="2000"
+                                                       Height="2000"
+                                                       Fill="Transparent"
+                                                       Stroke="{StaticResource CanvasGridBrush}"
+                                                       StrokeThickness="0.25"
+                                                       StrokeDashArray="1,11" />
+                                        </Canvas>
+                                        <ScrollViewer HorizontalScrollBarVisibility="Auto"
+                                                      VerticalScrollBarVisibility="Auto">
+                                            <Grid Margin="90">
+                                                <Border Background="#000000"
+                                                        BorderBrush="{StaticResource StrokeBrush}"
+                                                        BorderThickness="1"
+                                                        Padding="40"
+                                                        RenderTransformOrigin="0.5,0.5">
+                                                    <Border.RenderTransform>
+                                                        <ScaleTransform ScaleX="{Binding PreviewZoom}" ScaleY="{Binding PreviewZoom}" />
+                                                    </Border.RenderTransform>
+                                                    <ContentControl Content="{Binding RenderedContent}"
+                                                                    HorizontalContentAlignment="Center"
+                                                                    VerticalContentAlignment="Center" />
+                                                </Border>
+                                            </Grid>
+                                        </ScrollViewer>
+                                    </Grid>
+                                </Border>
+
+                                <Border Grid.Row="2"
+                                        Background="{StaticResource ChromeBrush}"
+                                        BorderBrush="{StaticResource StrokeBrush}"
+                                        BorderThickness="0,1,0,0"
+                                        Padding="12,0">
+                                    <TextBlock Text="Preview builds the UI from .arxui and project resources without running user event code."
+                                               Foreground="{StaticResource TextMutedBrush}"
+                                               VerticalAlignment="Center"
+                                               TextTrimming="CharacterEllipsis" />
+                                </Border>
+                            </Grid>
+                        </Border>
+
+                        <Border Grid.Column="2"
+                                Background="{StaticResource EditorBrush}"
+                                BorderBrush="{StaticResource StrokeBrush}"
+                                BorderThickness="1,0,0,1">
+                            <TextBlock Text="⋮"
+                                       Foreground="{StaticResource TextMutedBrush}"
+                                       HorizontalAlignment="Center"
+                                       VerticalAlignment="Top"
+                                       Margin="0,10,0,0" />
+                        </Border>
+                    </Grid>
+
+                    <Border IsVisible="{Binding IsSourceMode}"
+                            Background="{StaticResource EditorBrush}"
+                            BorderBrush="{StaticResource StrokeBrush}"
+                            BorderThickness="0,0,0,1">
+                        <Grid RowDefinitions="34,*">
+                            <Border Grid.Row="0"
+                                    Background="{StaticResource ChromeBrush}"
+                                    BorderBrush="{StaticResource StrokeBrush}"
+                                    BorderThickness="0,0,0,1"
+                                    Padding="12,0">
+                                <TextBlock Text="Source"
+                                           Foreground="{StaticResource TextPrimaryBrush}"
+                                           VerticalAlignment="Center"
+                                           FontWeight="SemiBold" />
+                            </Border>
+
+                            <TextBox Grid.Row="1"
+                                     Classes="editor"
+                                     Margin="10"
+                                     Text="{Binding JsonText}"
+                                     AcceptsReturn="True"
+                                     AcceptsTab="True"
+                                     FontFamily="Consolas, Cascadia Code, Menlo, Monaco"
+                                     FontSize="12.5"
+                                     TextWrapping="NoWrap" />
+                        </Grid>
+                    </Border>
+
+                    <Grid IsVisible="{Binding IsSplitMode}" RowDefinitions="*,240">
+                        <Grid Grid.Row="0" ColumnDefinitions="280, *, 18">
+                            <Border Grid.Column="0"
+                                    Classes="panel"
+                                    BorderThickness="0,0,1,1">
+                                <Grid RowDefinitions="36,*">
+                                    <Border Grid.Row="0"
+                                            Background="{StaticResource ChromeBrush}"
+                                            BorderBrush="{StaticResource StrokeBrush}"
+                                            BorderThickness="0,0,0,1"
+                                            Padding="12,0">
+                                        <TextBlock Text="Document Outline"
+                                                   Foreground="{StaticResource TextPrimaryBrush}"
+                                                   VerticalAlignment="Center"
+                                                   FontWeight="SemiBold" />
+                                    </Border>
+
+                                    <TreeView Grid.Row="1"
+                                              Classes="ide-tree"
+                                              Margin="8"
+                                              ItemsSource="{Binding ControlTreeRoot.Children}"
+                                              SelectedItem="{Binding SelectedNode, Mode=TwoWay}">
+                                        <TreeView.DataTemplates>
+                                            <TreeDataTemplate x:DataType="m:ControlNode"
+                                                              ItemsSource="{Binding Children}">
+                                                <TextBlock Text="{Binding DisplayName}"
+                                                           Margin="4,2"
+                                                           Foreground="{StaticResource TextPrimaryBrush}" />
+                                            </TreeDataTemplate>
+                                        </TreeView.DataTemplates>
+                                    </TreeView>
+                                </Grid>
+                            </Border>
+
+                            <Border Grid.Column="1"
+                                    Background="{StaticResource CanvasBrush}"
+                                    BorderBrush="{StaticResource StrokeBrush}"
+                                    BorderThickness="0,0,0,1">
+                                <Grid RowDefinitions="38, *, 38">
+                                    <Border Grid.Row="0"
+                                            Background="{StaticResource ChromeBrush}"
+                                            BorderBrush="{StaticResource StrokeBrush}"
+                                            BorderThickness="0,0,0,1"
+                                            Padding="12,0">
+                                        <Grid ColumnDefinitions="Auto,*,Auto,Auto,Auto,Auto" VerticalAlignment="Center">
+                                            <TextBlock Text="ArxisStudio.Markup.Template"
+                                                       Foreground="{StaticResource SuccessBrush}"
+                                                       VerticalAlignment="Center" />
+                                            <Button Grid.Column="2" Classes="chrome" Content="−" Command="{Binding ZoomOutCommand}" />
+                                            <Button Grid.Column="3" Classes="chrome" Content="↺" Command="{Binding ResetZoomCommand}" />
+                                            <Button Grid.Column="4" Classes="chrome" Content="+" Command="{Binding ZoomInCommand}" />
+                                            <TextBlock Grid.Column="5"
+                                                       Text="{Binding PreviewZoomPercent}"
+                                                       Foreground="{StaticResource TextSecondaryBrush}"
+                                                       VerticalAlignment="Center"
+                                                       Margin="12,0,0,0" />
+                                        </Grid>
+                                    </Border>
+
+                                    <Border Grid.Row="1"
+                                            Margin="0"
+                                            Background="{StaticResource CanvasBrush}">
+                                        <Grid ShowGridLines="False">
+                                            <Canvas>
+                                                <Rectangle Width="2000"
+                                                           Height="2000"
+                                                           Fill="Transparent"
+                                                           Stroke="{StaticResource CanvasGridBrush}"
+                                                           StrokeThickness="0.25"
+                                                           StrokeDashArray="1,11" />
+                                            </Canvas>
+                                            <ScrollViewer HorizontalScrollBarVisibility="Auto"
+                                                          VerticalScrollBarVisibility="Auto">
+                                                <Grid Margin="90">
+                                                    <Border Background="#000000"
+                                                            BorderBrush="{StaticResource StrokeBrush}"
+                                                            BorderThickness="1"
+                                                            Padding="40"
+                                                            RenderTransformOrigin="0.5,0.5">
+                                                        <Border.RenderTransform>
+                                                            <ScaleTransform ScaleX="{Binding PreviewZoom}" ScaleY="{Binding PreviewZoom}" />
+                                                        </Border.RenderTransform>
+                                                        <ContentControl Content="{Binding RenderedContent}"
+                                                                        HorizontalContentAlignment="Center"
+                                                                        VerticalContentAlignment="Center" />
+                                                    </Border>
+                                                </Grid>
+                                            </ScrollViewer>
+                                        </Grid>
+                                    </Border>
+
+                                    <Border Grid.Row="2"
+                                            Background="{StaticResource ChromeBrush}"
+                                            BorderBrush="{StaticResource StrokeBrush}"
+                                            BorderThickness="0,1,0,0"
+                                            Padding="12,0">
+                                        <TextBlock Text="Preview builds the UI from .arxui and project resources without running user event code."
+                                                   Foreground="{StaticResource TextMutedBrush}"
+                                                   VerticalAlignment="Center"
+                                                   TextTrimming="CharacterEllipsis" />
+                                    </Border>
+                                </Grid>
+                            </Border>
+
+                            <Border Grid.Column="2"
+                                    Background="{StaticResource EditorBrush}"
+                                    BorderBrush="{StaticResource StrokeBrush}"
+                                    BorderThickness="1,0,0,1">
+                                <TextBlock Text="⋮"
+                                           Foreground="{StaticResource TextMutedBrush}"
+                                           HorizontalAlignment="Center"
+                                           VerticalAlignment="Top"
+                                           Margin="0,10,0,0" />
+                            </Border>
+                        </Grid>
+
+                        <Border Grid.Row="1"
+                                Background="{StaticResource EditorBrush}"
+                                BorderBrush="{StaticResource StrokeBrush}"
+                                BorderThickness="0,1,0,0">
+                            <Grid RowDefinitions="34,*">
+                                <Border Grid.Row="0"
+                                        Background="{StaticResource ChromeBrush}"
+                                        BorderBrush="{StaticResource StrokeBrush}"
+                                        BorderThickness="0,0,0,1"
+                                        Padding="12,0">
+                                    <TextBlock Text="Source"
+                                               Foreground="{StaticResource TextPrimaryBrush}"
+                                               VerticalAlignment="Center"
+                                               FontWeight="SemiBold" />
+                                </Border>
+
+                                <TextBox Grid.Row="1"
+                                         Classes="editor"
+                                         Margin="10"
+                                         Text="{Binding JsonText}"
+                                         AcceptsReturn="True"
+                                         AcceptsTab="True"
+                                         FontFamily="Consolas, Cascadia Code, Menlo, Monaco"
+                                         FontSize="12.5"
+                                         TextWrapping="NoWrap" />
+                            </Grid>
+                        </Border>
+                    </Grid>
+                </Grid>
+            </Grid>
+
+            <Border Grid.Column="4"
+                    Background="{StaticResource EditorAltBrush}"
+                    BorderBrush="{StaticResource StrokeBrush}"
+                    BorderThickness="1,0,0,0">
+                <Grid RowDefinitions="36, *, 128, 48">
+                    <Border Grid.Row="0"
+                            Background="{StaticResource ChromeBrush}"
+                            BorderBrush="{StaticResource StrokeBrush}"
+                            BorderThickness="0,0,0,1"
+                            Padding="12,0">
+                        <Grid ColumnDefinitions="*,Auto" VerticalAlignment="Center">
+                            <TextBlock Text="Inspector"
+                                       Foreground="{StaticResource TextPrimaryBrush}"
+                                       VerticalAlignment="Center"
+                                       FontWeight="SemiBold" />
+                            <TextBlock Grid.Column="1"
+                                       Text="Properties"
+                                       Foreground="{StaticResource TextMutedBrush}"
+                                       VerticalAlignment="Center" />
+                        </Grid>
+                    </Border>
+
+                    <ScrollViewer Grid.Row="1" Margin="8" VerticalScrollBarVisibility="Auto">
                         <ItemsControl ItemsSource="{Binding EditableProperties}">
                             <ItemsControl.ItemTemplate>
                                 <DataTemplate x:DataType="m:PropertyItem">
                                     <Border Margin="0,0,0,10"
-                                            Padding="10"
-                                            Background="{StaticResource SurfaceMutedBrush}"
+                                            Padding="8"
+                                            Background="{StaticResource PanelBrush}"
                                             BorderBrush="{StaticResource StrokeBrush}"
                                             BorderThickness="1">
-                                        <Grid RowDefinitions="Auto, Auto" RowSpacing="8">
+                                        <Grid RowDefinitions="Auto, Auto" RowSpacing="6">
                                             <TextBlock Text="{Binding Name}"
+                                                       FontSize="12"
                                                        FontWeight="SemiBold"
                                                        Foreground="{StaticResource TextPrimaryBrush}" />
                                             <TextBox Grid.Row="1"
@@ -308,27 +648,75 @@
                             </ItemsControl.ItemTemplate>
                         </ItemsControl>
                     </ScrollViewer>
+
+                    <Border Grid.Row="2"
+                            Background="{StaticResource PanelBrush}"
+                            BorderBrush="{StaticResource StrokeBrush}"
+                            BorderThickness="0,1,0,1"
+                            Padding="8">
+                        <Grid RowDefinitions="Auto,Auto,*" RowSpacing="6">
+                            <TextBlock Text="Diagnostics"
+                                       Classes="section-title" />
+                            <TextBlock Grid.Row="1"
+                                       Text="Last message"
+                                       Classes="kicker" />
+                            <TextBlock Grid.Row="2"
+                                       Text="{Binding ErrorMessage}"
+                                       Foreground="#F0B5BD"
+                                       TextWrapping="Wrap" />
+                        </Grid>
+                    </Border>
+
+                    <Button Grid.Row="3"
+                            Margin="8"
+                            Content="Delete Selected Control"
+                            Command="{Binding DeleteSelectedControlCommand}" />
                 </Grid>
             </Border>
         </Grid>
 
         <Border Grid.Row="2"
-                Background="#160C10"
-                BorderBrush="#5D1F2A"
-                BorderThickness="1,0,0,0"
-                Padding="14,12"
-                Margin="0,14,0,0">
-            <Grid ColumnDefinitions="Auto, *" ColumnSpacing="12">
-                <TextBlock Grid.Column="0"
-                           Text="Diagnostics"
-                           Foreground="{StaticResource DangerBrush}"
-                           FontWeight="Bold"
-                           VerticalAlignment="Center" />
-                <TextBlock Grid.Column="1"
-                           Text="{Binding ErrorMessage}"
-                           Foreground="#FFD2D9"
-                           TextWrapping="Wrap"
-                           VerticalAlignment="Center" />
+                Background="{StaticResource EditorBrush}"
+                BorderBrush="{StaticResource StrokeBrush}"
+                BorderThickness="0,1,0,0">
+            <Grid RowDefinitions="34,*">
+                <Border Grid.Row="0"
+                        Background="{StaticResource ChromeBrush}"
+                        BorderBrush="{StaticResource StrokeBrush}"
+                        BorderThickness="0,0,0,1"
+                        Padding="12,0">
+                    <Grid ColumnDefinitions="Auto,16,Auto,8,Auto,16,*">
+                        <TextBlock Text="Run"
+                                   Foreground="{StaticResource TextPrimaryBrush}"
+                                   VerticalAlignment="Center"
+                                   FontWeight="SemiBold" />
+                        <Button Grid.Column="2"
+                                Content="Start"
+                                Command="{Binding RunProjectCommand}"
+                                IsEnabled="{Binding CanRunProject}"
+                                VerticalAlignment="Center" />
+                        <Button Grid.Column="4"
+                                Content="Stop"
+                                Command="{Binding StopProjectCommand}"
+                                IsEnabled="{Binding CanStopProject}"
+                                VerticalAlignment="Center" />
+                        <TextBlock Grid.Column="6"
+                                   Text="{Binding RunStatus}"
+                                   Foreground="{StaticResource TextSecondaryBrush}"
+                                   VerticalAlignment="Center"
+                                   TextTrimming="CharacterEllipsis" />
+                    </Grid>
+                </Border>
+
+                <TextBox Grid.Row="1"
+                         Classes="editor"
+                         Margin="12"
+                         Text="{Binding RunOutput}"
+                         IsReadOnly="True"
+                         AcceptsReturn="True"
+                         TextWrapping="NoWrap"
+                         FontFamily="Consolas, Cascadia Code, Menlo, Monaco"
+                         FontSize="12.5" />
             </Grid>
         </Border>
     </Grid>

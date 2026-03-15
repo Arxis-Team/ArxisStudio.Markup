@@ -1,9 +1,9 @@
 using CommunityToolkit.Mvvm.ComponentModel;
 using System.Globalization;
 using Newtonsoft.Json.Linq;
-using ArxisStudio.Markup.Json.Loader.Services; // Для доступа к DesignerService
+using ArxisStudio.Editor.Services; // Для доступа к DesignerService
 
-namespace ArxisStudio.Markup.Json.Loader.Models
+namespace ArxisStudio.Editor.Models
 {
     public partial class PropertyItem : ObservableObject
     {

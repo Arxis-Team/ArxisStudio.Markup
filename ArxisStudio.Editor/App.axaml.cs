@@ -4,10 +4,10 @@ using Avalonia.Data.Core;
 using Avalonia.Data.Core.Plugins;
 using System.Linq;
 using Avalonia.Markup.Xaml;
-using ArxisStudio.Markup.Json.Loader.ViewModels;
-using ArxisStudio.Markup.Json.Loader.Views;
+using ArxisStudio.Editor.ViewModels;
+using ArxisStudio.Editor.Views;
 
-namespace ArxisStudio.Markup.Json.Loader;
+namespace ArxisStudio.Editor;
 
 public partial class App : Application
 {

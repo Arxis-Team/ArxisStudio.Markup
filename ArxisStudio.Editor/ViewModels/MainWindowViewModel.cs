@@ -1,22 +1,26 @@
 ﻿using ArxisStudio.Markup.Json;
+using Avalonia.Threading;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using Avalonia.Controls;
-using ArxisStudio.Markup.Json.Loader.Services;
+using ArxisStudio.Editor.Services;
 using System;
+using System.Diagnostics;
 using System.IO;
 using System.Linq;
 using Newtonsoft.Json.Linq;
 using System.Collections.ObjectModel;
-using ArxisStudio.Markup.Json.Loader.Models;
+using ArxisStudio.Editor.Models;
+using System.Threading.Tasks;
 
-namespace ArxisStudio.Markup.Json.Loader.ViewModels
+namespace ArxisStudio.Editor.ViewModels
 {
     public partial class MainWindowViewModel : ObservableObject
     {
         private readonly ProjectDiscoveryService _projectDiscoveryService = new();
         private bool _suppressJsonTextChanged;
         private string? _currentDocumentPath;
+        private Process? _runningProcess;
 
         [ObservableProperty]
         private string _jsonText = "";
@@ -49,6 +53,33 @@ namespace ArxisStudio.Markup.Json.Loader.ViewModels
 
         [ObservableProperty]
         private ProjectFileItem? _selectedProjectFile;
+
+        [ObservableProperty]
+        private string _workspaceMode = "Designer";
+
+        [ObservableProperty]
+        private double _previewZoom = 1.0;
+
+        [ObservableProperty]
+        private string _runOutput = "";
+
+        [ObservableProperty]
+        private string _runStatus = "No process started.";
+
+        [ObservableProperty]
+        private bool _isProjectRunning;
+
+        public bool IsDesignerMode => WorkspaceMode == "Designer";
+
+        public bool IsSourceMode => WorkspaceMode == "Source";
+
+        public bool IsSplitMode => WorkspaceMode == "Split";
+
+        public string PreviewZoomPercent => $"{PreviewZoom * 100:0}%";
+
+        public bool CanRunProject => !IsProjectRunning && !string.IsNullOrWhiteSpace(ProjectPathInput);
+
+        public bool CanStopProject => IsProjectRunning;
 
         public ObservableCollection<ProjectFileItem> ProjectArxuiFiles { get; } = new();
 
@@ -174,6 +205,49 @@ namespace ArxisStudio.Markup.Json.Loader.ViewModels
         partial void OnSelectedProjectFileChanged(ProjectFileItem? oldValue, ProjectFileItem? newValue)
         {
             OpenSelectedProjectFileCommand.NotifyCanExecuteChanged();
+        }
+
+        partial void OnLoadedProjectChanged(ProjectContext? value)
+        {
+            RunProjectCommand.NotifyCanExecuteChanged();
+        }
+
+        partial void OnProjectPathInputChanged(string value)
+        {
+            OnPropertyChanged(nameof(CanRunProject));
+            RunProjectCommand.NotifyCanExecuteChanged();
+        }
+
+        partial void OnWorkspaceModeChanged(string value)
+        {
+            OnPropertyChanged(nameof(IsDesignerMode));
+            OnPropertyChanged(nameof(IsSourceMode));
+            OnPropertyChanged(nameof(IsSplitMode));
+        }
+
+        partial void OnPreviewZoomChanged(double value)
+        {
+            if (value < 0.25)
+            {
+                PreviewZoom = 0.25;
+                return;
+            }
+
+            if (value > 3.0)
+            {
+                PreviewZoom = 3.0;
+                return;
+            }
+
+            OnPropertyChanged(nameof(PreviewZoomPercent));
+        }
+
+        partial void OnIsProjectRunningChanged(bool value)
+        {
+            OnPropertyChanged(nameof(CanRunProject));
+            OnPropertyChanged(nameof(CanStopProject));
+            RunProjectCommand.NotifyCanExecuteChanged();
+            StopProjectCommand.NotifyCanExecuteChanged();
         }
         
         // --- Основная логика синхронизации и исправления ошибки ---
@@ -375,6 +449,134 @@ namespace ArxisStudio.Markup.Json.Loader.ViewModels
         public bool CanOpenSelectedProjectFile => SelectedProjectFile != null;
 
         [RelayCommand]
+        private void SetWorkspaceMode(string? mode)
+        {
+            if (string.IsNullOrWhiteSpace(mode))
+            {
+                return;
+            }
+
+            WorkspaceMode = mode;
+        }
+
+        [RelayCommand]
+        private void ZoomIn()
+        {
+            PreviewZoom = Math.Round(PreviewZoom + 0.1, 2);
+        }
+
+        [RelayCommand]
+        private void ZoomOut()
+        {
+            PreviewZoom = Math.Round(PreviewZoom - 0.1, 2);
+        }
+
+        [RelayCommand]
+        private void ResetZoom()
+        {
+            PreviewZoom = 1.0;
+        }
+
+        [RelayCommand(CanExecute = nameof(CanRunProject))]
+        private async Task RunProject()
+        {
+            if (IsProjectRunning || string.IsNullOrWhiteSpace(ProjectPathInput))
+            {
+                return;
+            }
+
+            try
+            {
+                if (LoadedProject == null || !string.Equals(LoadedProject.ProjectPath, ProjectPathInput, StringComparison.OrdinalIgnoreCase))
+                {
+                    var project = _projectDiscoveryService.Load(ProjectPathInput);
+                    LoadedProject = project;
+                }
+
+                if (LoadedProject == null)
+                {
+                    RunStatus = "Project is not loaded.";
+                    return;
+                }
+
+                var projectPath = LoadedProject.ProjectPath;
+                var workingDirectory = Path.GetDirectoryName(projectPath) ?? Environment.CurrentDirectory;
+
+                RunOutput = "";
+                RunStatus = $"Starting {Path.GetFileName(projectPath)}...";
+
+                var process = new Process
+                {
+                    StartInfo = new ProcessStartInfo
+                    {
+                        FileName = "dotnet",
+                        Arguments = $"run --project \"{projectPath}\"",
+                        WorkingDirectory = workingDirectory,
+                        RedirectStandardOutput = true,
+                        RedirectStandardError = true,
+                        UseShellExecute = false,
+                        CreateNoWindow = true
+                    },
+                    EnableRaisingEvents = true
+                };
+
+                process.OutputDataReceived += (_, args) => AppendRunOutput(args.Data);
+                process.ErrorDataReceived += (_, args) => AppendRunOutput(args.Data);
+
+                if (!process.Start())
+                {
+                    RunStatus = "Failed to start process.";
+                    return;
+                }
+
+                _runningProcess = process;
+                IsProjectRunning = true;
+                RunStatus = $"Running PID {process.Id}";
+                AppendRunOutput($"> dotnet run --project \"{projectPath}\"");
+
+                process.BeginOutputReadLine();
+                process.BeginErrorReadLine();
+
+                await process.WaitForExitAsync();
+
+                var exitCode = process.ExitCode;
+                _runningProcess = null;
+                IsProjectRunning = false;
+                RunStatus = $"Process finished with exit code {exitCode}.";
+                AppendRunOutput($"Process finished with exit code {exitCode}.");
+            }
+            catch (Exception ex)
+            {
+                _runningProcess = null;
+                IsProjectRunning = false;
+                RunStatus = "Run failed.";
+                AppendRunOutput($"Run error: {ex.Message}");
+                ErrorMessage = $"Run Error: {ex.Message}";
+            }
+        }
+
+        [RelayCommand(CanExecute = nameof(CanStopProject))]
+        private void StopProject()
+        {
+            if (_runningProcess == null || _runningProcess.HasExited)
+            {
+                return;
+            }
+
+            try
+            {
+                AppendRunOutput($"Stopping PID {_runningProcess.Id}...");
+                _runningProcess.Kill(entireProcessTree: true);
+                RunStatus = "Stopping process...";
+            }
+            catch (Exception ex)
+            {
+                AppendRunOutput($"Stop error: {ex.Message}");
+                ErrorMessage = $"Stop Error: {ex.Message}";
+            }
+        }
+
+        [RelayCommand]
         private void AddNewControl(JObject? controlTemplate)
         {
             if (SelectedNode == null)
@@ -434,5 +636,20 @@ namespace ArxisStudio.Markup.Json.Loader.ViewModels
         public bool CanDeleteSelectedControl => SelectedNode != null && 
                                                SelectedNode.ParentJsonContainer != null && 
                                                SelectedNode.DisplayName != "Root Document";
+
+        private void AppendRunOutput(string? line)
+        {
+            if (string.IsNullOrWhiteSpace(line))
+            {
+                return;
+            }
+
+            Dispatcher.UIThread.Post(() =>
+            {
+                RunOutput = string.IsNullOrWhiteSpace(RunOutput)
+                    ? line
+                    : $"{RunOutput}{Environment.NewLine}{line}";
+            });
+        }
     }
 }

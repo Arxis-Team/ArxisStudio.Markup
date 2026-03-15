@@ -1,9 +1,9 @@
 using System;
 using Avalonia.Controls;
 using Avalonia.Controls.Templates;
-using ArxisStudio.Markup.Json.Loader.ViewModels;
+using ArxisStudio.Editor.ViewModels;
 
-namespace ArxisStudio.Markup.Json.Loader;
+namespace ArxisStudio.Editor;
 
 public class ViewLocator : IDataTemplate
 {

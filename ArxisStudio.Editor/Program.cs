@@ -1,7 +1,7 @@
 ﻿using Avalonia;
 using System;
 
-namespace ArxisStudio.Markup.Json.Loader;
+namespace ArxisStudio.Editor;
 
 sealed class Program
 {

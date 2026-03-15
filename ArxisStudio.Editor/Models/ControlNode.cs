@@ -3,7 +3,7 @@ using Newtonsoft.Json.Linq;
 using System.Collections.ObjectModel;
 using System.Linq;
 
-namespace ArxisStudio.Markup.Json.Loader.Models
+namespace ArxisStudio.Editor.Models
 {
     public partial class ControlNode : ObservableObject
     {

@@ -6,7 +6,8 @@ public sealed record UiDocument(
     int SchemaVersion,
     UiDocumentKind Kind,
     string? Class,
-    UiNode Root);
+    UiNode Root,
+    UiDocumentDesign? Design = null);
 
 public enum UiDocumentKind
 {
@@ -21,7 +22,19 @@ public sealed record UiNode(
     string TypeName,
     IReadOnlyDictionary<string, UiValue> Properties,
     UiStyles? Styles = null,
-    UiResources? Resources = null);
+    UiResources? Resources = null,
+    UiNodeDesign? Design = null);
+
+public sealed record UiDocumentDesign(
+    double? SurfaceWidth = null,
+    double? SurfaceHeight = null);
+
+public sealed record UiNodeDesign(
+    bool? Locked = null,
+    bool? Hidden = null,
+    bool? IgnorePreviewInput = null,
+    bool? AllowMove = null,
+    bool? AllowResize = null);
 
 public sealed record UiStyles(
     IReadOnlyList<UiStyleValue> Items);

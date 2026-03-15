@@ -1,4 +1,4 @@
-namespace ArxisStudio.Markup.Json.Loader.Models;
+namespace ArxisStudio.Editor.Models;
 
 public sealed class ProjectFileItem
 {

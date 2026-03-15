@@ -1,6 +1,6 @@
 ﻿using CommunityToolkit.Mvvm.ComponentModel;
 
-namespace ArxisStudio.Markup.Json.Loader.ViewModels;
+namespace ArxisStudio.Editor.ViewModels;
 
 public class ViewModelBase : ObservableObject
 {

@@ -1,6 +1,6 @@
 using System;
 
-namespace ArxisStudio.Markup.Json.Loader.Services
+namespace ArxisStudio.Editor.Services
 {
     public enum DesignerChangeKind
     {

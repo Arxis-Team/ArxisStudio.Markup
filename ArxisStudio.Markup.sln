@@ -8,7 +8,7 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "ArxisStudio.Markup.Sample",
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "ArxisStudio.Markup.Json.Generator.Tests", "ArxisStudio.Tests\ArxisStudio.Markup.Json.Generator.Tests.csproj", "{CD5B3C4E-8482-45F8-8A6D-24D45A07AB65}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "ArxisStudio.Editor", "ArxisStudio.Editor\ArxisStudio.Markup.Json.Loader.csproj", "{5AB36F98-F930-47AF-9874-BC1DDE640A77}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "ArxisStudio.Editor", "ArxisStudio.Editor\ArxisStudio.Editor.csproj", "{5AB36F98-F930-47AF-9874-BC1DDE640A77}"
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "ArxisStudio.Template", "ArxisStudio.Template\ArxisStudio.Markup.Template.csproj", "{8A6B5D0E-0E19-4F42-84C9-B06B98F508A5}"
 EndProject

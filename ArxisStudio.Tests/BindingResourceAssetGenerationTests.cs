@@ -121,5 +121,38 @@ namespace TestApp.Views
                 "this.AvatarImage.Source = new global::Avalonia.Media.Imaging.Bitmap(global::Avalonia.Platform.AssetLoader.Open(new global::System.Uri(\"avares://Sample.Assembly/Assets/avatar.png\")));",
                 source);
         }
+
+        [Fact]
+        public void Multiline_string_values_should_be_escaped_in_generated_code()
+        {
+            const string multilineJson = @"
+{
+  ""SchemaVersion"": 1,
+  ""Kind"": ""Control"",
+  ""Class"": ""TestApp.Views.BindingResourceAssetControl"",
+  ""Root"": {
+    ""TypeName"": ""Avalonia.Controls.UserControl"",
+    ""Properties"": {
+      ""Content"": {
+        ""TypeName"": ""Avalonia.Controls.TextBlock"",
+        ""Properties"": {
+          ""Text"": ""Первая строка\nВторая строка\tс табом""
+        }
+      }
+    }
+  }
+}
+";
+
+            var source = GeneratorTestHelper.GetGeneratedSource(
+                DummyUserControlSource,
+                "BindingResourceAssetControl.arxui.cs",
+                "TestApp.Views.BindingResourceAssetControl.g.cs",
+                ("BindingResourceAssetControl.arxui", multilineJson));
+
+            Assert.Contains("\\n", source);
+            Assert.Contains("\\t", source);
+            Assert.Contains("Первая строка\\nВторая строка\\tс табом", source);
+        }
     }
 }

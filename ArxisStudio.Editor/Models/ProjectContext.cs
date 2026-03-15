@@ -1,6 +1,6 @@
 using System.Collections.Generic;
 
-namespace ArxisStudio.Markup.Json.Loader.Models;
+namespace ArxisStudio.Editor.Models;
 
 public sealed class ProjectContext
 {

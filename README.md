@@ -90,6 +90,7 @@
 - подключать `StyleInclude`
 - подключать merged resource dictionaries
 - хранить локальные keyed resources у root и вложенных узлов
+- хранить design-time metadata через `$design`
 
 Этого уже достаточно для:
 
@@ -97,6 +98,45 @@
 - `Window` и `UserControl` деревьев
 - локальных ресурсов внутри визуального дерева
 - гибридного сценария, где стили живут в `.axaml`, а layout в `.arxui`
+
+## Design-Time Метаданные
+
+`.arxui` теперь поддерживает минимальный design-time канал `$design`, аналогичный по смыслу `d:*` в XAML.
+
+Generator и production runtime должны игнорировать эти поля. Они предназначены для визуального редактора и preview.
+
+На текущем этапе поддерживаются:
+
+- document-level `SurfaceWidth`
+- document-level `SurfaceHeight`
+- node-level `Locked`
+- node-level `Hidden`
+- node-level `IgnorePreviewInput`
+- node-level `AllowMove`
+- node-level `AllowResize`
+
+Пример:
+
+```json
+{
+  "SchemaVersion": 1,
+  "Kind": "Control",
+  "Class": "MyApp.Views.DashboardView",
+  "$design": {
+    "SurfaceWidth": 1440,
+    "SurfaceHeight": 900
+  },
+  "Root": {
+    "TypeName": "Avalonia.Controls.UserControl",
+    "$design": {
+      "IgnorePreviewInput": true,
+      "AllowMove": true,
+      "AllowResize": true
+    },
+    "Properties": {}
+  }
+}
+```
 
 ## Чем Проект Не Является
 
@@ -269,7 +309,7 @@ public partial class SolidColorBrush : ContentControl
 dotnet build ArxisStudio.Markup.sln
 dotnet test ArxisStudio.Markup.sln
 dotnet run --project ArxisStudio.Sample/ArxisStudio.Markup.Sample.csproj
-dotnet run --project ArxisStudio.Editor/ArxisStudio.Markup.Json.Loader.csproj
+dotnet run --project ArxisStudio.Editor/ArxisStudio.Editor.csproj
 dotnet run --project ArxisStudio.Template/ArxisStudio.Markup.Template.csproj
 ```
 

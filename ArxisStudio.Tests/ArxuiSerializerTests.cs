@@ -12,8 +12,18 @@ namespace ArxisStudio.Markup.Json.Generator.Tests
   ""SchemaVersion"": 1,
   ""Kind"": ""Control"",
   ""Class"": ""Sample.Views.ProfileView"",
+  ""$design"": {
+    ""SurfaceWidth"": 1440,
+    ""SurfaceHeight"": 900
+  },
   ""Root"": {
     ""TypeName"": ""Avalonia.Controls.UserControl"",
+    ""$design"": {
+      ""Locked"": false,
+      ""IgnorePreviewInput"": true,
+      ""AllowMove"": true,
+      ""AllowResize"": true
+    },
     ""Styles"": [
       {
         ""$styleInclude"": ""avares://Sample.Assembly/Styles/ProfileView.axaml""
@@ -43,6 +53,9 @@ namespace ArxisStudio.Markup.Json.Generator.Tests
       },
       ""Content"": {
         ""TypeName"": ""Avalonia.Controls.Image"",
+        ""$design"": {
+          ""Hidden"": false
+        },
         ""Properties"": {
           ""Source"": {
             ""$asset"": {
@@ -74,7 +87,15 @@ namespace ArxisStudio.Markup.Json.Generator.Tests
             Assert.Equal(1, document!.SchemaVersion);
             Assert.Equal(UiDocumentKind.Control, document.Kind);
             Assert.Equal("Sample.Views.ProfileView", document.Class);
+            Assert.NotNull(document.Design);
+            Assert.Equal(1440, document.Design!.SurfaceWidth);
+            Assert.Equal(900, document.Design.SurfaceHeight);
             Assert.Equal("Avalonia.Controls.UserControl", document.Root.TypeName);
+            Assert.NotNull(document.Root.Design);
+            Assert.False(document.Root.Design!.Locked);
+            Assert.True(document.Root.Design.IgnorePreviewInput);
+            Assert.True(document.Root.Design.AllowMove);
+            Assert.True(document.Root.Design.AllowResize);
             Assert.NotNull(document.Root.Styles);
             Assert.Equal(2, document.Root.Styles!.Items.Count);
             var styleInclude = Assert.IsType<StyleIncludeValue>(document.Root.Styles.Items[0]);
@@ -91,6 +112,8 @@ namespace ArxisStudio.Markup.Json.Generator.Tests
             Assert.Equal("BackgroundBrush", background.Key);
 
             var content = Assert.IsType<NodeValue>(document.Root.Properties["Content"]);
+            Assert.NotNull(content.Node.Design);
+            Assert.False(content.Node.Design!.Hidden);
             var source = Assert.IsType<UriReferenceValue>(content.Node.Properties["Source"]);
             Assert.Equal("/Assets/avatar.png", source.Path);
             Assert.Equal("Sample.Assembly", source.Assembly);
@@ -115,7 +138,12 @@ namespace ArxisStudio.Markup.Json.Generator.Tests
             Assert.Equal(original!.SchemaVersion, roundTripped!.SchemaVersion);
             Assert.Equal(original.Kind, roundTripped.Kind);
             Assert.Equal(original.Class, roundTripped.Class);
+            Assert.NotNull(roundTripped.Design);
+            Assert.Equal(1440, roundTripped.Design!.SurfaceWidth);
+            Assert.Equal(900, roundTripped.Design.SurfaceHeight);
             Assert.Equal(original.Root.TypeName, roundTripped.Root.TypeName);
+            Assert.NotNull(roundTripped.Root.Design);
+            Assert.True(roundTripped.Root.Design!.IgnorePreviewInput);
             Assert.NotNull(roundTripped.Root.Styles);
             Assert.Equal(2, roundTripped.Root.Styles!.Items.Count);
             var roundTrippedStyleInclude = Assert.IsType<StyleIncludeValue>(roundTripped.Root.Styles.Items[0]);
@@ -130,6 +158,8 @@ namespace ArxisStudio.Markup.Json.Generator.Tests
             Assert.Equal("BackgroundBrush", roundTrippedBackground.Key);
 
             var roundTrippedContent = Assert.IsType<NodeValue>(roundTripped.Root.Properties["Content"]);
+            Assert.NotNull(roundTrippedContent.Node.Design);
+            Assert.False(roundTrippedContent.Node.Design!.Hidden);
             var roundTrippedSource = Assert.IsType<UriReferenceValue>(roundTrippedContent.Node.Properties["Source"]);
             Assert.Equal("/Assets/avatar.png", roundTrippedSource.Path);
             Assert.Equal("Sample.Assembly", roundTrippedSource.Assembly);
@@ -146,6 +176,9 @@ namespace ArxisStudio.Markup.Json.Generator.Tests
             Assert.Contains(@"""Assembly"": ""Sample.Assembly""", serialized);
             Assert.Contains(@"""$styleInclude"": ""avares://Sample.Assembly/Styles/ProfileView.axaml""", serialized);
             Assert.Contains(@"""$mergedDictionaries"": [", serialized);
+            Assert.Contains(@"""$design"": {", serialized);
+            Assert.Contains(@"""SurfaceWidth"": 1440.0", serialized);
+            Assert.Contains(@"""IgnorePreviewInput"": true", serialized);
         }
 
         [Fact]

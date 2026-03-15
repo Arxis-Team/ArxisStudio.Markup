@@ -49,7 +49,7 @@
                             "Properties": {
                               "Classes": "hero-copy",
                               "TextWrapping": "Wrap",
-                              "Text": "Этот шаблонный проект предназначен для открытия в ArxisStudio.Editor и для запуска как обычного приложения. Он демонстрирует загрузку проекта, внешние стили, merged resource dictionaries и более реалистичную dashboard-композицию."
+                              "Text": "Этот шаблонный проект предназначен для открытия в ArxisStudio.Editor и для запуска как обычного приложения.\nОн демонстрирует загрузку проекта, внешние стили, merged resource dictionaries и более реалистичную dashboard-композицию."
                             }
                           },
                           {

@@ -1,12 +1,12 @@
-// ArxisStudio.Markup.Json.Loader/Views/MainWindow.axaml.cs
+// ArxisStudio.Editor/Views/MainWindow.axaml.cs
 
 using Avalonia.Controls;
 using Avalonia.Input;
-using ArxisStudio.Markup.Json.Loader.ViewModels;
-using ArxisStudio.Markup.Json.Loader.Models;
+using ArxisStudio.Editor.ViewModels;
+using ArxisStudio.Editor.Models;
 using Newtonsoft.Json.Linq;
 
-namespace ArxisStudio.Markup.Json.Loader.Views
+namespace ArxisStudio.Editor.Views
 {
     public partial class MainWindow : Window
     {

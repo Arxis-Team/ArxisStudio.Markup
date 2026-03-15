@@ -3,9 +3,9 @@ using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Xml.Linq;
-using ArxisStudio.Markup.Json.Loader.Models;
+using ArxisStudio.Editor.Models;
 
-namespace ArxisStudio.Markup.Json.Loader.Services;
+namespace ArxisStudio.Editor.Services;
 
 public sealed class ProjectDiscoveryService
 {

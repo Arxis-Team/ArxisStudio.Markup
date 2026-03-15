@@ -11,9 +11,9 @@ using Avalonia.Markup.Xaml;
 using Avalonia.Media;
 using Avalonia.Styling;
 using ArxisStudio.Markup.Json;
-using ArxisStudio.Markup.Json.Loader.Models;
+using ArxisStudio.Editor.Models;
 
-namespace ArxisStudio.Markup.Json.Loader.Services
+namespace ArxisStudio.Editor.Services
 {
     public static class UiBuilder
     {

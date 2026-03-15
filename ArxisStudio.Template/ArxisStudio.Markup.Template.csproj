@@ -29,4 +29,14 @@
                       OutputItemType="Analyzer"
                       ReferenceOutputAssembly="false" />
   </ItemGroup>
+
+  <ItemGroup>
+    <Folder Include="Forms\" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Compile Update="Forms\TemplateDashboard.arxui.cs">
+      <DependentUpon>TemplateDashboard.arxui</DependentUpon>
+    </Compile>
+  </ItemGroup>
 </Project>
