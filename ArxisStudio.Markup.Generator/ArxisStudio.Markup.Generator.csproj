@@ -9,8 +9,9 @@
     <EnforceExtendedAnalyzerRules>true</EnforceExtendedAnalyzerRules>
     <IsRoslynComponent>true</IsRoslynComponent>
 
-    <RootNamespace>ArxisStudio.Markup.Json.Generator</RootNamespace>
-    <PackageId>ArxisStudio.Markup.Json.Generator</PackageId>
+    <RootNamespace>ArxisStudio.Markup.Generator</RootNamespace>
+    <AssemblyName>ArxisStudio.Markup.Generator</AssemblyName>
+    <PackageId>ArxisStudio.Markup.Generator</PackageId>
     <GenerateDocumentationFile>true</GenerateDocumentationFile>
 </PropertyGroup>
 
@@ -22,7 +23,8 @@
 </ItemGroup>
 
 <ItemGroup>
-    <ProjectReference Include="..\..\ArxisStudio.Contracts\ArxisStudio.Markup.Json.csproj" />
+    <ProjectReference Include="..\ArxisStudio.Markup\ArxisStudio.Markup.csproj" />
+    <ProjectReference Include="..\ArxisStudio.Markup.Json\ArxisStudio.Markup.Json.csproj" />
 </ItemGroup>
 
 <ItemGroup>
@@ -46,7 +48,8 @@
 <Target Name="GetDependencyTargetPaths">
     <ItemGroup>
         <TargetPathWithTargetPlatformMoniker Include="$(PKGNewtonsoft_Json)\lib\netstandard2.0\Newtonsoft.Json.dll" IncludeRuntimeDependency="false" />
-        <TargetPathWithTargetPlatformMoniker Include="$(MSBuildThisFileDirectory)..\..\ArxisStudio.Contracts\bin\$(Configuration)\netstandard2.0\ArxisStudio.Markup.Json.dll" IncludeRuntimeDependency="false" />
+        <TargetPathWithTargetPlatformMoniker Include="$(MSBuildThisFileDirectory)..\ArxisStudio.Markup\bin\$(Configuration)\netstandard2.0\ArxisStudio.Markup.dll" IncludeRuntimeDependency="false" />
+        <TargetPathWithTargetPlatformMoniker Include="$(MSBuildThisFileDirectory)..\ArxisStudio.Markup.Json\bin\$(Configuration)\netstandard2.0\ArxisStudio.Markup.Json.dll" IncludeRuntimeDependency="false" />
     </ItemGroup>
 </Target>    
     

@@ -4,14 +4,15 @@ using System.Collections.Immutable;
 using System.IO;
 using System.Linq;
 using System.Text;
+using ArxisStudio.Markup;
 using ArxisStudio.Markup.Json;
-using ArxisStudio.Markup.Json.Generator.Builders;
-using ArxisStudio.Markup.Json.Generator.Services;
+using ArxisStudio.Markup.Generator.Builders;
+using ArxisStudio.Markup.Generator.Services;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
 using Microsoft.CodeAnalysis.Text;
 
-namespace ArxisStudio.Markup.Json.Generator
+namespace ArxisStudio.Markup.Generator
 {
     /// <summary>
     /// Инкрементальный Roslyn generator, компилирующий документы <c>.arxui</c> в код

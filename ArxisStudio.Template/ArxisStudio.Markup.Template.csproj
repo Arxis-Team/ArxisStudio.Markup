@@ -25,18 +25,17 @@
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\ArxisStudio.Generator\ArxisStudio.Generator\ArxisStudio.Markup.Json.Generator.csproj"
+    <ProjectReference Include="..\ArxisStudio.Markup.Generator\ArxisStudio.Markup.Generator.csproj"
                       OutputItemType="Analyzer"
                       ReferenceOutputAssembly="false" />
   </ItemGroup>
 
   <ItemGroup>
-    <Folder Include="Forms\" />
-  </ItemGroup>
-
-  <ItemGroup>
     <Compile Update="Forms\TemplateDashboard.arxui.cs">
       <DependentUpon>TemplateDashboard.arxui</DependentUpon>
+    </Compile>
+    <Compile Update="Views\MainWindow.arxui.cs">
+      <DependentUpon>MainWindow.arxui</DependentUpon>
     </Compile>
   </ItemGroup>
 </Project>

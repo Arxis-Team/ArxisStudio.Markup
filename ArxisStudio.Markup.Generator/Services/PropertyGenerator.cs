@@ -2,10 +2,11 @@
 using System.CodeDom.Compiler;
 using System.Collections.Generic;
 using System.Linq;
+using ArxisStudio.Markup;
 using ArxisStudio.Markup.Json;
 using Microsoft.CodeAnalysis;
 
-namespace ArxisStudio.Markup.Json.Generator.Services
+namespace ArxisStudio.Markup.Generator.Services
 {
     internal class PropertyGenerator
     {

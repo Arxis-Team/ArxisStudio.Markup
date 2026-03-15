@@ -5,11 +5,16 @@
     <Nullable>enable</Nullable>
     <LangVersion>latest</LangVersion>
     <RootNamespace>ArxisStudio.Markup.Json</RootNamespace>
+    <AssemblyName>ArxisStudio.Markup.Json</AssemblyName>
     <GenerateDocumentationFile>true</GenerateDocumentationFile>
   </PropertyGroup>
 
   <ItemGroup>
     <PackageReference Include="Newtonsoft.Json" Version="13.0.4" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\ArxisStudio.Markup\ArxisStudio.Markup.csproj" />
   </ItemGroup>
 
 </Project>

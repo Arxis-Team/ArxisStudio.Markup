@@ -10,10 +10,11 @@ using Avalonia.Controls;
 using Avalonia.Markup.Xaml;
 using Avalonia.Media;
 using Avalonia.Styling;
-using ArxisStudio.Markup.Json;
-using ArxisStudio.Editor.Models;
+using Avalonia.Layout;
 
-namespace ArxisStudio.Editor.Services
+using ArxisStudio.Markup.Json.Loader.Models;
+
+namespace ArxisStudio.Markup.Json.Loader
 {
     public static class UiBuilder
     {
@@ -32,7 +33,29 @@ namespace ArxisStudio.Editor.Services
             var controlType = FindType(node.TypeName);
             if (controlType == null)
             {
+                var arxuiControl = TryBuildArxuiBackedControl(node, projectContext, nodeMap);
+                if (arxuiControl != null)
+                {
+                    return arxuiControl;
+                }
+
                 return new TextBlock { Text = $"Error: Type '{node.TypeName}' not found", Foreground = Brushes.Red };
+            }
+
+            if (!typeof(Control).IsAssignableFrom(controlType))
+            {
+                return new TextBlock
+                {
+                    Text = $"Preview for root type '{node.TypeName}' is not supported. Open a Control or Window document.",
+                    Foreground = Brushes.Orange,
+                    TextWrapping = TextWrapping.Wrap,
+                    Margin = new Thickness(16)
+                };
+            }
+
+            if (typeof(Window).IsAssignableFrom(controlType))
+            {
+                return BuildWindowPreview(node, projectContext, nodeMap);
             }
 
             var control = (Control)Activator.CreateInstance(controlType)!;
@@ -53,6 +76,152 @@ namespace ArxisStudio.Editor.Services
             }
 
             return control;
+        }
+
+        private static Control BuildWindowPreview(
+            UiNode node,
+            ProjectContext? projectContext,
+            IDictionary<UiNode, Control>? nodeMap)
+        {
+            var chromeBrush = SolidColorBrush.Parse("#20242A");
+            var bodyBackground = SolidColorBrush.Parse("#11161D");
+            var borderBrush = SolidColorBrush.Parse("#495668");
+            var titleBrush = Brushes.White;
+
+            var titleBar = new Border
+            {
+                Background = chromeBrush,
+                BorderBrush = borderBrush,
+                BorderThickness = new Thickness(0, 0, 0, 1),
+                Padding = new Thickness(14, 10),
+                Child = new TextBlock
+                {
+                    Text = GetScalarString(node, "Title") ?? "Window",
+                    Foreground = titleBrush,
+                    FontWeight = FontWeight.SemiBold,
+                    VerticalAlignment = VerticalAlignment.Center
+                }
+            };
+
+            var contentHost = new Border
+            {
+                Background = bodyBackground,
+                Padding = new Thickness(0)
+            };
+
+            var layout = new Grid
+            {
+                RowDefinitions = new RowDefinitions("Auto,*")
+            };
+            Grid.SetRow(titleBar, 0);
+            Grid.SetRow(contentHost, 1);
+            layout.Children.Add(titleBar);
+            layout.Children.Add(contentHost);
+
+            var shell = new Border
+            {
+                BorderBrush = borderBrush,
+                BorderThickness = new Thickness(1),
+                Background = bodyBackground,
+                Child = layout
+            };
+
+            if (nodeMap != null)
+            {
+                nodeMap[node] = shell;
+            }
+
+            var resourceScope = new Dictionary<string, object?>(StringComparer.Ordinal);
+            ApplyDesignMetadata(shell, node.Design);
+            ApplyResources(shell, node.Resources, resourceScope, projectContext);
+            ApplyStyles(shell, node.Styles, projectContext);
+
+            foreach (var property in node.Properties)
+            {
+                if (string.Equals(property.Key, "Content", StringComparison.Ordinal))
+                {
+                    if (property.Value is NodeValue nodeValue)
+                    {
+                        var content = CreateComplexObject(nodeValue.Node, resourceScope, projectContext, nodeMap);
+                        if (content is Control contentControl)
+                        {
+                            contentHost.Child = contentControl;
+                        }
+                    }
+
+                    continue;
+                }
+
+                if (string.Equals(property.Key, "Title", StringComparison.Ordinal))
+                {
+                    continue;
+                }
+
+                ApplyProperty(shell, property.Key, property.Value, resourceScope, projectContext, nodeMap);
+            }
+
+            return shell;
+        }
+
+        private static string? GetScalarString(UiNode node, string propertyName)
+        {
+            if (!node.Properties.TryGetValue(propertyName, out var value))
+            {
+                return null;
+            }
+
+            if (value is ScalarValue scalar && scalar.Value != null)
+            {
+                return Convert.ToString(scalar.Value, CultureInfo.InvariantCulture);
+            }
+
+            return null;
+        }
+
+        private static Control? TryBuildArxuiBackedControl(
+            UiNode node,
+            ProjectContext? projectContext,
+            IDictionary<UiNode, Control>? nodeMap)
+        {
+            if (projectContext == null || string.IsNullOrWhiteSpace(node.TypeName))
+            {
+                return null;
+            }
+
+            var documentRoot = TryResolveArxuiDocumentRoot(node.TypeName, projectContext);
+            if (documentRoot == null)
+            {
+                return null;
+            }
+
+            var builtControl = Build(documentRoot, projectContext, nodeMap);
+            if (nodeMap != null)
+            {
+                nodeMap[node] = builtControl;
+            }
+
+            return builtControl;
+        }
+
+        private static UiNode? TryResolveArxuiDocumentRoot(string className, ProjectContext projectContext)
+        {
+            foreach (var file in projectContext.ArxuiFiles)
+            {
+                try
+                {
+                    var document = ArxuiSerializer.Deserialize(File.ReadAllText(file.FullPath));
+                    if (document != null && string.Equals(document.Class, className, StringComparison.Ordinal))
+                    {
+                        return document.Root;
+                    }
+                }
+                catch
+                {
+                    // Ignore invalid documents while scanning preview metadata.
+                }
+            }
+
+            return null;
         }
 
         private static void ApplyDesignMetadata(Control control, UiNodeDesign? design)
@@ -254,7 +423,7 @@ namespace ArxisStudio.Editor.Services
             var resolvedType = FindType(node.TypeName);
             if (resolvedType == null)
             {
-                return null;
+                return TryBuildArxuiBackedControl(node, projectContext, nodeMap);
             }
 
             if (typeof(Control).IsAssignableFrom(resolvedType))
@@ -464,7 +633,7 @@ namespace ArxisStudio.Editor.Services
             }
 
             var xaml = File.ReadAllText(filePath);
-            return AvaloniaRuntimeXamlLoader.Parse<Styles>(xaml, typeof(App).Assembly);
+            return AvaloniaRuntimeXamlLoader.Parse<Styles>(xaml, typeof(UiBuilder).Assembly);
         }
 
         private static ResourceDictionary? LoadResourceDictionary(string source, ProjectContext? projectContext)
@@ -476,7 +645,7 @@ namespace ArxisStudio.Editor.Services
             }
 
             var xaml = File.ReadAllText(filePath);
-            return AvaloniaRuntimeXamlLoader.Parse<ResourceDictionary>(xaml, typeof(App).Assembly);
+            return AvaloniaRuntimeXamlLoader.Parse<ResourceDictionary>(xaml, typeof(UiBuilder).Assembly);
         }
 
         private static string? ResolveProjectRelativePath(string path, string? assemblyName, ProjectContext? projectContext)

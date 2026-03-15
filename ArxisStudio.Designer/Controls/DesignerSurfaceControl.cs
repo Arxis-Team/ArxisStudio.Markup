@@ -8,7 +8,7 @@ using ArxisStudio.Designer.Abstractions;
 using ArxisStudio.Designer.Behaviors;
 using ArxisStudio.Designer.Models;
 using ArxisStudio.Designer.Services;
-using ArxisStudio.Markup.Json;
+using ArxisStudio.Markup;
 
 namespace ArxisStudio.Designer.Controls;
 
@@ -81,8 +81,8 @@ public sealed class DesignerSurfaceControl : UserControl
     {
         _previewPresenter = new ContentControl
         {
-            HorizontalContentAlignment = HorizontalAlignment.Stretch,
-            VerticalContentAlignment = VerticalAlignment.Stretch
+            HorizontalContentAlignment = HorizontalAlignment.Left,
+            VerticalContentAlignment = VerticalAlignment.Top
         };
 
         _surfaceBorder = new Border

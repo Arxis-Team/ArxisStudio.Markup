@@ -1,5 +1,5 @@
 using System;
-using ArxisStudio.Markup.Json;
+using ArxisStudio.Markup;
 
 namespace ArxisStudio.Designer.Abstractions;
 

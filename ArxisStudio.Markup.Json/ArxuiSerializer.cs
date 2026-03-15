@@ -3,6 +3,8 @@ using System.Collections.Generic;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
 
+using ArxisStudio.Markup;
+
 namespace ArxisStudio.Markup.Json;
 
 /// <summary>

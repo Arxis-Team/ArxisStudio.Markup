@@ -1,6 +1,6 @@
 using System.Collections.Generic;
 
-namespace ArxisStudio.Markup.Json;
+namespace ArxisStudio.Markup;
 
 /// <summary>
 /// Представляет корневой документ <c>.arxui</c>.

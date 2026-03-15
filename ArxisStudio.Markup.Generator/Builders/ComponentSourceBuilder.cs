@@ -2,13 +2,14 @@
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using ArxisStudio.Markup;
 using ArxisStudio.Markup.Json;
-using ArxisStudio.Markup.Json.Generator.Models;
-using ArxisStudio.Markup.Json.Generator.Services;
-using ArxisStudio.Markup.Json.Generator.Utility;
+using ArxisStudio.Markup.Generator.Models;
+using ArxisStudio.Markup.Generator.Services;
+using ArxisStudio.Markup.Generator.Utility;
 using Microsoft.CodeAnalysis;
 
-namespace ArxisStudio.Markup.Json.Generator.Builders
+namespace ArxisStudio.Markup.Generator.Builders
 {
     internal class ComponentSourceBuilder
     {

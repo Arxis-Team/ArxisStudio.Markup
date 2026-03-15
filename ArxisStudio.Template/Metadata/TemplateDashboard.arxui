@@ -93,7 +93,7 @@
                                 {
                                   "TypeName": "Avalonia.Controls.Button",
                                   "Properties": {
-                                    "Classes": "secondary-action",
+                                    "Classes": "primary-action",
                                     "MinWidth": 160,
                                     "HorizontalAlignment": "Left",
                                     "Content": "Просмотреть JSON"
@@ -465,7 +465,7 @@
   },
   "Class": "ArxisStudio.Markup.Template.Forms.TemplateDashboard",
   "$design": {
-    "SurfaceWidth": 800.0,
-    "SurfaceHeight": 600.0
+    "SurfaceWidth": 1000.0,
+    "SurfaceHeight": 800.0
   }
 }

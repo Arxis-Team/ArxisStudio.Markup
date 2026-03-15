@@ -1,0 +1,31 @@
+{
+  "SchemaVersion": 1,
+  "Kind": "Window",
+  "Root": {
+    "TypeName": "Avalonia.Controls.Window",
+    "Properties": {
+      "Width": 900,
+      "Height": 600,
+      "Title": "ArxisStudio Template",
+      "Content": {
+        "TypeName": "ArxisStudio.Markup.Template.Forms.TemplateDashboard",
+        "Properties": {},
+        "$design": {
+          "IgnorePreviewInput": true,
+          "AllowMove": false,
+          "AllowResize": false
+        }
+      }
+    },
+    "$design": {
+      "IgnorePreviewInput": true,
+      "AllowMove": false,
+      "AllowResize": false
+    }
+  },
+  "Class": "ArxisStudio.Markup.Template.Views.MainWindow",
+  "$design": {
+    "SurfaceWidth": 900.0,
+    "SurfaceHeight": 600.0
+  }
+}

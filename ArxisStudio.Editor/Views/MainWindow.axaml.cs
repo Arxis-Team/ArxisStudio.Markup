@@ -3,7 +3,7 @@
 using Avalonia.Controls;
 using Avalonia.Input;
 using ArxisStudio.Editor.ViewModels;
-using ArxisStudio.Editor.Models;
+using ArxisStudio.Markup.Json.Loader.Models;
 using Newtonsoft.Json.Linq;
 
 namespace ArxisStudio.Editor.Views

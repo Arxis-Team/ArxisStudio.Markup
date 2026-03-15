@@ -2,11 +2,12 @@
 
 `ArxisStudio.Markup` — инфраструктура для model-driven описания интерфейсов Avalonia на основе JSON-документов `.arxui`.
 
-Проект состоит из трёх основных частей:
+Текущее ядро разделено на четыре библиотеки:
 
-- контрактной модели `.arxui`;
-- Roslyn source generator, который компилирует `.arxui` в `InitializeComponent()`;
-- визуального редактора `ArxisStudio.Editor`, работающего с тем же форматом как с persistence model конструктора.
+- `ArxisStudio.Markup`
+- `ArxisStudio.Markup.Json`
+- `ArxisStudio.Markup.Json.Loader`
+- `ArxisStudio.Markup.Generator`
 
 Библиотека не пытается заменить Avalonia XAML как язык ручной разработки. Её задача — дать структурированную модель, пригодную для визуального конструктора, трансформаций дерева, сериализации и code generation.
 
@@ -33,11 +34,17 @@
 
 ## Состав репозитория
 
-- `ArxisStudio.Contracts`
-  Контрактные типы модели `.arxui` и сериализация JSON.
+- `ArxisStudio.Markup`
+  Нейтральная модель документа `.arxui`: `UiDocument`, `UiNode`, `UiValue`, `$design`.
 
-- `ArxisStudio.Generator/ArxisStudio.Generator`
-  Инкрементальный Roslyn source generator.
+- `ArxisStudio.Markup.Json`
+  JSON serializer/deserializer формата `.arxui`.
+
+- `ArxisStudio.Markup.Json.Loader`
+  Runtime/design-time loader, строящий Avalonia object tree из `.arxui`.
+
+- `ArxisStudio.Markup.Generator`
+  Инкрементальный Roslyn source generator `ArxisStudio.Markup.Generator`.
 
 - `ArxisStudio.Editor`
   Визуальный редактор и design-time previewer.
@@ -224,7 +231,7 @@ public partial class ProfileView : UserControl
 Базовые правила editor:
 
 - проект используется как источник типов, ресурсов, `.arxui` и `.axaml`;
-- preview строится из модели документа;
+- preview строится через `ArxisStudio.Markup.Json.Loader`;
 - пользовательский code-behind и event handlers не должны исполняться;
 - design-time chrome должен жить отдельно от production visual tree.
 

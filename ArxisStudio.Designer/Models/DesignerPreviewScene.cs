@@ -1,7 +1,7 @@
 using System;
 using Avalonia;
 using Avalonia.Controls;
-using ArxisStudio.Markup.Json;
+using ArxisStudio.Markup;
 
 namespace ArxisStudio.Designer.Models;
 

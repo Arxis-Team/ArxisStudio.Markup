@@ -1,17 +1,21 @@
-﻿using ArxisStudio.Markup.Json;
+﻿using ArxisStudio.Markup;
+using ArxisStudio.Markup.Json;
 using Avalonia.Threading;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using Avalonia.Controls;
+using ArxisStudio.Markup.Json.Loader;
 using ArxisStudio.Editor.Services;
 using System;
 using System.Diagnostics;
 using System.IO;
 using System.Linq;
 using System.Collections.Generic;
+using System.Text;
 using Newtonsoft.Json.Linq;
 using System.Collections.ObjectModel;
 using ArxisStudio.Editor.Models;
+using ArxisStudio.Markup.Json.Loader.Models;
 using System.Threading.Tasks;
 using ArxisStudio.Designer.Abstractions;
 using ArxisStudio.Designer.Services;
@@ -152,52 +156,8 @@ namespace ArxisStudio.Editor.ViewModels
         public MainWindowViewModel()
         {
             ProjectPathInput = Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", "ArxisStudio.Template", "ArxisStudio.Markup.Template.csproj"));
-            JsonText = @"{
-  ""SchemaVersion"": 1,
-  ""Kind"": ""Control"",
-  ""Root"": {
-    ""TypeName"": ""Avalonia.Controls.UserControl"",
-    ""Properties"": {
-      ""Width"": 600,
-      ""Height"": 600,
-      ""Content"": {
-        ""TypeName"": ""Avalonia.Controls.Canvas"",
-        ""Properties"": {
-          ""Width"": 400,
-          ""Height"": 400,
-          ""Background"": ""Black"",
-          ""Children"": [
-            {
-              ""TypeName"": ""Avalonia.Controls.Shapes.Rectangle"",
-              ""Properties"": {
-                ""Width"": 100,
-                ""Height"": 100,
-                ""Fill"": ""Red"",
-                ""Avalonia.Controls.Canvas.Left"": 50,
-                ""Avalonia.Controls.Canvas.Top"": 50
-              }
-            },
-            {
-              ""TypeName"": ""Avalonia.Controls.Shapes.Ellipse"",
-              ""Properties"": {
-                ""Width"": 80,
-                ""Height"": 80,
-                ""Fill"": ""Blue"",
-                ""Stroke"": ""White"",
-                ""StrokeThickness"": 2,
-                ""Avalonia.Controls.Canvas.Left"": 200,
-                ""Avalonia.Controls.Canvas.Top"": 100
-              }
-            }
-          ]
-        }
-      }
-    }
-  }
-}";
             DesignerService.Instance.JsonChanged += OnJsonChanged;
             DesignerSelectionService.SelectedNodeChanged += OnDesignerSelectionChanged;
-            UpdateTreeAndUIFromText();
         }
 
         private void OnJsonChanged(DesignerChangeKind changeKind)
@@ -569,8 +529,9 @@ namespace ArxisStudio.Editor.ViewModels
 
                 if (ProjectArxuiFiles.Count > 0)
                 {
-                    SelectedProjectFile = ProjectArxuiFiles[0];
-                    OpenProjectFile(ProjectArxuiFiles[0]);
+                    var startupFile = SelectStartupDocument(ProjectArxuiFiles) ?? ProjectArxuiFiles[0];
+                    SelectedProjectFile = startupFile;
+                    OpenProjectFile(startupFile);
                 }
             }
             catch (Exception ex)
@@ -614,6 +575,35 @@ namespace ArxisStudio.Editor.ViewModels
         }
 
         public bool CanOpenSelectedProjectFile => SelectedProjectFile != null;
+
+        private static ProjectFileItem? SelectStartupDocument(IEnumerable<ProjectFileItem> files)
+        {
+            foreach (var file in files)
+            {
+                var kind = TryReadDocumentKind(file.FullPath);
+                if (kind == UiDocumentKind.Window || kind == UiDocumentKind.Control)
+                {
+                    return file;
+                }
+            }
+
+            return files.FirstOrDefault();
+        }
+
+        private static UiDocumentKind? TryReadDocumentKind(string path)
+        {
+            try
+            {
+                using var stream = File.OpenRead(path);
+                using var reader = new StreamReader(stream, Encoding.UTF8, detectEncodingFromByteOrderMarks: true);
+                var json = JObject.Parse(reader.ReadToEnd());
+                return json["Kind"]?.ToObject<UiDocumentKind>();
+            }
+            catch
+            {
+                return null;
+            }
+        }
 
         [RelayCommand]
         private void SetWorkspaceMode(string? mode)

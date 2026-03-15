@@ -1,7 +1,6 @@
 {
   "SchemaVersion": 1,
   "Kind": "Control",
-  "Class": "ArxisStudio.Markup.Sample.Forms.SolidColorBrush",
   "Root": {
     "TypeName": "Avalonia.Controls.ContentControl",
     "Properties": {
@@ -31,5 +30,6 @@
         }
       }
     }
-  }
+  },
+  "Class": "ArxisStudio.Markup.Sample.Forms.SolidColorBrush"
 }

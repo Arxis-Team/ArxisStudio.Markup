@@ -1,6 +1,6 @@
 using Xunit;
 
-namespace ArxisStudio.Markup.Json.Generator.Tests
+namespace ArxisStudio.Markup.Generator.Tests
 {
     public class BindingResourceAssetGenerationTests
     {

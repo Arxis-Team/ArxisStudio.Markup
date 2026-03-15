@@ -1,9 +1,0 @@
-<Window xmlns="https://github.com/avaloniaui"
-        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-        xmlns:forms="clr-namespace:ArxisStudio.Markup.Template.Forms"
-        x:Class="ArxisStudio.Markup.Template.Views.MainWindow"
-        Width="900"
-        Height="600"
-        Title="ArxisStudio Template">
-    <forms:TemplateDashboard />
-</Window>

@@ -1,6 +1,6 @@
 ﻿using Microsoft.CodeAnalysis;
 
-namespace ArxisStudio.Markup.Json.Generator.Services
+namespace ArxisStudio.Markup.Generator.Services
 {
     internal class ClassInfo
     {

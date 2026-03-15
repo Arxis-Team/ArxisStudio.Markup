@@ -2,7 +2,7 @@ using System.Text;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.Text;
 
-namespace ArxisStudio.Markup.Json.Generator.Tests
+namespace ArxisStudio.Markup.Generator.Tests
 {
     internal sealed class InMemoryAdditionalText : AdditionalText
     {

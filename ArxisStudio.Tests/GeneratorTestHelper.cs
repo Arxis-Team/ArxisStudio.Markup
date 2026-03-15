@@ -2,12 +2,12 @@ using System;
 using System.Collections.Immutable;
 using System.Linq;
 using Avalonia.Controls;
-using ArxisStudio.Markup.Json.Generator;
+using ArxisStudio.Markup.Generator;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using Xunit.Sdk;
 
-namespace ArxisStudio.Markup.Json.Generator.Tests
+namespace ArxisStudio.Markup.Generator.Tests
 {
     internal static class GeneratorTestHelper
     {

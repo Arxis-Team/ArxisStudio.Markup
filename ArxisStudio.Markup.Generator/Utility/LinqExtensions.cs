@@ -8,7 +8,7 @@ namespace System.Runtime.CompilerServices
     internal static class IsExternalInit { }
 }
 
-namespace ArxisStudio.Markup.Json.Generator.Utility
+namespace ArxisStudio.Markup.Generator.Utility
 {
     internal static class LinqExtensions
     {

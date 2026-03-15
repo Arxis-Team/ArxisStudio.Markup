@@ -1,6 +1,6 @@
 ﻿using Microsoft.CodeAnalysis;
 
-namespace ArxisStudio.Markup.Json.Generator
+namespace ArxisStudio.Markup.Generator
 {
     /// <summary>
     /// Содержит описатели диагностик, публикуемых source generator.

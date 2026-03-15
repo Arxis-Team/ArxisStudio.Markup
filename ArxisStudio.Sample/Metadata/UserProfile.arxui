@@ -1,7 +1,6 @@
 {
   "SchemaVersion": 1,
   "Kind": "Control",
-  "Class": "ArxisStudio.Markup.Sample.Views.UserProfile",
   "Root": {
     "TypeName": "ArxisStudio.Markup.Sample.Views.MyControl",
     "Properties": {
@@ -160,5 +159,6 @@
         }
       }
     }
-  }
+  },
+  "Class": "ArxisStudio.Markup.Sample.Views.UserProfile"
 }

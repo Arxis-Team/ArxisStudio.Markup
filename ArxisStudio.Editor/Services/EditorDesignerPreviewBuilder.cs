@@ -4,7 +4,9 @@ using Avalonia;
 using Avalonia.Controls;
 using ArxisStudio.Designer.Abstractions;
 using ArxisStudio.Designer.Models;
-using ArxisStudio.Editor.Models;
+using ArxisStudio.Markup.Json.Loader.Models;
+using ArxisStudio.Markup.Json.Loader;
+using ArxisStudio.Markup;
 using ArxisStudio.Markup.Json;
 
 namespace ArxisStudio.Editor.Services;

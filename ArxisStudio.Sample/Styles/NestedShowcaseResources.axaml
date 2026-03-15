@@ -1,0 +1,5 @@
+<ResourceDictionary xmlns="https://github.com/avaloniaui"
+                    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+    <SolidColorBrush x:Key="ImportedBodyBrush">#FFE0FBFC</SolidColorBrush>
+    <SolidColorBrush x:Key="NestedImportedPanelBrush">#FF243447</SolidColorBrush>
+</ResourceDictionary>

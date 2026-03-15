@@ -24,8 +24,9 @@
     </ItemGroup>
 
     <ItemGroup>
-      <ProjectReference Include="..\ArxisStudio.Generator\ArxisStudio.Generator\ArxisStudio.Markup.Json.Generator.csproj" />
-      <ProjectReference Include="..\ArxisStudio.Contracts\ArxisStudio.Markup.Json.csproj" />
+      <ProjectReference Include="..\ArxisStudio.Markup.Generator\ArxisStudio.Markup.Generator.csproj" />
+      <ProjectReference Include="..\ArxisStudio.Markup\ArxisStudio.Markup.csproj" />
+      <ProjectReference Include="..\ArxisStudio.Markup.Json\ArxisStudio.Markup.Json.csproj" />
     </ItemGroup>
 
 </Project>

@@ -1,6 +1,6 @@
 using System;
 using ArxisStudio.Designer.Abstractions;
-using ArxisStudio.Markup.Json;
+using ArxisStudio.Markup;
 
 namespace ArxisStudio.Designer.Services;
 

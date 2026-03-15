@@ -1,9 +1,10 @@
 using System.Linq;
+using ArxisStudio.Markup;
 using ArxisStudio.Markup.Json;
 using Newtonsoft.Json;
 using Xunit;
 
-namespace ArxisStudio.Markup.Json.Generator.Tests
+namespace ArxisStudio.Markup.Generator.Tests
 {
     public class ArxuiSerializerTests
     {

@@ -1,6 +1,7 @@
 using CommunityToolkit.Mvvm.ComponentModel;
 using System.Globalization;
 using Newtonsoft.Json.Linq;
+using ArxisStudio.Markup.Json.Loader;
 using ArxisStudio.Editor.Services; // Для доступа к DesignerService
 
 namespace ArxisStudio.Editor.Models

@@ -2,7 +2,7 @@ using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Media;
 using ArxisStudio.Designer.Models;
-using ArxisStudio.Markup.Json;
+using ArxisStudio.Markup;
 
 namespace ArxisStudio.Designer.Controls;
 

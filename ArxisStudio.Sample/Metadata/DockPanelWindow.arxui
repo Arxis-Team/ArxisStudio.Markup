@@ -1,7 +1,6 @@
 {
   "SchemaVersion": 1,
   "Kind": "Window",
-  "Class": "ArxisStudio.Markup.Sample.Forms.DockPanelWindow",
   "Root": {
     "TypeName": "Avalonia.Controls.Window",
     "Properties": {
@@ -60,7 +59,7 @@
                         "TypeName": "Avalonia.Controls.ListBox",
                         "Properties": {
                           "Name": "SideMenu",
-                          "MinHeight": 200
+                          "MinHeight": 300
                         }
                       }
                     ]
@@ -122,5 +121,6 @@
         }
       }
     }
-  }
+  },
+  "Class": "ArxisStudio.Markup.Sample.Forms.DockPanelWindow"
 }

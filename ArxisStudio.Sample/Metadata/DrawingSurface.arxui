@@ -1,14 +1,17 @@
 {
   "SchemaVersion": 1,
   "Kind": "Control",
-  "Class": "ArxisStudio.Markup.Sample.Forms.DrawingSurface",
   "Root": {
     "TypeName": "Avalonia.Controls.UserControl",
     "Properties": {
+      "Width": 400,
+      "Height": 400,
       "Content": {
         "TypeName": "Avalonia.Controls.Canvas",
         "Properties": {
-          "Background": "Black",
+          "Width": 400,
+          "Height": 400,
+          "Background": "White",
           "Children": [
             {
               "TypeName": "Avalonia.Controls.Shapes.Rectangle",
@@ -36,5 +39,6 @@
         }
       }
     }
-  }
+  },
+  "Class": "ArxisStudio.Markup.Sample.Forms.DrawingSurface"
 }

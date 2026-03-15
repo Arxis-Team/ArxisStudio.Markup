@@ -9,10 +9,10 @@
       "Content": {
         "TypeName": "Avalonia.Controls.Border",
         "Properties": {
-          "Name": "GradientBorder",
+          "Name": "GradientBorder1",
           "BorderThickness": "5",
           "CornerRadius": "20",
-          "Padding": "20",
+          "Padding": "0",
           "BorderBrush": {
             "TypeName": "Avalonia.Media.LinearGradientBrush",
             "Properties": {
@@ -50,11 +50,30 @@
               "VerticalAlignment": "Center",
               "FontSize": 24,
               "FontWeight": "Bold"
+            },
+            "$design": {
+              "IgnorePreviewInput": true,
+              "AllowMove": false,
+              "AllowResize": false
             }
           }
+        },
+        "$design": {
+          "IgnorePreviewInput": true,
+          "AllowMove": true,
+          "AllowResize": true
         }
       }
+    },
+    "$design": {
+      "IgnorePreviewInput": true,
+      "AllowMove": false,
+      "AllowResize": false
     }
   },
-  "Class": "ArxisStudio.Markup.Sample.Forms.GradientCard"
+  "Class": "ArxisStudio.Markup.Template.Forms.GradientCard",
+  "$design": {
+    "SurfaceWidth": 640.0,
+    "SurfaceHeight": 360.0
+  }
 }
