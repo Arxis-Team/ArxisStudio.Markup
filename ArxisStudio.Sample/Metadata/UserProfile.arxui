@@ -1,0 +1,164 @@
+{
+  "SchemaVersion": 1,
+  "Kind": "Control",
+  "Root": {
+    "TypeName": "ArxisStudio.Markup.Sample.Views.MyControl",
+    "Properties": {
+      "Avalonia.Controls.Design.Width": 800,
+      "Avalonia.Controls.Design.Height": 600,
+      "DataContext": {
+        "TypeName": "ArxisStudio.Markup.Sample.ViewModels.UserProfileViewModel",
+        "Properties": {}
+      },
+      "Content": {
+        "TypeName": "Avalonia.Controls.Grid",
+        "Properties": {
+          "Name": "RootGrid",
+          "RowDefinitions": "Auto, Auto, Auto",
+          "Margin": "0",
+          "Background": {
+            "$resource": "BackgroundBrush"
+          },
+          "Children": [
+            {
+              "TypeName": "Avalonia.Controls.Border",
+              "Properties": {
+                "Avalonia.Controls.Grid.Row": 0,
+                "Padding": "16",
+                "Child": {
+                  "TypeName": "Avalonia.Controls.TextBlock",
+                  "Properties": {
+                    "Text": "User Profile",
+                    "Foreground": {
+                      "$resource": "ForegroundBrush"
+                    },
+                    "FontSize": 20,
+                    "FontWeight": "Bold"
+                  }
+                }
+              }
+            },
+            {
+              "TypeName": "Avalonia.Controls.StackPanel",
+              "Properties": {
+                "Avalonia.Controls.Grid.Row": 1,
+                "Margin": "20",
+                "Spacing": "15",
+                "Children": [
+                  {
+                    "TypeName": "Avalonia.Controls.Image",
+                    "Properties": {
+                      "Source": {
+                        "$asset": "/Assets/avalonia-logo.ico"
+                      },
+                      "Width": 64,
+                      "Height": 64,
+                      "HorizontalAlignment": "Center",
+                      "Margin": "0,0,0,10"
+                    }
+                  },
+                  {
+                    "TypeName": "Avalonia.Controls.StackPanel",
+                    "Properties": {
+                      "Spacing": 5,
+                      "Children": [
+                        {
+                          "TypeName": "Avalonia.Controls.TextBlock",
+                          "Properties": {
+                            "Text": "Username:"
+                          }
+                        },
+                        {
+                          "TypeName": "Avalonia.Controls.TextBox",
+                          "Properties": {
+                            "Name": "UsernameInput",
+                            "Watermark": "Enter username",
+                            "Text": {
+                              "$binding": "UserName"
+                            }
+                          }
+                        }
+                      ]
+                    }
+                  },
+                  {
+                    "TypeName": "Avalonia.Controls.StackPanel",
+                    "Properties": {
+                      "Spacing": 5,
+                      "Children": [
+                        {
+                          "TypeName": "Avalonia.Controls.TextBlock",
+                          "Properties": {
+                            "Text": "Status Message:"
+                          }
+                        },
+                        {
+                          "TypeName": "Avalonia.Controls.TextBox",
+                          "Properties": {
+                            "Text": {
+                              "$binding": "Status"
+                            },
+                            "AcceptsReturn": true,
+                            "Height": 80
+                          }
+                        }
+                      ]
+                    }
+                  },
+                  {
+                    "TypeName": "Avalonia.Controls.CheckBox",
+                    "Properties": {
+                      "Content": "Is Administrator",
+                      "IsChecked": {
+                        "$binding": "CanSave",
+                        "Mode": "TwoWay"
+                      }
+                    }
+                  }
+                ]
+              }
+            },
+            {
+              "TypeName": "Avalonia.Controls.StackPanel",
+              "Properties": {
+                "Name": "StackPanel1",
+                "Avalonia.Controls.Grid.Row": 2,
+                "Orientation": "Horizontal",
+                "HorizontalAlignment": "Right",
+                "Spacing": 10,
+                "Margin": "15",
+                "Height": 80,
+                "Children": [
+                  {
+                    "TypeName": "Avalonia.Controls.Button",
+                    "Properties": {
+                      "Name": "CancelButton",
+                      "Content": "Cancel"
+                    }
+                  },
+                  {
+                    "TypeName": "Avalonia.Controls.Button",
+                    "Properties": {
+                      "Name": "SaveButton",
+                      "Content": "Save Changes",
+                      "Classes": "accent h1",
+                      "IsEnabled": {
+                        "$binding": "CanSave",
+                        "Mode": "TwoWay"
+                      },
+                      "Command": {
+                        "$binding": "Save"
+                      },
+                      "HotKey": "Ctrl+S"
+                    }
+                  }
+                ]
+              }
+            }
+          ]
+        }
+      }
+    }
+  },
+  "Class": "ArxisStudio.Markup.Sample.Views.UserProfile"
+}

@@ -1,0 +1,35 @@
+{
+  "SchemaVersion": 1,
+  "Kind": "Control",
+  "Root": {
+    "TypeName": "Avalonia.Controls.ContentControl",
+    "Properties": {
+      "Width": 400,
+      "Height": 250,
+      "Content": {
+        "TypeName": "Avalonia.Controls.Border",
+        "Properties": {
+          "Name": "NamedBorder",
+          "BorderThickness": "3",
+          "BorderBrush": "Gray",
+          "Background": {
+            "TypeName": "Avalonia.Media.SolidColorBrush",
+            "Properties": {
+              "Color": "Blue",
+              "Opacity": 0.3
+            }
+          },
+          "Child": {
+            "TypeName": "Avalonia.Controls.TextBlock",
+            "Properties": {
+              "Text": "Hello Brush!",
+              "HorizontalAlignment": "Center",
+              "VerticalAlignment": "Center"
+            }
+          }
+        }
+      }
+    }
+  },
+  "Class": "ArxisStudio.Markup.Sample.Forms.SolidColorBrush"
+}

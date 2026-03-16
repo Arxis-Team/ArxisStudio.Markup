@@ -1,0 +1,15 @@
+{
+  "SchemaVersion": 1,
+  "Kind": "Application",
+  "Root": {
+    "TypeName": "Avalonia.Application",
+    "Properties": {},
+    "Styles": [
+      {
+        "TypeName": "Avalonia.Themes.Fluent.FluentTheme",
+        "Properties": {}
+      }
+    ]
+  },
+  "Class": "ArxisStudio.Markup.Template.App"
+}

@@ -1,0 +1,10 @@
+<Styles xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+    <StyleInclude Source="avares://ArxisStudio.Markup.Sample/Styles/NestedImportedStyles.axaml" />
+
+    <Style Selector="TextBlock.demo-title">
+        <Setter Property="FontSize" Value="28" />
+        <Setter Property="FontWeight" Value="Bold" />
+        <Setter Property="Foreground" Value="{DynamicResource ImportedTitleBrush}" />
+    </Style>
+</Styles>

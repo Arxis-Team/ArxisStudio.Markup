@@ -1,0 +1,93 @@
+{
+  "SchemaVersion": 1,
+  "Kind": "Control",
+  "Root": {
+    "TypeName": "Avalonia.Controls.UserControl",
+    "Properties": {
+      "HorizontalAlignment": "Center",
+      "VerticalAlignment": "Center",
+      "Content": {
+        "TypeName": "Avalonia.Controls.Border",
+        "Properties": {
+          "Width": 560,
+          "Padding": "28",
+          "CornerRadius": "24",
+          "Background": {
+            "$resource": "ImportedCardBackgroundBrush"
+          },
+          "BorderBrush": {
+            "$resource": "LocalCardBorderBrush"
+          },
+          "BorderThickness": "2",
+          "Child": {
+            "TypeName": "Avalonia.Controls.StackPanel",
+            "Properties": {
+              "Spacing": 14,
+              "Children": [
+                {
+                  "TypeName": "Avalonia.Controls.TextBlock",
+                  "Properties": {
+                    "Classes": "demo-title",
+                    "Text": "Styles and resources loaded from .arxui"
+                  }
+                },
+                {
+                  "TypeName": "Avalonia.Controls.TextBlock",
+                  "Properties": {
+                    "Classes": "demo-copy",
+                    "TextWrapping": "Wrap",
+                    "Text": "The root UserControl imports an external style file, merges an external resource dictionary and also declares local resources used by child controls."
+                  }
+                },
+                {
+                  "TypeName": "Avalonia.Controls.Border",
+                  "Properties": {
+                    "Padding": "16",
+                    "CornerRadius": "16",
+                    "Background": {
+                      "$resource": "NestedImportedPanelBrush"
+                    },
+                    "Child": {
+                      "TypeName": "Avalonia.Controls.TextBlock",
+                      "Properties": {
+                        "Classes": "nested-note",
+                        "Foreground": {
+                          "$resource": "NestedAccentBrush"
+                        },
+                        "TextWrapping": "Wrap",
+                        "Text": "This nested Border also owns its own Styles and Resources, proving that host-level support works inside the tree."
+                      }
+                    }
+                  },
+                  "Styles": [
+                    {
+                      "$styleInclude": "avares://ArxisStudio.Markup.Sample/Styles/NestedShowcaseStyles.axaml"
+                    }
+                  ],
+                  "Resources": {
+                    "NestedAccentBrush": "#FFF9C74F"
+                  }
+                }
+              ]
+            }
+          }
+        }
+      }
+    },
+    "Styles": [
+      {
+        "$styleInclude": "avares://ArxisStudio.Markup.Sample/Styles/ShowcaseStyles.axaml"
+      }
+    ],
+    "Resources": {
+      "$mergedDictionaries": [
+        {
+          "Source": "avares://ArxisStudio.Markup.Sample/Styles/ShowcaseResources.axaml"
+        }
+      ],
+      "LocalBodyBrush": "#FFDCEAF7",
+      "LocalCardBorderBrush": "#FF51789A"
+    }
+  },
+  "Class": "ArxisStudio.Markup.Sample.Forms.StyledResourcesShowcase"
+}

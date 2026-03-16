@@ -1,0 +1,79 @@
+{
+  "SchemaVersion": 1,
+  "Kind": "Control",
+  "Root": {
+    "TypeName": "Avalonia.Controls.UserControl",
+    "Properties": {
+      "Width": 400,
+      "Height": 250,
+      "Content": {
+        "TypeName": "Avalonia.Controls.Border",
+        "Properties": {
+          "Name": "GradientBorder1",
+          "BorderThickness": "7",
+          "CornerRadius": "43",
+          "Padding": "30",
+          "BorderBrush": {
+            "TypeName": "Avalonia.Media.LinearGradientBrush",
+            "Properties": {
+              "StartPoint": "0%,0%",
+              "EndPoint": "100%,100%",
+              "GradientStops": [
+                {
+                  "TypeName": "Avalonia.Media.GradientStop",
+                  "Properties": {
+                    "Color": "#FFFF0000",
+                    "Offset": 0.0
+                  }
+                },
+                {
+                  "TypeName": "Avalonia.Media.GradientStop",
+                  "Properties": {
+                    "Color": "#FF0000FF",
+                    "Offset": 1.0
+                  }
+                }
+              ]
+            }
+          },
+          "Background": {
+            "TypeName": "Avalonia.Media.SolidColorBrush",
+            "Properties": {
+              "Color": "#10000000"
+            }
+          },
+          "Child": {
+            "TypeName": "Avalonia.Controls.TextBlock",
+            "Properties": {
+              "Text": "Gradient Test",
+              "HorizontalAlignment": "Center",
+              "VerticalAlignment": "Center",
+              "FontSize": 24,
+              "FontWeight": "Bold"
+            },
+            "$design": {
+              "IgnorePreviewInput": true,
+              "AllowMove": false,
+              "AllowResize": false
+            }
+          }
+        },
+        "$design": {
+          "IgnorePreviewInput": true,
+          "AllowMove": true,
+          "AllowResize": true
+        }
+      }
+    },
+    "$design": {
+      "IgnorePreviewInput": true,
+      "AllowMove": false,
+      "AllowResize": false
+    }
+  },
+  "Class": "ArxisStudio.Markup.Template.Forms.GradientCard",
+  "$design": {
+    "SurfaceWidth": 640.0,
+    "SurfaceHeight": 360.0
+  }
+}

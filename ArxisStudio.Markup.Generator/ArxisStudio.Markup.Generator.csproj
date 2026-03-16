@@ -1,0 +1,56 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+<PropertyGroup>
+    <TargetFramework>netstandard2.0</TargetFramework>
+    <IsPackable>false</IsPackable>
+    <Nullable>enable</Nullable>
+    <LangVersion>latest</LangVersion>
+
+    <EnforceExtendedAnalyzerRules>true</EnforceExtendedAnalyzerRules>
+    <IsRoslynComponent>true</IsRoslynComponent>
+
+    <RootNamespace>ArxisStudio.Markup.Generator</RootNamespace>
+    <AssemblyName>ArxisStudio.Markup.Generator</AssemblyName>
+    <PackageId>ArxisStudio.Markup.Generator</PackageId>
+    <GenerateDocumentationFile>true</GenerateDocumentationFile>
+</PropertyGroup>
+
+    
+<ItemGroup>
+    <!-- Generator dependencies -->
+    <PackageReference Include="Newtonsoft.Json" Version="13.0.4" GeneratePathProperty="true" PrivateAssets="all" />
+    <PackageReference Include="Avalonia" Version="11.3.8" GeneratePathProperty="true" PrivateAssets="all" />
+</ItemGroup>
+
+<ItemGroup>
+    <ProjectReference Include="..\ArxisStudio.Markup\ArxisStudio.Markup.csproj" />
+    <ProjectReference Include="..\ArxisStudio.Markup.Json\ArxisStudio.Markup.Json.csproj" />
+</ItemGroup>
+
+<ItemGroup>
+    <AdditionalFiles Include="AnalyzerReleases.Shipped.md" />
+    <AdditionalFiles Include="AnalyzerReleases.Unshipped.md" />
+</ItemGroup>
+
+<ItemGroup>
+    <PackageReference Include="Microsoft.CodeAnalysis.Analyzers" Version="3.3.4">
+        <PrivateAssets>all</PrivateAssets>
+        <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+    </PackageReference>
+    <PackageReference Include="Microsoft.CodeAnalysis.CSharp" Version="4.3.0"/>
+    <PackageReference Include="Microsoft.CodeAnalysis.CSharp.Workspaces" Version="4.3.0"/>
+</ItemGroup>
+    
+<PropertyGroup>
+    <GetTargetPathDependsOn>$(GetTargetPathDependsOn);GetDependencyTargetPaths</GetTargetPathDependsOn>
+</PropertyGroup>
+
+<Target Name="GetDependencyTargetPaths">
+    <ItemGroup>
+        <TargetPathWithTargetPlatformMoniker Include="$(PKGNewtonsoft_Json)\lib\netstandard2.0\Newtonsoft.Json.dll" IncludeRuntimeDependency="false" />
+        <TargetPathWithTargetPlatformMoniker Include="$(MSBuildThisFileDirectory)..\ArxisStudio.Markup\bin\$(Configuration)\netstandard2.0\ArxisStudio.Markup.dll" IncludeRuntimeDependency="false" />
+        <TargetPathWithTargetPlatformMoniker Include="$(MSBuildThisFileDirectory)..\ArxisStudio.Markup.Json\bin\$(Configuration)\netstandard2.0\ArxisStudio.Markup.Json.dll" IncludeRuntimeDependency="false" />
+    </ItemGroup>
+</Target>    
+    
+</Project>

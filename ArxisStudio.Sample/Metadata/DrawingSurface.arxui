@@ -1,0 +1,44 @@
+{
+  "SchemaVersion": 1,
+  "Kind": "Control",
+  "Root": {
+    "TypeName": "Avalonia.Controls.UserControl",
+    "Properties": {
+      "Width": 400,
+      "Height": 400,
+      "Content": {
+        "TypeName": "Avalonia.Controls.Canvas",
+        "Properties": {
+          "Width": 400,
+          "Height": 400,
+          "Background": "White",
+          "Children": [
+            {
+              "TypeName": "Avalonia.Controls.Shapes.Rectangle",
+              "Properties": {
+                "Width": 100,
+                "Height": 100,
+                "Fill": "Red",
+                "Avalonia.Controls.Canvas.Left": 50,
+                "Avalonia.Controls.Canvas.Top": 50
+              }
+            },
+            {
+              "TypeName": "Avalonia.Controls.Shapes.Ellipse",
+              "Properties": {
+                "Width": 80,
+                "Height": 80,
+                "Fill": "Blue",
+                "Stroke": "White",
+                "StrokeThickness": 2,
+                "Avalonia.Controls.Canvas.Left": 200,
+                "Avalonia.Controls.Canvas.Top": 100
+              }
+            }
+          ]
+        }
+      }
+    }
+  },
+  "Class": "ArxisStudio.Markup.Sample.Forms.DrawingSurface"
+}
