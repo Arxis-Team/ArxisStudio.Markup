@@ -22,7 +22,7 @@ public static class ArxuiSerializer
     public static UiDocument? Deserialize(string json)
     {
         var root = JObject.Parse(json);
-        return Deserialize(root);
+        return DeserializeCore(root);
     }
 
     /// <summary>
@@ -30,7 +30,12 @@ public static class ArxuiSerializer
     /// </summary>
     /// <param name="root">Корневой JSON-объект документа.</param>
     /// <returns>Десериализованный документ или <see langword="null"/>, если документ не содержит корневого узла.</returns>
-    public static UiDocument? Deserialize(JObject root)
+    internal static UiDocument? Deserialize(JObject root)
+    {
+        return DeserializeCore(root);
+    }
+
+    private static UiDocument? DeserializeCore(JObject root)
     {
         var kindToken = root["Kind"] ?? root["AssetType"];
         UiDocumentKind kind;

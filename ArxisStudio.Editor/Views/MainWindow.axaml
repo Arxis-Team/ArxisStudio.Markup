@@ -2,7 +2,6 @@
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:vm="using:ArxisStudio.Editor.ViewModels"
         xmlns:m="using:ArxisStudio.Editor.Models"
-        xmlns:lm="using:ArxisStudio.Markup.Json.Loader.Models"
         xmlns:designer="using:ArxisStudio.Designer.Controls"
         xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
@@ -238,7 +237,7 @@
                                      SelectedItem="{Binding SelectedProjectFile, Mode=TwoWay}"
                                      DoubleTapped="ProjectFilesListBox_DoubleTapped">
                                 <ListBox.ItemTemplate>
-                                    <DataTemplate x:DataType="lm:ProjectFileItem">
+                                    <DataTemplate x:DataType="m:ProjectFileItem">
                                         <StackPanel Margin="4,3">
                                             <TextBlock Text="{Binding RelativePath}"
                                                        Foreground="{StaticResource TextPrimaryBrush}" />

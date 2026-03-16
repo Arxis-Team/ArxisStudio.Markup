@@ -1,8 +1,8 @@
 using System.IO;
+using System.Collections.Generic;
 
 using ArxisStudio.Markup.Json;
 using ArxisStudio.Markup.Json.Loader.Abstractions;
-using ArxisStudio.Markup.Json.Loader.Models;
 
 namespace ArxisStudio.Markup.Json.Loader.Services;
 
@@ -11,24 +11,24 @@ namespace ArxisStudio.Markup.Json.Loader.Services;
 /// </summary>
 public sealed class ProjectMarkupDocumentResolver : IMarkupDocumentResolver
 {
-    private readonly ProjectContext _projectContext;
+    private readonly IReadOnlyList<string> _arxuiFilePaths;
 
     /// <summary>
     /// Инициализирует новый экземпляр <see cref="ProjectMarkupDocumentResolver"/>.
     /// </summary>
-    public ProjectMarkupDocumentResolver(ProjectContext projectContext)
+    public ProjectMarkupDocumentResolver(IReadOnlyList<string> arxuiFilePaths)
     {
-        _projectContext = projectContext;
+        _arxuiFilePaths = arxuiFilePaths;
     }
 
     /// <inheritdoc />
     public UiNode? ResolveRootByClass(string className)
     {
-        foreach (var file in _projectContext.ArxuiFiles)
+        foreach (var filePath in _arxuiFilePaths)
         {
             try
             {
-                var document = ArxuiSerializer.Deserialize(File.ReadAllText(file.FullPath));
+                var document = ArxuiSerializer.Deserialize(File.ReadAllText(filePath));
                 if (document != null && string.Equals(document.Class, className, System.StringComparison.Ordinal))
                 {
                     return document.Root;

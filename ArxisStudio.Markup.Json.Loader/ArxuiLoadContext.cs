@@ -1,7 +1,6 @@
 using System.Collections.Generic;
 using Avalonia.Controls;
 using ArxisStudio.Markup.Json.Loader.Abstractions;
-using ArxisStudio.Markup.Json.Loader.Models;
 
 namespace ArxisStudio.Markup.Json.Loader;
 
@@ -26,14 +25,14 @@ public sealed class ArxuiLoadContext
     public IMarkupDocumentResolver? DocumentResolver { get; init; }
 
     /// <summary>
+    /// Получает или задаёт резолвер внешних путей ресурсов и ассетов.
+    /// </summary>
+    public IPathResolver? PathResolver { get; init; }
+
+    /// <summary>
     /// Получает или задаёт фабрику preview-представлений для top-level контролов.
     /// </summary>
     public ITopLevelControlFactory? TopLevelControlFactory { get; init; }
-
-    /// <summary>
-    /// Получает или задаёт проектный контекст, используемый резолверами и загрузчиком.
-    /// </summary>
-    public ProjectContext? ProjectContext { get; init; }
 
     /// <summary>
     /// Получает или задаёт карту соответствия узлов модели и созданных контролов.

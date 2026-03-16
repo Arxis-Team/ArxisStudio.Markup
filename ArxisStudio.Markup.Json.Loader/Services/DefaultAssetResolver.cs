@@ -16,7 +16,7 @@ public sealed class DefaultAssetResolver : IAssetResolver
     /// <inheritdoc />
     public object? Resolve(UriReferenceValue asset, Type targetType, ArxuiLoadContext context)
     {
-        var assetPath = ProjectPathResolver.ResolveProjectRelativePath(asset.Path, asset.Assembly, context.ProjectContext);
+        var assetPath = context.PathResolver?.ResolvePath(asset.Path, asset.Assembly);
         if (assetPath == null || !File.Exists(assetPath))
         {
             return null;

@@ -8,10 +8,13 @@ using System.Reflection;
 
 using Avalonia;
 using Avalonia.Controls;
+using Avalonia.Data;
+using Avalonia.Data.Converters;
 using Avalonia.Layout;
 using Avalonia.Markup.Xaml;
 using Avalonia.Media;
 using Avalonia.Styling;
+using Avalonia.VisualTree;
 
 using ArxisStudio.Markup.Json.Loader.Abstractions;
 using ArxisStudio.Markup.Json.Loader.Services;
@@ -23,6 +26,8 @@ namespace ArxisStudio.Markup.Json.Loader;
 /// </summary>
 public sealed class ArxuiLoader
 {
+    private static readonly object ConversionFailed = new();
+
     /// <summary>
     /// Строит Avalonia-контрол по описанию узла.
     /// </summary>
@@ -221,6 +226,7 @@ public sealed class ArxuiLoader
 
             if (value is BindingValue)
             {
+                ApplyBinding(control, propertyName, (BindingValue)value, resourceScope, context);
                 return;
             }
 
@@ -239,7 +245,7 @@ public sealed class ArxuiLoader
             }
 
             var convertedValue = ConvertPropertyValue(value, targetType, resourceScope, context);
-            if (convertedValue == null)
+            if (ReferenceEquals(convertedValue, ConversionFailed))
             {
                 return;
             }
@@ -274,7 +280,7 @@ public sealed class ArxuiLoader
 
         var targetType = setter.GetParameters()[1].ParameterType;
         var convertedValue = ConvertPropertyValue(value, targetType, resourceScope, context);
-        if (convertedValue == null)
+        if (ReferenceEquals(convertedValue, ConversionFailed))
         {
             return;
         }
@@ -420,25 +426,125 @@ public sealed class ArxuiLoader
                 return scopedResource;
             }
 
-            return null;
+            return ConversionFailed;
         }
 
         if (value is UriReferenceValue assetReference)
         {
             if (!context.Options.AllowAssets)
             {
-                return null;
+                return ConversionFailed;
             }
 
-            return context.AssetResolver?.Resolve(assetReference, targetType, context);
+            return context.AssetResolver?.Resolve(assetReference, targetType, context) ?? ConversionFailed;
         }
 
-        if (value is not ScalarValue scalar || scalar.Value == null)
+        if (value is not ScalarValue scalar)
         {
-            return null;
+            return ConversionFailed;
         }
 
-        return ConvertPrimitive(scalar.Value, targetType);
+        if (scalar.Value == null)
+        {
+            return targetType.IsValueType && Nullable.GetUnderlyingType(targetType) == null
+                ? ConversionFailed
+                : null;
+        }
+
+        try
+        {
+            return ConvertPrimitive(scalar.Value, targetType);
+        }
+        catch
+        {
+            return ConversionFailed;
+        }
+    }
+
+    private void ApplyBinding(
+        Control control,
+        string propertyName,
+        BindingValue bindingValue,
+        IDictionary<string, object?> resourceScope,
+        ArxuiLoadContext context)
+    {
+        var avaloniaProperty = AvaloniaPropertyRegistry.Instance.FindRegistered(control, propertyName);
+        if (avaloniaProperty == null)
+        {
+            return;
+        }
+
+        var binding = new Binding(bindingValue.Binding.Path)
+        {
+            Mode = MapBindingMode(bindingValue.Binding.Mode),
+            StringFormat = bindingValue.Binding.StringFormat,
+            ElementName = bindingValue.Binding.ElementName,
+            FallbackValue = bindingValue.Binding.FallbackValue,
+            TargetNullValue = bindingValue.Binding.TargetNullValue,
+            ConverterParameter = bindingValue.Binding.ConverterParameter
+        };
+
+        if (!string.IsNullOrWhiteSpace(bindingValue.Binding.ConverterKey) &&
+            resourceScope.TryGetValue(bindingValue.Binding.ConverterKey!, out var converter) &&
+            converter is IValueConverter typedConverter)
+        {
+            binding.Converter = typedConverter;
+        }
+
+        if (bindingValue.Binding.RelativeSource != null)
+        {
+            binding.RelativeSource = BuildRelativeSource(bindingValue.Binding.RelativeSource, context);
+        }
+
+        control.Bind(avaloniaProperty, binding);
+    }
+
+    private RelativeSource BuildRelativeSource(RelativeSourceSpec relativeSourceSpec, ArxuiLoadContext context)
+    {
+        var source = new RelativeSource(MapRelativeSourceMode(relativeSourceSpec.Mode));
+
+        if (!string.IsNullOrWhiteSpace(relativeSourceSpec.AncestorType))
+        {
+            source.AncestorType = context.TypeResolver.Resolve(relativeSourceSpec.AncestorType!);
+        }
+
+        if (relativeSourceSpec.AncestorLevel.HasValue)
+        {
+            source.AncestorLevel = relativeSourceSpec.AncestorLevel.Value;
+        }
+
+        if (!string.IsNullOrWhiteSpace(relativeSourceSpec.Tree) &&
+            Enum.TryParse<TreeType>(relativeSourceSpec.Tree, ignoreCase: true, out var treeType))
+        {
+            source.Tree = treeType;
+        }
+
+        return source;
+    }
+
+    private static Avalonia.Data.BindingMode MapBindingMode(ArxisStudio.Markup.BindingMode? mode)
+    {
+        return mode switch
+        {
+            ArxisStudio.Markup.BindingMode.Default or null => Avalonia.Data.BindingMode.Default,
+            ArxisStudio.Markup.BindingMode.OneWay => Avalonia.Data.BindingMode.OneWay,
+            ArxisStudio.Markup.BindingMode.TwoWay => Avalonia.Data.BindingMode.TwoWay,
+            ArxisStudio.Markup.BindingMode.OneTime => Avalonia.Data.BindingMode.OneTime,
+            ArxisStudio.Markup.BindingMode.OneWayToSource => Avalonia.Data.BindingMode.OneWayToSource,
+            _ => Avalonia.Data.BindingMode.Default
+        };
+    }
+
+    private static Avalonia.Data.RelativeSourceMode MapRelativeSourceMode(ArxisStudio.Markup.RelativeSourceMode mode)
+    {
+        return mode switch
+        {
+            ArxisStudio.Markup.RelativeSourceMode.DataContext => Avalonia.Data.RelativeSourceMode.DataContext,
+            ArxisStudio.Markup.RelativeSourceMode.TemplatedParent => Avalonia.Data.RelativeSourceMode.TemplatedParent,
+            ArxisStudio.Markup.RelativeSourceMode.Self => Avalonia.Data.RelativeSourceMode.Self,
+            ArxisStudio.Markup.RelativeSourceMode.FindAncestor => Avalonia.Data.RelativeSourceMode.FindAncestor,
+            _ => Avalonia.Data.RelativeSourceMode.FindAncestor
+        };
     }
 
     private static void ApplyClasses(Control control, UiValue value)
@@ -552,7 +658,7 @@ public sealed class ArxuiLoader
 
     private static Styles? LoadStyles(string source, ArxuiLoadContext context)
     {
-        var filePath = ProjectPathResolver.ResolveProjectRelativePath(source, null, context.ProjectContext);
+        var filePath = context.PathResolver?.ResolvePath(source);
         if (filePath == null || !File.Exists(filePath))
         {
             return null;
@@ -564,7 +670,7 @@ public sealed class ArxuiLoader
 
     private static ResourceDictionary? LoadResourceDictionary(string source, ArxuiLoadContext context)
     {
-        var filePath = ProjectPathResolver.ResolveProjectRelativePath(source, null, context.ProjectContext);
+        var filePath = context.PathResolver?.ResolvePath(source);
         if (filePath == null || !File.Exists(filePath))
         {
             return null;

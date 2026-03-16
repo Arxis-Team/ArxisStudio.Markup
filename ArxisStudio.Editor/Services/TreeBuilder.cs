@@ -1,6 +1,5 @@
 using ArxisStudio.Markup;
 using ArxisStudio.Markup.Json;
-using ArxisStudio.Markup.Json.Loader.Models;
 using ArxisStudio.Editor.Models;
 using Newtonsoft.Json.Linq;
 using System.Collections.ObjectModel;

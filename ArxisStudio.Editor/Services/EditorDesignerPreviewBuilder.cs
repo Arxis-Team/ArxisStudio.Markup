@@ -4,7 +4,7 @@ using Avalonia;
 using Avalonia.Controls;
 using ArxisStudio.Designer.Abstractions;
 using ArxisStudio.Designer.Models;
-using ArxisStudio.Markup.Json.Loader.Models;
+using ArxisStudio.Editor.Models;
 using ArxisStudio.Markup.Json.Loader;
 using ArxisStudio.Markup;
 using ArxisStudio.Markup.Json;
@@ -31,9 +31,9 @@ public sealed class EditorDesignerPreviewBuilder : IDesignerPreviewBuilder
         {
             TypeResolver = new ReflectionTypeResolver(),
             AssetResolver = new DefaultAssetResolver(),
-            DocumentResolver = ProjectContext != null ? new ProjectMarkupDocumentResolver(ProjectContext) : null,
+            DocumentResolver = ProjectContext != null ? new ProjectMarkupDocumentResolver(ProjectContext.ArxuiFiles.Select(file => file.FullPath).ToList()) : null,
+            PathResolver = ProjectContext != null ? new ProjectContextPathResolver(ProjectContext.ProjectDirectory, ProjectContext.AssemblyName) : null,
             TopLevelControlFactory = new DefaultTopLevelControlFactory(),
-            ProjectContext = ProjectContext,
             NodeMap = nodeMap,
             Options = new ArxuiLoadOptions()
         };

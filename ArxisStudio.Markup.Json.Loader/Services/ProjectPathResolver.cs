@@ -1,15 +1,17 @@
 using System;
 using System.IO;
 
-using ArxisStudio.Markup.Json.Loader.Models;
-
 namespace ArxisStudio.Markup.Json.Loader.Services;
 
 internal static class ProjectPathResolver
 {
-    public static string? ResolveProjectRelativePath(string path, string? assemblyName, ProjectContext? projectContext)
+    public static string? ResolveProjectRelativePath(
+        string path,
+        string? assemblyName,
+        string? projectDirectory,
+        string? projectAssemblyName)
     {
-        if (projectContext == null || string.IsNullOrWhiteSpace(path))
+        if (string.IsNullOrWhiteSpace(projectDirectory) || string.IsNullOrWhiteSpace(path))
         {
             return null;
         }
@@ -22,21 +24,21 @@ internal static class ProjectPathResolver
             }
 
             if (!string.IsNullOrWhiteSpace(assemblyName) &&
-                !string.Equals(assemblyName, projectContext.AssemblyName, StringComparison.Ordinal))
+                !string.Equals(assemblyName, projectAssemblyName, StringComparison.Ordinal))
             {
                 return null;
             }
 
             if (!string.IsNullOrWhiteSpace(absoluteUri.Host) &&
-                !string.Equals(absoluteUri.Host, projectContext.AssemblyName, StringComparison.Ordinal))
+                !string.Equals(absoluteUri.Host, projectAssemblyName, StringComparison.Ordinal))
             {
                 return null;
             }
 
             var relativePath = absoluteUri.AbsolutePath.TrimStart('/');
-            return Path.Combine(projectContext.ProjectDirectory, relativePath.Replace('/', Path.DirectorySeparatorChar));
+            return Path.Combine(projectDirectory, relativePath.Replace('/', Path.DirectorySeparatorChar));
         }
 
-        return Path.Combine(projectContext.ProjectDirectory, path.TrimStart('/', '\\'));
+        return Path.Combine(projectDirectory, path.TrimStart('/', '\\'));
     }
 }

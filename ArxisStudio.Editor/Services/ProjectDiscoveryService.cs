@@ -3,7 +3,7 @@ using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Xml.Linq;
-using ArxisStudio.Markup.Json.Loader.Models;
+using ArxisStudio.Editor.Models;
 
 namespace ArxisStudio.Editor.Services;
 

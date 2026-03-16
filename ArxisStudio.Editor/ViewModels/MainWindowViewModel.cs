@@ -15,7 +15,6 @@ using System.Text;
 using Newtonsoft.Json.Linq;
 using System.Collections.ObjectModel;
 using ArxisStudio.Editor.Models;
-using ArxisStudio.Markup.Json.Loader.Models;
 using System.Threading.Tasks;
 using ArxisStudio.Designer.Abstractions;
 using ArxisStudio.Designer.Services;
@@ -267,9 +266,9 @@ namespace ArxisStudio.Editor.ViewModels
                 {
                     TypeResolver = new ReflectionTypeResolver(),
                     AssetResolver = new DefaultAssetResolver(),
-                    DocumentResolver = LoadedProject != null ? new ProjectMarkupDocumentResolver(LoadedProject) : null,
+                    DocumentResolver = LoadedProject != null ? new ProjectMarkupDocumentResolver(LoadedProject.ArxuiFiles.Select(file => file.FullPath).ToList()) : null,
+                    PathResolver = LoadedProject != null ? new ProjectContextPathResolver(LoadedProject.ProjectDirectory, LoadedProject.AssemblyName) : null,
                     TopLevelControlFactory = new DefaultTopLevelControlFactory(),
-                    ProjectContext = LoadedProject,
                     Options = new ArxuiLoadOptions()
                 };
                 RenderedContent = loader.Load(rootModel.Root, loadContext);
