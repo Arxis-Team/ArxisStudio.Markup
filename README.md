@@ -26,7 +26,7 @@ Runtime builder из `UiNode` в дерево Avalonia-контролов:
 - `ArxuiLoader.Load(UiNode node, ArxuiLoadContext context)`
 - расширения через `ITypeResolver`, `IAssetResolver`, `IMarkupDocumentResolver`, `IPathResolver`, `ITopLevelControlFactory`
 
-Loader не зависит от моделей editor/workspace; project-specific поведение подключается через адаптеры.
+Loader не зависит от инфраструктуры IDE; project-specific поведение подключается через адаптеры.
 
 ### `ArxisStudio.Markup.Generator`
 Roslyn source generator для `InitializeComponent()` по `.arxui`:
@@ -113,6 +113,6 @@ dotnet test ArxisStudio.Tests/ArxisStudio.Markup.Generator.Tests.csproj
 
 ## Текущее направление
 
-- дальнейшая стабилизация публичного API 4 библиотек
+- дальнейшая стабилизация публичного API библиотек
 - расширение тестов loader на binding/asset/null-assignment сценарии
 - подготовка package-first поставки для интеграции в внешний конструктор

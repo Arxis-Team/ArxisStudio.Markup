@@ -56,7 +56,7 @@
                               "HorizontalAlignment": "Left",
                               "TextWrapping": "Wrap",
                               "MaxWidth": 720,
-                              "Text": "Проектируйте более выразительные Avalonia-экраны из .arxui"
+                              "Text": "Создавайте прекрасное вместе с ArxisStudio"
                             }
                           },
                           {
@@ -66,7 +66,7 @@
                               "HorizontalAlignment": "Left",
                               "TextWrapping": "Wrap",
                               "MaxWidth": 760,
-                              "Text": "Этот шаблонный проект предназначен для открытия в ArxisStudio.Editor и для запуска как обычного приложения.\nОн демонстрирует загрузку проекта, внешние стили, merged resource dictionaries и более реалистичную dashboard-композицию."
+                              "Text": "Этот шаблонный проект предназначен для запуска как обычного приложения.\nОн демонстрирует внешние стили, merged resource dictionaries и более реалистичную dashboard-композицию."
                             }
                           },
                           {

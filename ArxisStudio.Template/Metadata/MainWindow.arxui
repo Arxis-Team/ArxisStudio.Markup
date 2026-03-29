@@ -26,6 +26,6 @@
   "Class": "ArxisStudio.Markup.Template.Views.MainWindow",
   "$design": {
     "SurfaceWidth": 900.0,
-    "SurfaceHeight": 600.0
+    "SurfaceHeight": 700.0
   }
 }
