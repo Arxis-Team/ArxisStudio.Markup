@@ -9,8 +9,14 @@ using Avalonia.Platform;
 
 namespace ArxisStudio.Markup.Sample.Views;
 
+/// <summary>
+/// Тестовый пользовательский контрол для экспериментальных сценариев.
+/// </summary>
 public partial class TestUserControl : UserControl
 {
+    /// <summary>
+    /// Инициализирует экземпляр контрола.
+    /// </summary>
     public TestUserControl()
     {
         InitializeComponent();

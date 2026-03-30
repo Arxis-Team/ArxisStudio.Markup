@@ -80,7 +80,6 @@ public sealed class ArxuiLoader
 
         var resourceScope = new Dictionary<string, object?>(StringComparer.Ordinal);
 
-        ApplyDesignMetadata(control, node.Design);
         ApplyResources(control, node.Resources, resourceScope, context);
         ApplyStyles(control, node.Styles, context);
 
@@ -110,7 +109,6 @@ public sealed class ArxuiLoader
         context.NodeMap?.Add(node, built.Root);
 
         var resourceScope = new Dictionary<string, object?>(StringComparer.Ordinal);
-        ApplyDesignMetadata(built.Root, node.Design);
         ApplyResources(built.Root, node.Resources, resourceScope, context);
         ApplyStyles(built.Root, node.Styles, context);
 
@@ -161,24 +159,6 @@ public sealed class ArxuiLoader
         }
 
         return builtControl;
-    }
-
-    private static void ApplyDesignMetadata(Control control, UiNodeDesign? design)
-    {
-        if (design == null)
-        {
-            return;
-        }
-
-        if (design.Hidden == true)
-        {
-            control.IsVisible = false;
-        }
-
-        if (design.IgnorePreviewInput == true)
-        {
-            control.IsHitTestVisible = false;
-        }
     }
 
     private void ApplyProperty(

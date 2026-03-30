@@ -50,6 +50,9 @@ namespace ArxisStudio.Markup.Generator.Builders
             }
             writer.WriteLine();
 
+            writer.WriteLine("/// <summary>");
+            writer.WriteLine("/// Инициализирует визуальное дерево компонента, сгенерированное из .arxui-документа.");
+            writer.WriteLine("/// </summary>");
             writer.WriteLine("public void InitializeComponent()");
             writer.WriteLine("{");
             writer.Indent++;

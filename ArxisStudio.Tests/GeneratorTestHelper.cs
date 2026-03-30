@@ -11,6 +11,13 @@ namespace ArxisStudio.Markup.Generator.Tests
 {
     internal static class GeneratorTestHelper
     {
+        /// <summary>
+        /// Запускает генератор с указанным исходником и дополнительными файлами.
+        /// </summary>
+        /// <param name="userSource">Исходный код пользовательского типа.</param>
+        /// <param name="userSourcePath">Путь к исходному файлу пользовательского типа.</param>
+        /// <param name="additionalFiles">Дополнительные файлы для генератора.</param>
+        /// <returns>Результат выполнения генератора.</returns>
         public static GeneratorDriverRunResult RunGenerator(
             string userSource,
             string userSourcePath,
@@ -57,6 +64,14 @@ namespace ArxisStudio.Markup.Generator.Tests
             return driver.GetRunResult();
         }
 
+        /// <summary>
+        /// Возвращает текст сгенерированного файла по имени подсказки.
+        /// </summary>
+        /// <param name="userSource">Исходный код пользовательского типа.</param>
+        /// <param name="userSourcePath">Путь к исходному файлу пользовательского типа.</param>
+        /// <param name="hintName">Имя ожидаемого сгенерированного файла.</param>
+        /// <param name="additionalFiles">Дополнительные файлы для генератора.</param>
+        /// <returns>Текст сгенерированного исходника.</returns>
         public static string GetGeneratedSource(
             string userSource,
             string userSourcePath,
@@ -78,6 +93,13 @@ namespace ArxisStudio.Markup.Generator.Tests
             return generated.SourceText.ToString();
         }
 
+        /// <summary>
+        /// Возвращает диагностические сообщения, выданные генератором.
+        /// </summary>
+        /// <param name="userSource">Исходный код пользовательского типа.</param>
+        /// <param name="userSourcePath">Путь к исходному файлу пользовательского типа.</param>
+        /// <param name="additionalFiles">Дополнительные файлы для генератора.</param>
+        /// <returns>Набор диагностик генератора.</returns>
         public static ImmutableArray<Diagnostic> GetGeneratorDiagnostics(
             string userSource,
             string userSourcePath,

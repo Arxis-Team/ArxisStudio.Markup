@@ -3,15 +3,15 @@
 ### New Rules
 Rule ID | Category | Severity | Notes
 --------|----------|----------|--------------------
-ADG0001 | Design | Error | Failed to parse asset file.
-ADG0002 | Design | Error | Type was not found during generation.
-ADG0003 | Design | Warning | Property was not found on the target type.
-ADG0004 | Design | Error | Event was not found on the target type.
-ADG0005 | Design | Error | Target class was not declared in the asset file.
-ADG0006 | Design | Error | Target class declared in the asset file could not be resolved.
-ADG0007 | Design | Error | Target class declared in the asset file must be partial.
-ADG0008 | Design | Error | Document kind declared in the asset file is not compatible with the target class.
-ADG0009 | Design | Error | Multiple asset files declare the same target class.
-ADG0010 | Design | Error | Root type declared in the asset file is not compatible with the document kind.
-ADG0011 | Design | Error | Root type declared in the asset file is not compatible with the target class.
-ADG9999 | Gen | Error | Unhandled exception occurred during generation.
+ADG0001 | Design | Error | Не удалось распарсить файл asset.
+ADG0002 | Design | Error | Тип не найден во время генерации.
+ADG0003 | Design | Warning | Свойство не найдено в целевом типе.
+ADG0004 | Design | Error | Событие не найдено в целевом типе.
+ADG0005 | Design | Error | Целевой класс не указан в файле asset.
+ADG0006 | Design | Error | Указанный в asset целевой класс не удалось разрешить.
+ADG0007 | Design | Error | Указанный в asset целевой класс должен быть partial.
+ADG0008 | Design | Error | Указанный в asset тип документа несовместим с целевым классом.
+ADG0009 | Design | Error | Несколько asset-файлов объявляют один и тот же целевой класс.
+ADG0010 | Design | Error | Корневой тип в asset-файле несовместим с типом документа.
+ADG0011 | Design | Error | Корневой тип в asset-файле несовместим с целевым классом.
+ADG9999 | Gen | Error | Во время генерации возникло необработанное исключение.

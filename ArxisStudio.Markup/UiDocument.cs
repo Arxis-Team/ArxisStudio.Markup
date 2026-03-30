@@ -3,27 +3,25 @@ using System.Collections.Generic;
 namespace ArxisStudio.Markup;
 
 /// <summary>
-/// Представляет корневой документ <c>.arxui</c>.
+/// Корневая модель документа <c>.arxui</c>.
 /// </summary>
 /// <param name="SchemaVersion">Версия схемы документа.</param>
 /// <param name="Kind">Семантический тип документа.</param>
-/// <param name="Class">Полное CLR-имя целевого partial-типа, если документ генерируется в класс.</param>
-/// <param name="Root">Корневой узел документа.</param>
-/// <param name="Design">Design-time метаданные документа, используемые редактором.</param>
+/// <param name="Class">Полное имя CLR-типа, если привязка к типу требуется.</param>
+/// <param name="Root">Корневой узел визуального дерева.</param>
 public sealed record UiDocument(
     int SchemaVersion,
     UiDocumentKind Kind,
     string? Class,
-    UiNode Root,
-    UiDocumentDesign? Design = null);
+    UiNode Root);
 
 /// <summary>
-/// Определяет семантический тип документа <c>.arxui</c>.
+/// Семантический тип документа.
 /// </summary>
 public enum UiDocumentKind
 {
     /// <summary>
-    /// Документ уровня <c>Avalonia.Application</c>.
+    /// Документ приложения.
     /// </summary>
     Application,
 
@@ -38,7 +36,7 @@ public enum UiDocumentKind
     Window,
 
     /// <summary>
-    /// Документ коллекции стилей.
+    /// Документ со стилями.
     /// </summary>
     Styles,
 
@@ -49,137 +47,110 @@ public enum UiDocumentKind
 }
 
 /// <summary>
-/// Представляет узел дерева UI внутри документа <c>.arxui</c>.
+/// Узел дерева пользовательского интерфейса.
 /// </summary>
-/// <param name="TypeName">Полное CLR-имя типа узла.</param>
+/// <param name="TypeName">Имя типа элемента.</param>
 /// <param name="Properties">Набор свойств узла.</param>
-/// <param name="Styles">Стили, принадлежащие узлу.</param>
-/// <param name="Resources">Ресурсы, принадлежащие узлу.</param>
-/// <param name="Design">Design-time метаданные узла.</param>
+/// <param name="Styles">Коллекция стилей узла.</param>
+/// <param name="Resources">Коллекция ресурсов узла.</param>
 public sealed record UiNode(
     string TypeName,
     IReadOnlyDictionary<string, UiValue> Properties,
     UiStyles? Styles = null,
-    UiResources? Resources = null,
-    UiNodeDesign? Design = null);
+    UiResources? Resources = null);
 
 /// <summary>
-/// Определяет design-time метаданные документа.
-/// </summary>
-/// <param name="SurfaceWidth">Желаемая ширина design surface в редакторе.</param>
-/// <param name="SurfaceHeight">Желаемая высота design surface в редакторе.</param>
-public sealed record UiDocumentDesign(
-    double? SurfaceWidth = null,
-    double? SurfaceHeight = null);
-
-/// <summary>
-/// Определяет design-time метаданные узла, используемые визуальным редактором.
-/// </summary>
-/// <param name="Locked">Запрещает редактирование узла в дизайнере.</param>
-/// <param name="Hidden">Скрывает узел в design-time preview.</param>
-/// <param name="IgnorePreviewInput">Запрещает передавать input самому контролу в preview.</param>
-/// <param name="AllowMove">Разрешает попытку перемещения узла в дизайнере.</param>
-/// <param name="AllowResize">Разрешает попытку изменения размеров узла в дизайнере.</param>
-public sealed record UiNodeDesign(
-    bool? Locked = null,
-    bool? Hidden = null,
-    bool? IgnorePreviewInput = null,
-    bool? AllowMove = null,
-    bool? AllowResize = null);
-
-/// <summary>
-/// Представляет коллекцию стилей, принадлежащих узлу.
+/// Коллекция стилей, привязанная к узлу.
 /// </summary>
 /// <param name="Items">Элементы коллекции стилей.</param>
-public sealed record UiStyles(
-    IReadOnlyList<UiStyleValue> Items);
+public sealed record UiStyles(IReadOnlyList<UiStyleValue> Items);
 
 /// <summary>
-/// Базовый тип для элементов коллекции стилей.
+/// Базовый тип значения в коллекции стилей.
 /// </summary>
 public abstract record UiStyleValue;
 
 /// <summary>
-/// Представляет ссылку на внешний style-файл.
+/// Подключение внешнего словаря стилей.
 /// </summary>
-/// <param name="Source">URI источника style-файла.</param>
+/// <param name="Source">Путь к ресурсу стилей.</param>
 public sealed record StyleIncludeValue(string Source) : UiStyleValue;
 
 /// <summary>
-/// Представляет inline style-узел.
+/// Вложенный узел стиля.
 /// </summary>
-/// <param name="Node">Узел, описывающий стиль.</param>
+/// <param name="Node">Узел, представляющий стиль.</param>
 public sealed record StyleNodeValue(UiNode Node) : UiStyleValue;
 
 /// <summary>
-/// Представляет набор ресурсов, принадлежащих узлу.
+/// Коллекция ресурсов, привязанная к узлу.
 /// </summary>
-/// <param name="MergedDictionaries">Подключённые merged resource dictionaries.</param>
-/// <param name="Values">Локальные ресурсы по ключу.</param>
+/// <param name="MergedDictionaries">Подключенные словари ресурсов.</param>
+/// <param name="Values">Локальные значения ресурсов.</param>
 public sealed record UiResources(
     IReadOnlyList<UiResourceDictionaryInclude> MergedDictionaries,
     IReadOnlyDictionary<string, UiValue> Values);
 
 /// <summary>
-/// Представляет подключение внешнего словаря ресурсов.
+/// Подключение внешнего словаря ресурсов.
 /// </summary>
-/// <param name="Source">URI источника словаря ресурсов.</param>
+/// <param name="Source">Путь к словарю ресурсов.</param>
 public sealed record UiResourceDictionaryInclude(string Source);
 
 /// <summary>
-/// Базовый тип значения свойства в модели <c>.arxui</c>.
+/// Базовый тип значения свойства узла.
 /// </summary>
 public abstract record UiValue;
 
 /// <summary>
-/// Представляет scalar-значение свойства.
+/// Скалярное значение свойства.
 /// </summary>
-/// <param name="Value">Значение свойства.</param>
+/// <param name="Value">Фактическое значение.</param>
 public sealed record ScalarValue(object? Value) : UiValue;
 
 /// <summary>
-/// Представляет вложенный узел.
+/// Значение свойства, содержащее вложенный узел.
 /// </summary>
 /// <param name="Node">Вложенный узел.</param>
 public sealed record NodeValue(UiNode Node) : UiValue;
 
 /// <summary>
-/// Представляет коллекцию значений.
+/// Коллекционное значение свойства.
 /// </summary>
 /// <param name="Items">Элементы коллекции.</param>
 public sealed record CollectionValue(IReadOnlyList<UiValue> Items) : UiValue;
 
 /// <summary>
-/// Представляет значение привязки.
+/// Значение свойства в виде binding-выражения.
 /// </summary>
-/// <param name="Binding">Спецификация привязки.</param>
+/// <param name="Binding">Описание привязки.</param>
 public sealed record BindingValue(BindingSpec Binding) : UiValue;
 
 /// <summary>
-/// Представляет ссылку на ресурс по ключу.
+/// Ссылка на ресурс по ключу.
 /// </summary>
 /// <param name="Key">Ключ ресурса.</param>
 public sealed record ResourceValue(string Key) : UiValue;
 
 /// <summary>
-/// Представляет ссылку на asset или avares-ресурс.
+/// Ссылка на ресурс по URI/пути.
 /// </summary>
-/// <param name="Path">Путь к asset внутри сборки.</param>
-/// <param name="Assembly">Имя сборки, в которой расположен asset.</param>
+/// <param name="Path">Путь к ресурсу.</param>
+/// <param name="Assembly">Имя сборки, если ресурс внешний.</param>
 public sealed record UriReferenceValue(string Path, string? Assembly = null) : UiValue;
 
 /// <summary>
-/// Определяет спецификацию data binding.
+/// Описание параметров привязки.
 /// </summary>
-/// <param name="Path">Путь binding.</param>
-/// <param name="Mode">Режим binding.</param>
-/// <param name="ConverterKey">Ключ ресурса-конвертера.</param>
+/// <param name="Path">Путь привязки.</param>
+/// <param name="Mode">Режим привязки.</param>
+/// <param name="ConverterKey">Ключ конвертера ресурса.</param>
 /// <param name="StringFormat">Строковый формат результата.</param>
 /// <param name="ElementName">Имя элемента-источника.</param>
-/// <param name="FallbackValue">Fallback value.</param>
-/// <param name="TargetNullValue">Значение для <see langword="null"/>.</param>
+/// <param name="FallbackValue">Значение при ошибке разрешения пути.</param>
+/// <param name="TargetNullValue">Значение, подставляемое при <see langword="null"/>.</param>
 /// <param name="ConverterParameter">Параметр конвертера.</param>
-/// <param name="RelativeSource">Настройки relative source.</param>
+/// <param name="RelativeSource">Относительный источник данных.</param>
 public sealed record BindingSpec(
     string Path,
     BindingMode? Mode = null,
@@ -192,12 +163,12 @@ public sealed record BindingSpec(
     RelativeSourceSpec? RelativeSource = null);
 
 /// <summary>
-/// Определяет режим binding.
+/// Режим привязки данных.
 /// </summary>
 public enum BindingMode
 {
     /// <summary>
-    /// Режим по умолчанию, определяемый свойством назначения.
+    /// Режим по умолчанию.
     /// </summary>
     Default,
 
@@ -212,7 +183,7 @@ public enum BindingMode
     TwoWay,
 
     /// <summary>
-    /// Однократное считывание значения из источника.
+    /// Однократная привязка.
     /// </summary>
     OneTime,
 
@@ -223,12 +194,12 @@ public enum BindingMode
 }
 
 /// <summary>
-/// Определяет источник для relative binding.
+/// Описание относительного источника данных для binding.
 /// </summary>
-/// <param name="Mode">Режим relative source.</param>
-/// <param name="AncestorType">Тип предка для поиска.</param>
-/// <param name="AncestorLevel">Уровень предка.</param>
-/// <param name="Tree">Тип дерева для поиска.</param>
+/// <param name="Mode">Режим поиска источника.</param>
+/// <param name="AncestorType">Тип предка при режиме поиска предка.</param>
+/// <param name="AncestorLevel">Уровень предка при режиме поиска предка.</param>
+/// <param name="Tree">Тип дерева для поиска (при необходимости).</param>
 public sealed record RelativeSourceSpec(
     RelativeSourceMode Mode,
     string? AncestorType = null,
@@ -236,27 +207,27 @@ public sealed record RelativeSourceSpec(
     string? Tree = null);
 
 /// <summary>
-/// Определяет режим relative source.
+/// Режим разрешения относительного источника данных.
 /// </summary>
 public enum RelativeSourceMode
 {
     /// <summary>
-    /// Источником служит текущий <c>DataContext</c>.
+    /// Используется текущий контекст данных.
     /// </summary>
     DataContext,
 
     /// <summary>
-    /// Источником служит templated parent.
+    /// Используется шаблонный родитель.
     /// </summary>
     TemplatedParent,
 
     /// <summary>
-    /// Источником служит текущий объект.
+    /// Используется сам элемент.
     /// </summary>
     Self,
 
     /// <summary>
-    /// Источником служит предок в дереве.
+    /// Используется поиск предка в визуальном/логическом дереве.
     /// </summary>
     FindAncestor
 }

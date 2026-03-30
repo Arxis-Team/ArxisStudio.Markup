@@ -8,7 +8,7 @@
     </PropertyGroup>
 
     <ItemGroup>
-        <PackageReference Include="Avalonia" Version="11.3.8"/>
+        <PackageReference Include="Avalonia" Version="11.3.9"/>
         <PackageReference Include="Microsoft.CodeAnalysis.CSharp.SourceGenerators.Testing.XUnit" Version="1.1.1"/>
         <PackageReference Include="coverlet.collector" Version="6.0.2"/>
         <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.12.0"/>
@@ -27,6 +27,9 @@
       <ProjectReference Include="..\ArxisStudio.Markup.Generator\ArxisStudio.Markup.Generator.csproj" />
       <ProjectReference Include="..\ArxisStudio.Markup\ArxisStudio.Markup.csproj" />
       <ProjectReference Include="..\ArxisStudio.Markup.Json\ArxisStudio.Markup.Json.csproj" />
+      <ProjectReference Include="..\ArxisStudio.Markup.Metadata\ArxisStudio.Markup.Metadata.csproj" />
+      <ProjectReference Include="..\ArxisStudio.Markup.Metadata.Json\ArxisStudio.Markup.Metadata.Json.csproj" />
+      <ProjectReference Include="..\ArxisStudio.Markup.DesignEditorBridge\ArxisStudio.Markup.DesignEditorBridge.csproj" />
     </ItemGroup>
 
 </Project>

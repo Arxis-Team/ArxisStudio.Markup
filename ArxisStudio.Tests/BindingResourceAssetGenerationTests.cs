@@ -2,6 +2,9 @@ using Xunit;
 
 namespace ArxisStudio.Markup.Generator.Tests
 {
+    /// <summary>
+    /// Тесты генерации кода для binding/resource/asset-сценариев.
+    /// </summary>
     public class BindingResourceAssetGenerationTests
     {
         private const string DummyUserControlSource = @"
@@ -90,6 +93,9 @@ namespace TestApp.Views
 }
 ";
 
+        /// <summary>
+        /// Проверяет генерацию binding, resource и asset-значений.
+        /// </summary>
         [Fact]
         public void Binding_resource_and_asset_values_should_be_generated_correctly()
         {
@@ -122,6 +128,9 @@ namespace TestApp.Views
                 source);
         }
 
+        /// <summary>
+        /// Проверяет экранирование многострочных строковых литералов.
+        /// </summary>
         [Fact]
         public void Multiline_string_values_should_be_escaped_in_generated_code()
         {

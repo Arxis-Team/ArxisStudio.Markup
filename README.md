@@ -2,44 +2,74 @@
 
 `ArxisStudio.Markup` — набор библиотек для model-driven описания Avalonia UI через документы `.arxui`, их сериализации, runtime-загрузки и compile-time генерации кода.
 
-Проект ориентирован на создание визуального конструктора, поэтому ключевой приоритет — **стабильный и независимый API** библиотек.
+Проект ориентирован на визуальный конструктор, поэтому основной приоритет — чистый и предсказуемый публичный API.
 
-## Состав
+## Текущая архитектура
+
+- `ArxisStudio.Markup` содержит только runtime-модель (`UiDocument`, `UiNode`, `UiValue`).
+- `$design` удалён из runtime-схемы `.arxui`.
+- Метаданные дизайнера вынесены в `ArxisStudio.Markup.Metadata` (`DesignOverlay`).
+- JSON-кодек для метаданных находится в `ArxisStudio.Markup.Metadata.Json`.
+- Интеграция с редактором дизайна реализована в `ArxisStudio.Markup.DesignEditorBridge`.
+- `ArxisStudio.DesignEditor` подключается как submodule и используется через bridge-слой.
+
+## Состав решения
 
 ### `ArxisStudio.Markup`
-Независимый контракт модели документа:
+
+Независимый контракт runtime-модели документа:
 - `UiDocument`, `UiNode`, `UiValue`
 - `UiStyles`, `UiResources`
-- binding/resource/asset/design metadata
+- binding/resource/asset-описания
 
 Пакет не зависит от Avalonia и инфраструктуры редактора.
 
 ### `ArxisStudio.Markup.Json`
+
 JSON codec для `.arxui`:
 - `ArxuiSerializer.Deserialize(string json)`
 - `ArxuiSerializer.Serialize(UiDocument document)`
 
-Публичный API не протекает типами JSON-движка.
-
 ### `ArxisStudio.Markup.Json.Loader`
+
 Runtime builder из `UiNode` в дерево Avalonia-контролов:
 - `ArxuiLoader.Load(UiNode node, ArxuiLoadContext context)`
-- расширения через `ITypeResolver`, `IAssetResolver`, `IMarkupDocumentResolver`, `IPathResolver`, `ITopLevelControlFactory`
+- расширение через `ITypeResolver`, `IAssetResolver`, `IMarkupDocumentResolver`, `IPathResolver`, `ITopLevelControlFactory`
 
-Loader не зависит от инфраструктуры IDE; project-specific поведение подключается через адаптеры.
+### `ArxisStudio.Markup.Metadata`
+
+Контракт метаданных дизайнера:
+- `DesignOverlay`
+- `IDesignPropertyRegistry`
+- `IMetadataValidator`
+
+### `ArxisStudio.Markup.Metadata.Json`
+
+JSON-сериализация метаданных дизайнера:
+- `DesignOverlaySerializer.Deserialize(string json)`
+- `DesignOverlaySerializer.Serialize(DesignOverlay overlay)`
+
+### `ArxisStudio.Markup.DesignEditorBridge`
+
+Bridge между метаданными и `ArxisStudio.DesignEditor`:
+- `DesignEditorBridgeRuntime`
+- `DesignOverlayApplier`
+- `DesignOverlayExtractor`
+- реестры свойств/апплаеров/ридеров
 
 ### `ArxisStudio.Markup.Generator`
+
 Roslyn source generator для `InitializeComponent()` по `.arxui`:
-- проверка контракта документа
-- валидация `Kind`/`Class`/`Root`
-- генерация кода и диагностик `ADG*`
+- валидация документа
+- генерация кода
+- диагностики `ADG*`
 
 ## Принципы API
 
-1. Ядро модели (`ArxisStudio.Markup`) изолировано от UI/framework.
-2. JSON-пакет отвечает только за codec.
-3. Loader расширяется через интерфейсы, а не через жёсткие зависимости.
-4. Generator публикует диагностируемое поведение и предсказуемый контракт.
+1. Runtime-модель изолирована от design-time инфраструктуры.
+2. Метаданные дизайнера не «размазаны» по core-модели.
+3. Расширение выполняется через реестры и интерфейсы, а не через hardcode в ядре.
+4. Публичное поведение должно быть диагностируемым и стабильным.
 
 ## Быстрый старт
 
@@ -66,20 +96,22 @@ var control = loader.Load(
         TypeResolver = new ReflectionTypeResolver(),
         AssetResolver = new DefaultAssetResolver(),
         PathResolver = new ProjectContextPathResolver(projectDirectory, assemblyName),
-        TopLevelControlFactory = new DefaultTopLevelControlFactory(),
-        Options = new ArxuiLoadOptions
-        {
-            AllowAssets = true,
-            AllowExternalIncludes = true,
-            AllowDocumentFallback = true,
-            AllowBindings = true
-        }
+        TopLevelControlFactory = new DefaultTopLevelControlFactory()
     });
 ```
 
-### 3) Генерация `InitializeComponent()`
+### 3) Работа с метаданными дизайнера
 
-Подключите `.arxui` как `AdditionalFiles` и generator как analyzer.
+```csharp
+using ArxisStudio.Markup.DesignEditorBridge;
+
+var runtime = DesignEditorBridgeRuntime.CreateDefault();
+var applyDiagnostics = runtime.Apply(overlay, controlMap);
+var extractedOverlay = runtime.Extract(controlMap);
+var metadataDiagnostics = runtime.Validate(overlay);
+```
+
+### 4) Подключение generator
 
 ```xml
 <ItemGroup>
@@ -93,26 +125,9 @@ var control = loader.Load(
 </ItemGroup>
 ```
 
-## Диагностики generator
-
-Основные коды:
-- `ADG0001` — ошибка JSON
-- `ADG0002` — тип не найден
-- `ADG0005` — отсутствует `Class` (где обязателен)
-- `ADG0006` — target class не найдена
-- `ADG0007` — target class не `partial`
-- `ADG0008`/`ADG0010`/`ADG0011` — несовместимость `Kind`/`Root`/`Class`
-- `ADG0009` — дубликат `.arxui` для одного CLR-типа
-
 ## Сборка и тесты
 
 ```bash
 dotnet build ArxisStudio.Markup.sln
 dotnet test ArxisStudio.Tests/ArxisStudio.Markup.Generator.Tests.csproj
 ```
-
-## Текущее направление
-
-- дальнейшая стабилизация публичного API библиотек
-- расширение тестов loader на binding/asset/null-assignment сценарии
-- подготовка package-first поставки для интеграции в внешний конструктор

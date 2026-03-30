@@ -4,6 +4,9 @@ using Xunit;
 
 namespace ArxisStudio.Markup.Generator.Tests
 {
+    /// <summary>
+    /// Тесты диагностик source generator для документов <c>.arxui</c>.
+    /// </summary>
     public class DiagnosticGenerationTests
     {
         private const string PartialUserControlSource = @"
@@ -39,6 +42,9 @@ namespace TestApp
 }
 ";
 
+        /// <summary>
+        /// Проверяет выдачу диагностики ADG0005 при отсутствии свойства Class.
+        /// </summary>
         [Fact]
         public void Missing_class_should_report_ADG0005()
         {
@@ -61,6 +67,9 @@ namespace TestApp
             Assert.Contains(diagnostics, d => d.Id == "ADG0005" && d.Severity == DiagnosticSeverity.Error);
         }
 
+        /// <summary>
+        /// Проверяет выдачу диагностики ADG0006 для неизвестного класса.
+        /// </summary>
         [Fact]
         public void Unknown_class_should_report_ADG0006()
         {
@@ -84,6 +93,9 @@ namespace TestApp
             Assert.Contains(diagnostics, d => d.Id == "ADG0006" && d.Severity == DiagnosticSeverity.Error);
         }
 
+        /// <summary>
+        /// Проверяет выдачу диагностики ADG0007 для неполного класса.
+        /// </summary>
         [Fact]
         public void Non_partial_class_should_report_ADG0007()
         {
@@ -107,6 +119,9 @@ namespace TestApp
             Assert.Contains(diagnostics, d => d.Id == "ADG0007" && d.Severity == DiagnosticSeverity.Error);
         }
 
+        /// <summary>
+        /// Проверяет выдачу диагностики ADG0008 при несовместимом Kind.
+        /// </summary>
         [Fact]
         public void Incompatible_kind_should_report_ADG0008()
         {
@@ -130,6 +145,9 @@ namespace TestApp
             Assert.Contains(diagnostics, d => d.Id == "ADG0008" && d.Severity == DiagnosticSeverity.Error);
         }
 
+        /// <summary>
+        /// Проверяет выдачу ADG0009 для каждого дублирующего ассета.
+        /// </summary>
         [Fact]
         public void Duplicate_class_should_report_ADG0009_for_each_asset()
         {
@@ -166,6 +184,9 @@ namespace TestApp
             Assert.Equal(2, diagnostics.Count(d => d.Id == "ADG0009" && d.Severity == DiagnosticSeverity.Error));
         }
 
+        /// <summary>
+        /// Проверяет выдачу диагностики ADG0010 при несовместимом корневом типе для Kind.
+        /// </summary>
         [Fact]
         public void Incompatible_root_kind_should_report_ADG0010()
         {
@@ -189,6 +210,9 @@ namespace TestApp
             Assert.Contains(diagnostics, d => d.Id == "ADG0010" && d.Severity == DiagnosticSeverity.Error);
         }
 
+        /// <summary>
+        /// Проверяет выдачу диагностики ADG0011 при несовместимости Root и target-класса.
+        /// </summary>
         [Fact]
         public void Incompatible_root_target_class_should_report_ADG0011()
         {
@@ -212,6 +236,9 @@ namespace TestApp
             Assert.Contains(diagnostics, d => d.Id == "ADG0011" && d.Severity == DiagnosticSeverity.Error);
         }
 
+        /// <summary>
+        /// Проверяет отсутствие ADG0005 для документа стилей без Class.
+        /// </summary>
         [Fact]
         public void Styles_without_class_should_not_report_ADG0005()
         {
@@ -234,6 +261,9 @@ namespace TestApp
             Assert.DoesNotContain(diagnostics, d => d.Id == "ADG0005");
         }
 
+        /// <summary>
+        /// Проверяет выдачу ADG0005 для документа приложения без Class.
+        /// </summary>
         [Fact]
         public void Application_with_missing_class_should_report_ADG0005()
         {
@@ -256,6 +286,9 @@ namespace TestApp
             Assert.Contains(diagnostics, d => d.Id == "ADG0005" && d.Severity == DiagnosticSeverity.Error);
         }
 
+        /// <summary>
+        /// Проверяет отсутствие несовместимых диагностик Kind при корректном приложении.
+        /// </summary>
         [Fact]
         public void Application_with_matching_class_should_not_report_kind_diagnostics()
         {

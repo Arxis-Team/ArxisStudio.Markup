@@ -1,0 +1,3 @@
+[submodule "submodules/ArxisStudio.DesignEditor"]
+	path = submodules/ArxisStudio.DesignEditor
+	url = https://github.com/Arxis-Team/ArxisStudio.DesignEditor.git

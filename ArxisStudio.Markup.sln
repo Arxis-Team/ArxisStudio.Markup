@@ -14,6 +14,12 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "ArxisStudio.Markup.Generato
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "ArxisStudio.Template", "ArxisStudio.Template\ArxisStudio.Markup.Template.csproj", "{8A6B5D0E-0E19-4F42-84C9-B06B98F508A5}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "ArxisStudio.Markup.Metadata", "ArxisStudio.Markup.Metadata\ArxisStudio.Markup.Metadata.csproj", "{104A4C40-C7BF-43A3-9A5E-2CE648DD1A57}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "ArxisStudio.Markup.Metadata.Json", "ArxisStudio.Markup.Metadata.Json\ArxisStudio.Markup.Metadata.Json.csproj", "{61604F32-BE50-4F42-9F28-0726C372E72E}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "ArxisStudio.Markup.DesignEditorBridge", "ArxisStudio.Markup.DesignEditorBridge\ArxisStudio.Markup.DesignEditorBridge.csproj", "{9DB91D1A-E951-4151-8281-CC3996D1615E}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -48,5 +54,17 @@ Global
 		{8A6B5D0E-0E19-4F42-84C9-B06B98F508A5}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{8A6B5D0E-0E19-4F42-84C9-B06B98F508A5}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{8A6B5D0E-0E19-4F42-84C9-B06B98F508A5}.Release|Any CPU.Build.0 = Release|Any CPU
+		{104A4C40-C7BF-43A3-9A5E-2CE648DD1A57}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{104A4C40-C7BF-43A3-9A5E-2CE648DD1A57}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{104A4C40-C7BF-43A3-9A5E-2CE648DD1A57}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{104A4C40-C7BF-43A3-9A5E-2CE648DD1A57}.Release|Any CPU.Build.0 = Release|Any CPU
+		{61604F32-BE50-4F42-9F28-0726C372E72E}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{61604F32-BE50-4F42-9F28-0726C372E72E}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{61604F32-BE50-4F42-9F28-0726C372E72E}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{61604F32-BE50-4F42-9F28-0726C372E72E}.Release|Any CPU.Build.0 = Release|Any CPU
+		{9DB91D1A-E951-4151-8281-CC3996D1615E}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{9DB91D1A-E951-4151-8281-CC3996D1615E}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{9DB91D1A-E951-4151-8281-CC3996D1615E}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{9DB91D1A-E951-4151-8281-CC3996D1615E}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 EndGlobal

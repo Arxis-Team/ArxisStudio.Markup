@@ -5,7 +5,7 @@ namespace ArxisStudio.Markup.Json.Loader.Services;
 
 internal static class ProjectPathResolver
 {
-    public static string? ResolveProjectRelativePath(
+    internal static string? ResolveProjectRelativePath(
         string path,
         string? assemblyName,
         string? projectDirectory,

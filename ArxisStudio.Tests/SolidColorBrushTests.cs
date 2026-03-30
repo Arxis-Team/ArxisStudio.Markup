@@ -3,6 +3,9 @@ using Xunit;
 
 namespace ArxisStudio.Markup.Generator.Tests
 {
+    /// <summary>
+    /// Тесты генерации кода для сценария <c>SolidColorBrush</c>.
+    /// </summary>
     public class SolidColorBrushTests
     {
         private const string DummyUserControlSource = @"
@@ -52,6 +55,9 @@ namespace TestApp.Forms
 }
 ";
 
+        /// <summary>
+        /// Проверяет, что для <c>Opacity</c> генерируется литерал, а не <c>double.Parse</c>.
+        /// </summary>
         [Fact]
         public void Opacity_should_be_generated_as_literal_not_double_parse()
         {

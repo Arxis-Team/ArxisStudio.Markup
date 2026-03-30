@@ -3,6 +3,9 @@ using Xunit;
 
 namespace ArxisStudio.Markup.Generator.Tests
 {
+    /// <summary>
+    /// Тесты генерации enum-значений в выходном коде.
+    /// </summary>
     public class EnumGenerationTests
     {
         // Небольшой заглушечный исходник с partial UserControl под генерацию
@@ -74,6 +77,9 @@ namespace TestApp.Forms
 }
 ";
 
+        /// <summary>
+        /// Проверяет генерацию fully-qualified enum-значений для обычных свойств.
+        /// </summary>
         [Fact]
         public void Enum_properties_should_be_generated_with_fully_qualified_enum_members()
         {
@@ -98,6 +104,9 @@ namespace TestApp.Forms
                 source);
         }
 
+        /// <summary>
+        /// Проверяет генерацию attached enum-свойства <c>DockPanel.Dock</c>.
+        /// </summary>
         [Fact]
         public void Attached_enum_DockPanel_Dock_should_be_generated_correctly()
         {
