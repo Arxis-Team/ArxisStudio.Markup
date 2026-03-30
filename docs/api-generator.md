@@ -71,3 +71,35 @@
   }
 }
 ```
+
+## Примеры `.arxui` по вариантам `UiDocumentKind`
+
+`Application`:
+
+```json
+{
+  "SchemaVersion": 1,
+  "Kind": "Application",
+  "Class": "Demo.App",
+  "Root": {
+    "TypeName": "Demo.App",
+    "Properties": {}
+  }
+}
+```
+
+`Window`:
+
+```json
+{
+  "SchemaVersion": 1,
+  "Kind": "Window",
+  "Class": "Demo.Views.MainWindow",
+  "Root": {
+    "TypeName": "Demo.Views.MainWindow",
+    "Properties": {
+      "Title": "Main Window"
+    }
+  }
+}
+```

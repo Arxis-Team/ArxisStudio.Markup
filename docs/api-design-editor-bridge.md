@@ -76,3 +76,33 @@ runtime.ReaderRegistry.Register(
     "MyCompany.Design.GridSnap",
     new GridSnapReader());
 ```
+
+## Пример `.arxui` для Bridge-сценария
+
+Файл `EditorSurface.arxui`:
+
+```json
+{
+  "SchemaVersion": 1,
+  "Kind": "Control",
+  "Class": "Demo.Views.EditorSurface",
+  "Root": {
+    "TypeName": "Avalonia.Controls.Canvas",
+    "Properties": {
+      "Children": [
+        {
+          "TypeName": "Avalonia.Controls.Border",
+          "Properties": {
+            "Name": "Card1",
+            "Width": 180,
+            "Height": 80
+          }
+        }
+      ]
+    }
+  }
+}
+```
+
+Для этого файла bridge обычно применяет overlay-данные:
+`Layout.X`, `Layout.Y`, `MovePolicy`, `ResizePolicy`, `IsHitTestVisible`.

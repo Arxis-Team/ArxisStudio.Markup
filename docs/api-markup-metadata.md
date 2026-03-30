@@ -98,3 +98,33 @@ var overlay = new DesignOverlay(
             })
     });
 ```
+
+## Пример связки `.arxui` + metadata
+
+Файл `CanvasView.arxui` (runtime):
+
+```json
+{
+  "SchemaVersion": 1,
+  "Kind": "Control",
+  "Class": "Demo.Views.CanvasView",
+  "Root": {
+    "TypeName": "Avalonia.Controls.Canvas",
+    "Properties": {
+      "Children": [
+        {
+          "TypeName": "Avalonia.Controls.Border",
+          "Properties": {
+            "Name": "NodeA",
+            "Width": 120,
+            "Height": 48
+          }
+        }
+      ]
+    }
+  }
+}
+```
+
+Соответствующий `DesignOverlay` может хранить только design-time свойства этого узла, например:
+`IsHitTestVisible`, `Layout.X`, `Layout.Y`, `DesignInteraction.MovePolicy`.

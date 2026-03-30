@@ -93,3 +93,35 @@ public sealed class MyTypeResolver : ITypeResolver
     }
 }
 ```
+
+## Пример `.arxui` для `ArxuiLoader`
+
+Файл `PreviewWindow.arxui`:
+
+```json
+{
+  "SchemaVersion": 1,
+  "Kind": "Window",
+  "Class": "Demo.Views.PreviewWindow",
+  "Root": {
+    "TypeName": "Avalonia.Controls.Window",
+    "Properties": {
+      "Title": "Preview",
+      "Content": {
+        "TypeName": "Avalonia.Controls.Border",
+        "Properties": {
+          "Padding": "16",
+          "Child": {
+            "TypeName": "Avalonia.Controls.TextBlock",
+            "Properties": {
+              "Text": "Rendered by ArxuiLoader"
+            }
+          }
+        }
+      }
+    }
+  }
+}
+```
+
+Этот пример показывает top-level документ (`Kind = Window`) и путь, где используется `ITopLevelControlFactory`.

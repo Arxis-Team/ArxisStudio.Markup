@@ -1,117 +1,104 @@
 # ArxisStudio.Markup
 
-`ArxisStudio.Markup` — набор библиотек для model-driven описания Avalonia UI через документы `.arxui`, их сериализации, runtime-загрузки и compile-time генерации кода.
+![.NET](https://img.shields.io/badge/.NET-9.0-512BD4)
+![Avalonia](https://img.shields.io/badge/Avalonia-11.x-2E8B57)
+![Status](https://img.shields.io/badge/status-pre--MVP-orange)
 
-Проект ориентирован на визуальный конструктор, поэтому основной приоритет — чистый и предсказуемый публичный API.
+`ArxisStudio.Markup` — набор библиотек для model-driven описания Avalonia UI через `.arxui` документы, отдельные design-time metadata и интеграцию с визуальным редактором.
 
-## Текущая архитектура
+## Status
 
-- `ArxisStudio.Markup` содержит только runtime-модель (`UiDocument`, `UiNode`, `UiValue`).
-- `$design` удалён из runtime-схемы `.arxui`.
-- Метаданные дизайнера вынесены в `ArxisStudio.Markup.Metadata` (`DesignOverlay`).
-- JSON-кодек для метаданных находится в `ArxisStudio.Markup.Metadata.Json`.
-- Интеграция с редактором дизайна реализована в `ArxisStudio.Markup.DesignEditorBridge`.
-- `ArxisStudio.DesignEditor` подключается как submodule и используется через bridge-слой.
+Проект находится в pre-MVP стадии.
 
-## Состав решения
+- `SchemaVersion` для `.arxui`: `1`
+- обратная совместимость формата сейчас не гарантируется
+- публичный API проектируется с приоритетом чистой архитектуры и расширяемости
 
-### `ArxisStudio.Markup`
+## Архитектурные принципы
 
-Независимый контракт runtime-модели документа:
-- `UiDocument`, `UiNode`, `UiValue`
-- `UiStyles`, `UiResources`
-- binding/resource/asset-описания
+1. Runtime UI-модель и design-time metadata разделены.
+2. `.arxui` содержит только runtime-структуру.
+3. Design metadata живут в `DesignOverlay`.
+4. Интеграция с редактором идет через Bridge-слой, а не через хардкод в core.
 
-Пакет не зависит от Avalonia и инфраструктуры редактора.
+## Package Map
 
-### `ArxisStudio.Markup.Json`
+- `ArxisStudio.Markup`  
+  Core-модель: `UiDocument`, `UiNode`, `UiValue`.
+- `ArxisStudio.Markup.Json`  
+  JSON serializer/deserializer для `.arxui`.
+- `ArxisStudio.Markup.Json.Loader`  
+  Построение `Avalonia.Controls.Control` из `UiNode`.
+- `ArxisStudio.Markup.Metadata`  
+  Модель `DesignOverlay`, контракты registry/validator.
+- `ArxisStudio.Markup.Metadata.Json`  
+  JSON codec для `DesignOverlay`.
+- `ArxisStudio.Markup.DesignEditorBridge`  
+  Apply/Extract/Validate metadata между overlay и control tree.
+- `ArxisStudio.Markup.Generator`  
+  Roslyn incremental generator (`InitializeComponent()` из `.arxui`).
 
-JSON codec для `.arxui`:
-- `ArxuiSerializer.Deserialize(string json)`
-- `ArxuiSerializer.Serialize(UiDocument document)`
+## Пример `.arxui`
 
-### `ArxisStudio.Markup.Json.Loader`
+```json
+{
+  "SchemaVersion": 1,
+  "Kind": "Control",
+  "Class": "Demo.Views.MainView",
+  "Root": {
+    "TypeName": "Avalonia.Controls.UserControl",
+    "Properties": {
+      "Content": {
+        "TypeName": "Avalonia.Controls.TextBlock",
+        "Properties": {
+          "Text": "Hello from .arxui"
+        }
+      }
+    }
+  }
+}
+```
 
-Runtime builder из `UiNode` в дерево Avalonia-контролов:
-- `ArxuiLoader.Load(UiNode node, ArxuiLoadContext context)`
-- расширение через `ITypeResolver`, `IAssetResolver`, `IMarkupDocumentResolver`, `IPathResolver`, `ITopLevelControlFactory`
+## Quick Start
 
-### `ArxisStudio.Markup.Metadata`
-
-Контракт метаданных дизайнера:
-- `DesignOverlay`
-- `IDesignPropertyRegistry`
-- `IMetadataValidator`
-
-### `ArxisStudio.Markup.Metadata.Json`
-
-JSON-сериализация метаданных дизайнера:
-- `DesignOverlaySerializer.Deserialize(string json)`
-- `DesignOverlaySerializer.Serialize(DesignOverlay overlay)`
-
-### `ArxisStudio.Markup.DesignEditorBridge`
-
-Bridge между метаданными и `ArxisStudio.DesignEditor`:
-- `DesignEditorBridgeRuntime`
-- `DesignOverlayApplier`
-- `DesignOverlayExtractor`
-- реестры свойств/апплаеров/ридеров
-
-### `ArxisStudio.Markup.Generator`
-
-Roslyn source generator для `InitializeComponent()` по `.arxui`:
-- валидация документа
-- генерация кода
-- диагностики `ADG*`
-
-## Принципы API
-
-1. Runtime-модель изолирована от design-time инфраструктуры.
-2. Метаданные дизайнера не «размазаны» по core-модели.
-3. Расширение выполняется через реестры и интерфейсы, а не через hardcode в ядре.
-4. Публичное поведение должно быть диагностируемым и стабильным.
-
-## Быстрый старт
-
-### 1) Десериализация `.arxui`
+### 1. Deserialize `.arxui`
 
 ```csharp
 using ArxisStudio.Markup.Json;
 
-var json = File.ReadAllText("Views/MainWindow.arxui");
-var document = ArxuiSerializer.Deserialize(json);
+var doc = ArxuiSerializer.Deserialize(File.ReadAllText("Views/MainView.arxui"));
+if (doc is null)
+{
+    throw new InvalidOperationException("Root node is missing.");
+}
 ```
 
-### 2) Preview через loader
+### 2. Build preview with loader
 
 ```csharp
 using ArxisStudio.Markup.Json.Loader;
 using ArxisStudio.Markup.Json.Loader.Services;
 
 var loader = new ArxuiLoader();
-var control = loader.Load(
-    document!.Root,
-    new ArxuiLoadContext
-    {
-        TypeResolver = new ReflectionTypeResolver(),
-        AssetResolver = new DefaultAssetResolver(),
-        PathResolver = new ProjectContextPathResolver(projectDirectory, assemblyName),
-        TopLevelControlFactory = new DefaultTopLevelControlFactory()
-    });
+var root = loader.Load(doc.Root, new ArxuiLoadContext
+{
+    TypeResolver = new ReflectionTypeResolver(),
+    AssetResolver = new DefaultAssetResolver()
+});
 ```
 
-### 3) Работа с метаданными дизайнера
+### 3. Apply/Extract metadata through bridge
 
 ```csharp
 using ArxisStudio.Markup.DesignEditorBridge;
 
 var runtime = DesignEditorBridgeRuntime.CreateDefault();
+var validation = runtime.Validate(overlay);
 var applyDiagnostics = runtime.Apply(overlay, controlMap);
-var extractedOverlay = runtime.Extract(controlMap);
-var metadataDiagnostics = runtime.Validate(overlay);
+var extracted = runtime.Extract(controlMap);
 ```
 
-### 4) Подключение generator
+### 4. Connect source generator
 
 ```xml
 <ItemGroup>
@@ -125,9 +112,40 @@ var metadataDiagnostics = runtime.Validate(overlay);
 </ItemGroup>
 ```
 
-## Сборка и тесты
+## Documentation
+
+- [Docs Index](./docs/README.md)
+- [API Index](./docs/api-index.md)
+- [Metadata Format](./docs/metadata-format.md)
+- [DesignEditor Bridge](./docs/design-editor-bridge.md)
+- [Migration: `$design` -> `DesignOverlay`](./docs/migration-design-overlay.md)
+
+## Compatibility
+
+- Target platform: `.NET 9`
+- UI stack: `Avalonia 11`
+
+## Roadmap (Pre-MVP)
+
+1. Stabilize public API boundaries for core/metadata/bridge packages.
+2. Move from predefined hardcoded mappings to registry-first configuration where needed.
+3. Complete end-to-end integration with `ArxisStudio.DesignEditor` (submodule).
+4. Add scenario tests for round-trip: `.arxui` -> loader -> bridge extract/apply -> metadata JSON.
+5. Publish package versioning and release policy after MVP baseline.
+
+## Build & Test
 
 ```bash
 dotnet build ArxisStudio.Markup.sln
 dotnet test ArxisStudio.Tests/ArxisStudio.Markup.Generator.Tests.csproj
 ```
+
+## Contributing
+
+PR и issue приветствуются.
+
+Перед отправкой изменений:
+
+1. Проверьте сборку решения.
+2. Обновите документацию в `docs/`, если меняется публичный API.
+3. Для изменений формата `.arxui`/metadata добавьте примеры и миграционные заметки.

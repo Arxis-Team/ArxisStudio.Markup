@@ -82,3 +82,37 @@ var textNode = new UiNode(
             StringFormat: "Пользователь: {0}"))
     });
 ```
+
+## Пример `.arxui` (полное runtime-дерево)
+
+Файл `MainView.arxui`:
+
+```json
+{
+  "SchemaVersion": 1,
+  "Kind": "Control",
+  "Class": "Demo.Views.MainView",
+  "Root": {
+    "TypeName": "Avalonia.Controls.UserControl",
+    "Properties": {
+      "Content": {
+        "TypeName": "Avalonia.Controls.Grid",
+        "Properties": {
+          "Children": [
+            {
+              "TypeName": "Avalonia.Controls.TextBlock",
+              "Properties": {
+                "Text": {
+                  "$binding": "User.Name",
+                  "Mode": "OneWay",
+                  "StringFormat": "Пользователь: {0}"
+                }
+              }
+            }
+          ]
+        }
+      }
+    }
+  }
+}
+```

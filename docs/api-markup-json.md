@@ -65,3 +65,49 @@ File.WriteAllText("MainView.generated.arxui", output);
   }
 }
 ```
+
+## Пример `.arxui` со спец-конструкциями API
+
+Файл `Dashboard.arxui`:
+
+```json
+{
+  "SchemaVersion": 1,
+  "Kind": "Control",
+  "Class": "Demo.Views.DashboardView",
+  "Root": {
+    "TypeName": "Avalonia.Controls.UserControl",
+    "Resources": {
+      "$mergedDictionaries": [
+        { "Source": "avares://Demo/Styles/Theme.axaml" }
+      ],
+      "AccentBrush": "#2E8B57"
+    },
+    "Styles": [
+      { "$styleInclude": "avares://Demo/Styles/Dashboard.axaml" }
+    ],
+    "Properties": {
+      "Content": {
+        "TypeName": "Avalonia.Controls.StackPanel",
+        "Properties": {
+          "Children": [
+            {
+              "TypeName": "Avalonia.Controls.TextBlock",
+              "Properties": {
+                "Text": { "$binding": "Header.Title", "Mode": "OneWay" },
+                "Foreground": { "$resource": "AccentBrush" }
+              }
+            },
+            {
+              "TypeName": "Avalonia.Controls.Image",
+              "Properties": {
+                "Source": { "$asset": "Assets/logo.png" }
+              }
+            }
+          ]
+        }
+      }
+    }
+  }
+}
+```
