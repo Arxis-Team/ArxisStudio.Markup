@@ -1,20 +1,8 @@
 # Формат Metadata
 
-`ArxisStudio.Markup.Metadata` хранит design-time данные отдельно от runtime-модели.
+`ArxisStudio.Markup.Metadata` задаёт формат design-time данных, который хранится отдельно от runtime `.arxui`.
 
-## Базовые правила
-
-- Runtime UI-модель задаётся только в `ArxisStudio.Markup`.
-- Данные дизайнера представлены типом `DesignOverlay`.
-- Свойства метаданных определяются через реестр (`IDesignPropertyRegistry`).
-- `SchemaVersion` в `.arxui` остаётся равным `1`.
-
-## Разделение ответственности
-
-- `.arxui` (`UiDocument`) содержит только runtime-структуру.
-- Метаданные дизайнера загружаются и сохраняются отдельно как `DesignOverlay`.
-
-## Структура оверлея
+## Структура
 
 ```json
 {
@@ -24,31 +12,38 @@
   },
   "Nodes": {
     "/Root/Children/0": {
-      "IsHitTestVisible": false,
-      "Layout.X": 100,
-      "Layout.Y": 200,
-      "DesignInteraction.MovePolicy": "X",
-      "DesignInteraction.ResizePolicy": "None"
+      "Avalonia.Input.InputElement.IsHitTestVisible": false,
+      "ArxisStudio.Attached.Layout.X": 100,
+      "ArxisStudio.Attached.Layout.Y": 200
     }
   }
 }
 ```
 
-## Встроенные ключи
+## Модель данных
 
-- `Avalonia.Input.InputElement.IsHitTestVisible` (алиас: `IsHitTestVisible`)
-- `ArxisStudio.Attached.Layout.X` (алиас: `Layout.X`)
-- `ArxisStudio.Attached.Layout.Y` (алиас: `Layout.Y`)
-- `ArxisStudio.Attached.DesignInteraction.MovePolicy` (алиас: `DesignInteraction.MovePolicy`)
-- `ArxisStudio.Attached.DesignInteraction.ResizePolicy` (алиас: `DesignInteraction.ResizePolicy`)
+- `DesignOverlay` — корень metadata.
+- `DocumentDesignData` — свойства уровня документа.
+- `NodeDesignData` — свойства уровня узла.
+- `DesignValue` — скаляр/объект/коллекция.
+- `NodeRef` — ссылка на узел в дереве документа.
 
-Ключи объявлены в `KnownDesignProperties`.
+## Правила
+
+1. Runtime API (`UiDocument`, `UiNode`) не содержит `$design`.
+2. Design-time свойства определяются через registry (`IDesignPropertyRegistry`).
+3. Для интеграции с редактором используется отдельный bridge-пакет.
 
 ## Валидация
 
-`SimpleMetadataValidator` возвращает диагностики:
+`SimpleMetadataValidator` возвращает диагностические коды:
 
-- `MDV0001` — пустой `NodeRef`
-- `MDV0002` — неизвестное свойство
-- `MDV0003` — не-скалярное значение свойства
-- `MDV0004` — несовместимый тип значения
+- `MDV0001` пустой `NodeRef`
+- `MDV0002` неизвестное свойство
+- `MDV0003` не-скалярное значение
+- `MDV0004` несовместимый тип значения
+
+## Детальная API-документация
+
+- [API: ArxisStudio.Markup.Metadata](./api-markup-metadata.md)
+- [API: ArxisStudio.Markup.Metadata.Json](./api-markup-metadata-json.md)

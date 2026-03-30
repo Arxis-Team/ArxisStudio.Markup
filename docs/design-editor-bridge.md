@@ -1,37 +1,34 @@
 # DesignEditor Bridge
 
-`ArxisStudio.Markup.DesignEditorBridge` связывает `DesignOverlay` и `ArxisStudio.DesignEditor`.
+`ArxisStudio.Markup.DesignEditorBridge` реализует bridge-слой между `DesignOverlay` и контролами в визуальном редакторе.
 
-## Основные компоненты
+## Кратко
 
-- `DesignEditorBridgeRuntime` — единая точка конфигурации и использования bridge.
-- `DesignOverlayApplier` — применение метаданных к контролам.
-- `DesignOverlayExtractor` — извлечение метаданных из контролов.
-- `DesignPropertyRegistry` — разрешение канонических ключей и алиасов.
-- `DesignPropertyApplierRegistry` — обработчики применения значений.
-- `DesignPropertyReaderRegistry` — обработчики чтения значений.
-- `DefaultDesignEditorMappings` — встроенные маппинги для известных ключей.
+1. Runtime-структура UI живёт в `.arxui`.
+2. Design-time свойства живут отдельно в `DesignOverlay`.
+3. Bridge умеет валидировать metadata, применять её к контролам и извлекать обратно.
 
-## Диагностики bridge-слоя
-
-- `ADB0001` — для `NodeRef` не найден контрол.
-- `ADB0002` — неизвестный ключ свойства дизайнера.
-- `ADB0003` — не зарегистрирован обработчик применения.
-- `ADB0004` — значение свойства не является скаляром.
-
-## Режимы инициализации
-
-- `DesignEditorBridgeRuntime.CreateDefault()`:
-  регистрирует встроенные свойства и маппинги.
-- `DesignEditorBridgeRuntime.CreateEmpty()`:
-  создаёт runtime без встроенных регистраций (для полностью кастомной конфигурации).
-
-## Типовой сценарий
+## Быстрый пример
 
 ```csharp
+using ArxisStudio.Markup.DesignEditorBridge;
+
 var runtime = DesignEditorBridgeRuntime.CreateDefault();
 
-var applyDiagnostics = runtime.Apply(overlay, controlMap);
-var extractedOverlay = runtime.Extract(controlMap);
 var metadataDiagnostics = runtime.Validate(overlay);
+var bridgeDiagnostics = runtime.Apply(overlay, controlMap);
+var extracted = runtime.Extract(controlMap);
 ```
+
+## Для полной кастомизации
+
+Используйте `DesignEditorBridgeRuntime.CreateEmpty()` и вручную регистрируйте:
+
+- `DesignPropertyDescriptor` в `PropertyRegistry`
+- `IDesignPropertyApplier` в `ApplierRegistry`
+- `IDesignPropertyReader` в `ReaderRegistry`
+
+## Детальная API-документация
+
+- [API: ArxisStudio.Markup.DesignEditorBridge](./api-design-editor-bridge.md)
+- [API: ArxisStudio.Markup.Metadata](./api-markup-metadata.md)
