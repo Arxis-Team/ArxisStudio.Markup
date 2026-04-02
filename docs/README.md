@@ -1,4 +1,4 @@
-# Документация ArxisStudio.Markup
+﻿# Документация ArxisStudio.Markup
 
 Основная точка входа:
 
@@ -7,5 +7,7 @@
 Тематические документы:
 
 - [Формат Metadata](./metadata-format.md)
-- [DesignEditor Bridge](./design-editor-bridge.md)
-- [Миграция `$design` -> `DesignOverlay`](./migration-design-overlay.md)
+- [Inline `$design` Workflow](./inline-design-workflow.md)
+- [Миграция: `DesignMetadata` -> inline `$design`](./migration-design-overlay.md)
+
+

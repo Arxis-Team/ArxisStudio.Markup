@@ -29,7 +29,6 @@
       <ProjectReference Include="..\ArxisStudio.Markup.Json\ArxisStudio.Markup.Json.csproj" />
       <ProjectReference Include="..\ArxisStudio.Markup.Metadata\ArxisStudio.Markup.Metadata.csproj" />
       <ProjectReference Include="..\ArxisStudio.Markup.Metadata.Json\ArxisStudio.Markup.Metadata.Json.csproj" />
-      <ProjectReference Include="..\ArxisStudio.Markup.DesignEditorBridge\ArxisStudio.Markup.DesignEditorBridge.csproj" />
     </ItemGroup>
 
 </Project>

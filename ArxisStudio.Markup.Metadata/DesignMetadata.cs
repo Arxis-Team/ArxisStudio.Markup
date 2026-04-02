@@ -1,4 +1,4 @@
-using System.Collections.Generic;
+﻿using System.Collections.Generic;
 
 namespace ArxisStudio.Markup.Metadata;
 
@@ -7,9 +7,9 @@ namespace ArxisStudio.Markup.Metadata;
 /// </summary>
 /// <param name="Document">Документные метаданные.</param>
 /// <param name="Nodes">Метаданные узлов.</param>
-public sealed record DesignOverlay(
-    DocumentDesignData? Document,
-    IReadOnlyDictionary<NodeRef, NodeDesignData> Nodes);
+public sealed record DesignMetadata(
+    DocumentDesignMetadata? Document,
+    IReadOnlyDictionary<NodeRef, NodeDesignMetadata> Nodes);
 
 /// <summary>
 /// Ссылка на узел внутри документа.
@@ -21,12 +21,14 @@ public sealed record NodeRef(string Value);
 /// Метаданные дизайнера уровня документа.
 /// </summary>
 /// <param name="Properties">Набор свойств документа.</param>
-public sealed record DocumentDesignData(
+public sealed record DocumentDesignMetadata(
     IReadOnlyDictionary<string, DesignValue> Properties);
 
 /// <summary>
 /// Метаданные дизайнера уровня узла.
 /// </summary>
 /// <param name="Properties">Набор свойств узла.</param>
-public sealed record NodeDesignData(
+public sealed record NodeDesignMetadata(
     IReadOnlyDictionary<string, DesignValue> Properties);
+
+

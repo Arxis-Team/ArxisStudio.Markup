@@ -1,84 +1,29 @@
-# ArxisStudio.Markup.Metadata.Json
+﻿# ArxisStudio.Markup.Metadata.Json
 
-Пакет сериализует и десериализует `DesignOverlay` в JSON.
+Пакет сериализует `DesignMetadata` в JSON и обратно.
+
+## Когда использовать
+
+Основной сценарий конструктора — inline `$design` в `.arxui`.  
+`DesignMetadataSerializer` нужен как вспомогательный формат:
+
+1. экспорт/импорт metadata;
+2. отладка bridge;
+3. промежуточные инструменты миграции.
 
 ## Публичный API
 
-### `DesignOverlaySerializer`
+- `DesignMetadata DesignMetadataSerializer.Deserialize(string json)`
+- `string DesignMetadataSerializer.Serialize(DesignMetadata overlay)`
 
-- `DesignOverlay Deserialize(string json)` — чтение overlay из JSON.
-- `string Serialize(DesignOverlay overlay)` — запись overlay в JSON.
-
-## Модель сериализации
-
-- Объект верхнего уровня содержит `Document` и `Nodes`.
-- `Nodes` — объект, где ключом выступает `NodeRef.Value`.
-- Поддерживаются скаляры, объекты и массивы (`DesignScalarValue`, `DesignObjectValue`, `DesignCollectionValue`).
-
-## Пример: запись в JSON
+## Пример
 
 ```csharp
-using ArxisStudio.Markup.Metadata;
-using ArxisStudio.Markup.Metadata.Json;
+var overlay = InlineDesignMetadataConverter.FromInlineDesign(document);
+var json = DesignMetadataSerializer.Serialize(overlay);
 
-var overlay = new DesignOverlay(
-    Document: null,
-    Nodes: new Dictionary<NodeRef, NodeDesignData>
-    {
-        [new NodeRef("/Root/Children/0")] = new NodeDesignData(
-            new Dictionary<string, DesignValue>
-            {
-                ["Avalonia.Input.InputElement.IsHitTestVisible"] = new DesignScalarValue(false),
-                ["ArxisStudio.Attached.Layout.X"] = new DesignScalarValue(120.0)
-            })
-    });
-
-var json = DesignOverlaySerializer.Serialize(overlay);
-File.WriteAllText("MainView.design.json", json);
+var restored = DesignMetadataSerializer.Deserialize(json);
+var updatedDocument = InlineDesignMetadataConverter.ApplyOverlay(document, restored);
 ```
 
-## Пример: чтение из JSON
 
-```csharp
-using ArxisStudio.Markup.Metadata.Json;
-
-var overlay = DesignOverlaySerializer.Deserialize(File.ReadAllText("MainView.design.json"));
-Console.WriteLine($"Nodes: {overlay.Nodes.Count}");
-```
-
-## Пример связки `.arxui` + `*.design.json`
-
-Файл `MainView.arxui`:
-
-```json
-{
-  "SchemaVersion": 1,
-  "Kind": "Control",
-  "Class": "Demo.Views.MainView",
-  "Root": {
-    "TypeName": "Avalonia.Controls.Canvas",
-    "Properties": {
-      "Children": [
-        {
-          "TypeName": "Avalonia.Controls.Button",
-          "Properties": { "Content": "Click" }
-        }
-      ]
-    }
-  }
-}
-```
-
-Файл `MainView.design.json`:
-
-```json
-{
-  "Nodes": {
-    "/Root/Children/0": {
-      "ArxisStudio.Attached.Layout.X": 100,
-      "ArxisStudio.Attached.Layout.Y": 240,
-      "Avalonia.Input.InputElement.IsHitTestVisible": false
-    }
-  }
-}
-```

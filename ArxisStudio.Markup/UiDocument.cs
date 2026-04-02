@@ -9,11 +9,13 @@ namespace ArxisStudio.Markup;
 /// <param name="Kind">Семантический тип документа.</param>
 /// <param name="Class">Полное имя CLR-типа, если привязка к типу требуется.</param>
 /// <param name="Root">Корневой узел визуального дерева.</param>
+/// <param name="Design">Design-time свойства документа, хранящиеся в <c>$design</c>.</param>
 public sealed record UiDocument(
     int SchemaVersion,
     UiDocumentKind Kind,
     string? Class,
-    UiNode Root);
+    UiNode Root,
+    UiDesignData? Design = null);
 
 /// <summary>
 /// Семантический тип документа.
@@ -50,14 +52,45 @@ public enum UiDocumentKind
 /// Узел дерева пользовательского интерфейса.
 /// </summary>
 /// <param name="TypeName">Имя типа элемента.</param>
-/// <param name="Properties">Набор свойств узла.</param>
+/// <param name="Properties">Набор runtime-свойств узла.</param>
 /// <param name="Styles">Коллекция стилей узла.</param>
 /// <param name="Resources">Коллекция ресурсов узла.</param>
+/// <param name="Design">Design-time свойства узла, хранящиеся в <c>$design</c>.</param>
 public sealed record UiNode(
     string TypeName,
     IReadOnlyDictionary<string, UiValue> Properties,
     UiStyles? Styles = null,
-    UiResources? Resources = null);
+    UiResources? Resources = null,
+    UiDesignData? Design = null);
+
+/// <summary>
+/// Набор design-time свойств документа или узла.
+/// </summary>
+/// <param name="Properties">Словарь ключей и значений design-time свойств.</param>
+public sealed record UiDesignData(IReadOnlyDictionary<string, UiDesignValue> Properties);
+
+/// <summary>
+/// Базовый тип значения design-time свойства.
+/// </summary>
+public abstract record UiDesignValue;
+
+/// <summary>
+/// Скалярное design-time значение.
+/// </summary>
+/// <param name="Value">Фактическое значение.</param>
+public sealed record UiDesignScalarValue(object? Value) : UiDesignValue;
+
+/// <summary>
+/// Объектное design-time значение.
+/// </summary>
+/// <param name="Properties">Дочерние ключи и значения.</param>
+public sealed record UiDesignObjectValue(IReadOnlyDictionary<string, UiDesignValue> Properties) : UiDesignValue;
+
+/// <summary>
+/// Коллекционное design-time значение.
+/// </summary>
+/// <param name="Items">Элементы коллекции.</param>
+public sealed record UiDesignCollectionValue(IReadOnlyList<UiDesignValue> Items) : UiDesignValue;
 
 /// <summary>
 /// Коллекция стилей, привязанная к узлу.
@@ -98,30 +131,30 @@ public sealed record UiResources(
 public sealed record UiResourceDictionaryInclude(string Source);
 
 /// <summary>
-/// Базовый тип значения свойства узла.
+/// Базовый тип значения runtime-свойства узла.
 /// </summary>
 public abstract record UiValue;
 
 /// <summary>
-/// Скалярное значение свойства.
+/// Скалярное значение runtime-свойства.
 /// </summary>
 /// <param name="Value">Фактическое значение.</param>
 public sealed record ScalarValue(object? Value) : UiValue;
 
 /// <summary>
-/// Значение свойства, содержащее вложенный узел.
+/// Значение runtime-свойства, содержащее вложенный узел.
 /// </summary>
 /// <param name="Node">Вложенный узел.</param>
 public sealed record NodeValue(UiNode Node) : UiValue;
 
 /// <summary>
-/// Коллекционное значение свойства.
+/// Коллекционное значение runtime-свойства.
 /// </summary>
 /// <param name="Items">Элементы коллекции.</param>
 public sealed record CollectionValue(IReadOnlyList<UiValue> Items) : UiValue;
 
 /// <summary>
-/// Значение свойства в виде binding-выражения.
+/// Значение runtime-свойства в виде binding-выражения.
 /// </summary>
 /// <param name="Binding">Описание привязки.</param>
 public sealed record BindingValue(BindingSpec Binding) : UiValue;

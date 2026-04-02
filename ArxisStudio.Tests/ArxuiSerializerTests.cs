@@ -202,5 +202,55 @@ namespace ArxisStudio.Markup.Generator.Tests
 
             Assert.Throws<JsonSerializationException>(() => ArxuiSerializer.Deserialize(invalidJson));
         }
+
+        /// <summary>
+        /// Проверяет чтение и сериализацию inline-поля <c>$design</c> на уровне документа и узла.
+        /// </summary>
+        [Fact]
+        public void Serialize_and_deserialize_should_support_inline_design()
+        {
+            const string jsonWithDesign = @"
+{
+  ""SchemaVersion"": 1,
+  ""Kind"": ""Control"",
+  ""$design"": {
+    ""SurfaceWidth"": 1280,
+    ""SurfaceHeight"": 720
+  },
+  ""Root"": {
+    ""TypeName"": ""Avalonia.Controls.Canvas"",
+    ""Properties"": {
+      ""Children"": [
+        {
+          ""TypeName"": ""Avalonia.Controls.Border"",
+          ""$design"": {
+            ""Layout.X"": 100,
+            ""Layout.Y"": 220,
+            ""DesignInteraction.MovePolicy"": ""Both""
+          },
+          ""Properties"": {}
+        }
+      ]
+    }
+  }
+}
+";
+
+            var document = ArxuiSerializer.Deserialize(jsonWithDesign);
+
+            Assert.NotNull(document);
+            Assert.NotNull(document!.Design);
+            Assert.True(document.Design!.Properties.ContainsKey("SurfaceWidth"));
+
+            var children = Assert.IsType<CollectionValue>(document.Root.Properties["Children"]);
+            var childNode = Assert.IsType<NodeValue>(children.Items[0]).Node;
+            Assert.NotNull(childNode.Design);
+            Assert.True(childNode.Design!.Properties.ContainsKey("Layout.X"));
+
+            var serialized = ArxuiSerializer.Serialize(document);
+            Assert.Contains(@"""$design"": {", serialized);
+            Assert.Contains(@"""SurfaceWidth"": 1280", serialized);
+            Assert.Contains(@"""Layout.X"": 100", serialized);
+        }
     }
 }

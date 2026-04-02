@@ -1,41 +1,32 @@
-# Миграция: `$design` -> `DesignOverlay`
+# Миграция: `DesignMetadata` -> inline `$design`
 
-Документ описывает переход на отдельный слой metadata без встроенных `$design`-полей в `.arxui`.
+Документ описывает переход к хранению design-time данных внутри `.arxui`.
 
 ## Что изменилось
 
-1. `$design` удалён из runtime-модели `UiDocument`/`UiNode`.
-2. `ArxuiSerializer` больше не читает и не пишет `$design` внутри `.arxui`.
-3. Design-time данные теперь хранятся как отдельный `DesignOverlay`.
+1. В `UiDocument` и `UiNode` добавлено поле `Design` (`$design` в JSON).
+2. `ArxuiSerializer` читает и пишет `$design` на уровне документа и узла.
+3. Для editor-логики используется `DesignMetadata` + `InlineDesignMetadataConverter`.
 
-## Новый поток данных
+## Рекомендуемый поток для конструктора
 
-1. Загрузить `.arxui` через `ArxuiSerializer.Deserialize(...)`.
-2. Загрузить `DesignOverlay` отдельно через `DesignOverlaySerializer.Deserialize(...)`.
-3. В редакторе использовать `DesignEditorBridgeRuntime`:
-   `Validate(...)`, `Apply(...)`, `Extract(...)`.
+1. Загрузить `UiDocument` из `.arxui`.
+2. Получить metadata:
+   `InlineDesignMetadataConverter.FromInlineDesign(document)`.
+3. Применить metadata в редакторной логике.
+4. Извлечь обновленную metadata после редактирования.
+5. Записать обратно в `.arxui`:
+   `InlineDesignMetadataConverter.ApplyOverlay(document, extractedMetadata)`.
 
-## Пример
+## Минимальный пример
 
 ```csharp
-using ArxisStudio.Markup.Json;
-using ArxisStudio.Markup.Metadata.Json;
-using ArxisStudio.Markup.DesignEditorBridge;
+var document = ArxuiSerializer.Deserialize(File.ReadAllText("MainView.arxui"))!;
+var metadata = InlineDesignMetadataConverter.FromInlineDesign(document);
 
-var ui = ArxuiSerializer.Deserialize(File.ReadAllText("MainView.arxui"));
-var overlay = DesignOverlaySerializer.Deserialize(File.ReadAllText("MainView.design.json"));
+editor.Apply(metadata, controlMap);
+var extractedMetadata = editor.Extract(controlMap);
 
-var runtime = DesignEditorBridgeRuntime.CreateDefault();
-var validation = runtime.Validate(overlay);
-var applyDiagnostics = runtime.Apply(overlay, controlMap);
+var updated = InlineDesignMetadataConverter.ApplyOverlay(document, extractedMetadata);
+File.WriteAllText("MainView.arxui", ArxuiSerializer.Serialize(updated));
 ```
-
-## Что делать со старыми файлами
-
-1. Перенести все `$design`-данные из `.arxui` в отдельный JSON overlay-файл.
-2. Привести ключи к canonical-форме или зарегистрированным алиасам.
-3. Проверить overlay через `runtime.Validate(...)`.
-
-## Детальная API-документация
-
-- [Индекс API-документации](./api-index.md)

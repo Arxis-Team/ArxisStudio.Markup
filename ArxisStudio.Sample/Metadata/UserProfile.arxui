@@ -3,9 +3,12 @@
   "Kind": "Control",
   "Root": {
     "TypeName": "ArxisStudio.Markup.Sample.Views.MyControl",
+    "$design": {
+      "IgnorePreviewInput": true,
+      "AllowMove": false,
+      "AllowResize": false
+    },
     "Properties": {
-      "Avalonia.Controls.Design.Width": 800,
-      "Avalonia.Controls.Design.Height": 600,
       "DataContext": {
         "TypeName": "ArxisStudio.Markup.Sample.ViewModels.UserProfileViewModel",
         "Properties": {}

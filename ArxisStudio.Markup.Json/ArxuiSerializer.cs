@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
 
@@ -68,7 +69,12 @@ public static class ArxuiSerializer
             return null;
         }
 
-        return new UiDocument(schemaVersion, kind, className, rootNode);
+        return new UiDocument(
+            schemaVersion,
+            kind,
+            className,
+            rootNode,
+            ReadDesign(root["$design"] as JObject));
     }
 
     /// <summary>
@@ -90,6 +96,11 @@ public static class ArxuiSerializer
             root["Class"] = document.Class;
         }
 
+        if (document.Design != null && document.Design.Properties.Count > 0)
+        {
+            root["$design"] = WriteDesign(document.Design);
+        }
+
         return root.ToString(Formatting.Indented);
     }
 
@@ -108,7 +119,8 @@ public static class ArxuiSerializer
             typeName,
             properties,
             ReadStyles(nodeObject["Styles"] as JArray),
-            ReadResources(nodeObject["Resources"] as JObject));
+            ReadResources(nodeObject["Resources"] as JObject),
+            ReadDesign(nodeObject["$design"] as JObject));
     }
 
     private static IReadOnlyDictionary<string, UiValue> ReadProperties(JObject propertiesObject)
@@ -199,7 +211,8 @@ public static class ArxuiSerializer
             "System.Object",
             nestedProperties,
             ReadStyles(obj["Styles"] as JArray),
-            ReadResources(obj["Resources"] as JObject)));
+            ReadResources(obj["Resources"] as JObject),
+            ReadDesign(obj["$design"] as JObject)));
     }
 
     private static UiStyles? ReadStyles(JArray? stylesArray)
@@ -327,6 +340,11 @@ public static class ArxuiSerializer
             obj["Resources"] = WriteResources(node.Resources);
         }
 
+        if (node.Design != null && node.Design.Properties.Count > 0)
+        {
+            obj["$design"] = WriteDesign(node.Design);
+        }
+
         return obj;
     }
 
@@ -452,6 +470,88 @@ public static class ArxuiSerializer
         return obj;
     }
 
+    private static UiDesignData? ReadDesign(JObject? designObject)
+    {
+        if (designObject == null)
+        {
+            return null;
+        }
+
+        var properties = new Dictionary<string, UiDesignValue>(StringComparer.Ordinal);
+        foreach (var property in designObject.Properties())
+        {
+            properties[property.Name] = ReadDesignValue(property.Value);
+        }
+
+        return new UiDesignData(properties);
+    }
+
+    private static UiDesignValue ReadDesignValue(JToken token)
+    {
+        return token.Type switch
+        {
+            JTokenType.Object => new UiDesignObjectValue(ReadDesignProperties((JObject)token)),
+            JTokenType.Array => new UiDesignCollectionValue(ReadDesignCollection((JArray)token)),
+            JTokenType.Null => new UiDesignScalarValue(null),
+            _ => new UiDesignScalarValue(((JValue)token).Value)
+        };
+    }
+
+    private static IReadOnlyDictionary<string, UiDesignValue> ReadDesignProperties(JObject obj)
+    {
+        var properties = new Dictionary<string, UiDesignValue>(StringComparer.Ordinal);
+        foreach (var property in obj.Properties())
+        {
+            properties[property.Name] = ReadDesignValue(property.Value);
+        }
+
+        return properties;
+    }
+
+    private static IReadOnlyList<UiDesignValue> ReadDesignCollection(JArray array)
+    {
+        var items = new List<UiDesignValue>(array.Count);
+        foreach (var item in array)
+        {
+            items.Add(ReadDesignValue(item));
+        }
+
+        return items;
+    }
+
+    private static JObject WriteDesign(UiDesignData design)
+    {
+        var obj = new JObject();
+        foreach (var property in design.Properties)
+        {
+            obj[property.Key] = WriteDesignValue(property.Value);
+        }
+
+        return obj;
+    }
+
+    private static JToken WriteDesignValue(UiDesignValue value)
+    {
+        return value switch
+        {
+            UiDesignScalarValue scalar => scalar.Value == null ? JValue.CreateNull() : JToken.FromObject(scalar.Value),
+            UiDesignObjectValue obj => WriteDesign(new UiDesignData(obj.Properties)),
+            UiDesignCollectionValue collection => WriteDesignCollection(collection),
+            _ => throw new JsonSerializationException($"Unsupported design value type '{value.GetType().Name}'.")
+        };
+    }
+
+    private static JArray WriteDesignCollection(UiDesignCollectionValue collection)
+    {
+        var array = new JArray();
+        foreach (var item in collection.Items)
+        {
+            array.Add(WriteDesignValue(item));
+        }
+
+        return array;
+    }
+
     private static void WriteOptional(JObject obj, string propertyName, object? value)
     {
         if (value == null)
@@ -479,5 +579,4 @@ public static class ArxuiSerializer
             _ => "Avalonia.Controls.UserControl"
         };
     }
-
 }

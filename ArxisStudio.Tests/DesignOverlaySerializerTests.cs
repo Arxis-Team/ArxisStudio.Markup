@@ -1,4 +1,4 @@
-using System.Collections.Generic;
+﻿using System.Collections.Generic;
 using ArxisStudio.Markup.Metadata;
 using ArxisStudio.Markup.Metadata.Json;
 using Xunit;
@@ -8,7 +8,7 @@ namespace ArxisStudio.Markup.Generator.Tests;
 /// <summary>
 /// Тесты сериализатора оверлея метаданных.
 /// </summary>
-public class DesignOverlaySerializerTests
+public class DesignMetadataSerializerTests
 {
     /// <summary>
     /// Проверяет round-trip сериализацию и десериализацию оверлея.
@@ -16,13 +16,13 @@ public class DesignOverlaySerializerTests
     [Fact]
     public void Serialize_and_deserialize_should_round_trip_overlay()
     {
-        var overlay = new DesignOverlay(
-            new DocumentDesignData(new Dictionary<string, DesignValue>
+        var overlay = new DesignMetadata(
+            new DocumentDesignMetadata(new Dictionary<string, DesignValue>
             {
                 ["SurfaceWidth"] = new DesignScalarValue(1280),
                 ["SurfaceHeight"] = new DesignScalarValue(720)
             }),
-            new Dictionary<NodeRef, NodeDesignData>
+            new Dictionary<NodeRef, NodeDesignMetadata>
             {
                 [new NodeRef("/Root/Children/0")] = new(new Dictionary<string, DesignValue>
                 {
@@ -32,8 +32,8 @@ public class DesignOverlaySerializerTests
                 })
             });
 
-        var json = DesignOverlaySerializer.Serialize(overlay);
-        var roundTripped = DesignOverlaySerializer.Deserialize(json);
+        var json = DesignMetadataSerializer.Serialize(overlay);
+        var roundTripped = DesignMetadataSerializer.Deserialize(json);
 
         Assert.NotNull(roundTripped.Document);
         Assert.Equal(2, roundTripped.Document!.Properties.Count);
@@ -44,3 +44,5 @@ public class DesignOverlaySerializerTests
         Assert.Equal(3, node.Value.Properties.Count);
     }
 }
+
+

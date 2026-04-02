@@ -1,4 +1,4 @@
-# API-документация ArxisStudio.Markup
+﻿# API-документация ArxisStudio.Markup
 
 Этот раздел описывает публичный API библиотек решения `ArxisStudio.Markup`.
 Во всех разделах ниже добавлены примеры файлов `.arxui` для практического использования API.
@@ -14,10 +14,8 @@
 4. [ArxisStudio.Markup.Metadata](./api-markup-metadata.md)  
    Модель design-time overlay и контракты валидации.
 5. [ArxisStudio.Markup.Metadata.Json](./api-markup-metadata-json.md)  
-   JSON-сериализация `DesignOverlay`.
-6. [ArxisStudio.Markup.DesignEditorBridge](./api-design-editor-bridge.md)  
-   Применение и извлечение metadata между `DesignOverlay` и контролами редактора.
-7. [ArxisStudio.Markup.Generator](./api-generator.md)  
+   JSON-сериализация `DesignMetadata`.
+6. [ArxisStudio.Markup.Generator](./api-generator.md)  
    Roslyn incremental generator для `.arxui`.
 
 ## Быстрый старт
@@ -45,6 +43,8 @@ var rootControl = loader.Load(document.Root, context);
 
 ## Связанные документы
 
+- [Inline `$design` Workflow](./inline-design-workflow.md)
 - [Формат metadata](./metadata-format.md)
-- [Bridge с DesignEditor](./design-editor-bridge.md)
-- [Миграция `$design` -> `DesignOverlay`](./migration-design-overlay.md)
+- [Миграция: `DesignMetadata` -> inline `$design`](./migration-design-overlay.md)
+
+

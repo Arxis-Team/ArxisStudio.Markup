@@ -1,4 +1,4 @@
-using System.Collections.Generic;
+﻿using System.Collections.Generic;
 using System.Linq;
 using ArxisStudio.Markup.Metadata;
 using Newtonsoft.Json;
@@ -9,26 +9,26 @@ namespace ArxisStudio.Markup.Metadata.Json;
 /// <summary>
 /// JSON-сериализатор оверлея метаданных дизайнера.
 /// </summary>
-public static class DesignOverlaySerializer
+public static class DesignMetadataSerializer
 {
     /// <summary>
     /// Десериализует JSON-представление оверлея метаданных.
     /// </summary>
     /// <param name="json">JSON-строка с оверлеем метаданных.</param>
     /// <returns>Десериализованный оверлей.</returns>
-    public static DesignOverlay Deserialize(string json)
+    public static DesignMetadata Deserialize(string json)
     {
         var root = JObject.Parse(json);
         return Deserialize(root);
     }
 
-    internal static DesignOverlay Deserialize(JObject root)
+    internal static DesignMetadata Deserialize(JObject root)
     {
         var document = root["Document"] is JObject documentObject
-            ? new DocumentDesignData(ReadValueObject(documentObject))
+            ? new DocumentDesignMetadata(ReadValueObject(documentObject))
             : null;
 
-        var nodes = new Dictionary<NodeRef, NodeDesignData>();
+        var nodes = new Dictionary<NodeRef, NodeDesignMetadata>();
         if (root["Nodes"] is JObject nodesObject)
         {
             foreach (var property in nodesObject.Properties())
@@ -38,11 +38,11 @@ public static class DesignOverlaySerializer
                     continue;
                 }
 
-                nodes[new NodeRef(property.Name)] = new NodeDesignData(ReadValueObject(nodeObject));
+                nodes[new NodeRef(property.Name)] = new NodeDesignMetadata(ReadValueObject(nodeObject));
             }
         }
 
-        return new DesignOverlay(document, nodes);
+        return new DesignMetadata(document, nodes);
     }
 
     /// <summary>
@@ -50,7 +50,7 @@ public static class DesignOverlaySerializer
     /// </summary>
     /// <param name="overlay">Оверлей метаданных.</param>
     /// <returns>JSON-строка.</returns>
-    public static string Serialize(DesignOverlay overlay)
+    public static string Serialize(DesignMetadata overlay)
     {
         var root = new JObject();
 
@@ -113,3 +113,5 @@ public static class DesignOverlaySerializer
         };
     }
 }
+
+

@@ -361,13 +361,7 @@ namespace ArxisStudio.Markup.Generator.Services
                 var valType = setter.Parameters[1].Type;
                 string valueExpr = _formatter.Format(value, valType);
 
-                // Design-Time оптимизация
-                bool isDesignTime = ownerType.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat) == "global::Avalonia.Controls.Design";
-                if (isDesignTime) writer.WriteLine("#if DEBUG");
-
                 writer.WriteLine($"global::{ownerName}.{setter.Name}({targetName}, {valueExpr});");
-
-                if (isDesignTime) writer.WriteLine("#endif");
             }
             else
             {

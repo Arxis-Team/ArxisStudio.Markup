@@ -77,6 +77,21 @@ namespace TestApp.Forms
 }
 ";
 
+        private const string AvaloniaDesignAttachedPropertiesJsonModel = @"
+{
+  ""SchemaVersion"": 1,
+  ""Kind"": ""Control"",
+  ""Class"": ""TestApp.Forms.EnumTestControl"",
+  ""Root"": {
+    ""TypeName"": ""Avalonia.Controls.UserControl"",
+    ""Properties"": {
+      ""Avalonia.Controls.Design.Width"": 800,
+      ""Avalonia.Controls.Design.Height"": 600
+    }
+  }
+}
+";
+
         /// <summary>
         /// Проверяет генерацию fully-qualified enum-значений для обычных свойств.
         /// </summary>
@@ -131,6 +146,24 @@ namespace TestApp.Forms
             Assert.Contains(
                 "global::Avalonia.Controls.DockPanel.SetDock(this.TopBorder, global::Avalonia.Controls.Dock.Top);",
                 source);
+        }
+
+        /// <summary>
+        /// Проверяет, что attached-свойства <c>Avalonia.Controls.Design.*</c> генерируются без условной компиляции.
+        /// </summary>
+        [Fact]
+        public void Avalonia_design_attached_properties_should_be_generated_without_debug_preprocessor_blocks()
+        {
+            var source = GeneratorTestHelper.GetGeneratedSource(
+                DummyUserControlSource,
+                "EnumTestControl.arxui.cs",
+                "TestApp.Forms.EnumTestControl.g.cs",
+                ("EnumTestControl.arxui", AvaloniaDesignAttachedPropertiesJsonModel));
+
+            Assert.Contains("global::Avalonia.Controls.Design.SetWidth(this, 800);", source);
+            Assert.Contains("global::Avalonia.Controls.Design.SetHeight(this, 600);", source);
+            Assert.DoesNotContain("#if DEBUG", source);
+            Assert.DoesNotContain("#endif", source);
         }
     }
 }
