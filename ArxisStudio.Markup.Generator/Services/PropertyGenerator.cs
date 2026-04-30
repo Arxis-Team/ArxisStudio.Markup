@@ -14,8 +14,7 @@ namespace ArxisStudio.Markup.Generator.Services
         private readonly ValueFormatter _formatter;
         private readonly SourceProductionContext _context;
         private readonly string _assemblyName;
-        private readonly string _fileName;
-        private int _generatedObjectCounter;
+        private readonly Dictionary<string, int> _generatedLocalCounters = new(StringComparer.Ordinal);
 
         internal PropertyGenerator(
             TypeResolver resolver, 
@@ -28,7 +27,6 @@ namespace ArxisStudio.Markup.Generator.Services
             _formatter = formatter;
             _context = context;
             _assemblyName = assemblyName;
-            _fileName = fileName;
         }
 
         internal void GeneratePropertyAssignment(IndentedTextWriter writer,
@@ -69,13 +67,13 @@ namespace ArxisStudio.Markup.Generator.Services
                 if (avaloniaProp != null)
                 {
                     string propField = $"{targetTypeSymbol.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat)}.{avaloniaProp.Name}";
-                    string bindingCode = $"new global::Avalonia.Data.Binding(\"{bindingValue.Binding.Path}\")";
+                    string bindingCode = $"new global::Avalonia.Data.Binding({CSharpCode.StringLiteral(bindingValue.Binding.Path)})";
                     
                     var initializers = new List<string>();
                     if (bindingValue.Binding.Mode.HasValue) initializers.Add($"Mode = global::Avalonia.Data.BindingMode.{bindingValue.Binding.Mode.Value}");
-                    if (!string.IsNullOrEmpty(bindingValue.Binding.StringFormat)) initializers.Add($"StringFormat = \"{bindingValue.Binding.StringFormat}\"");
-                    if (!string.IsNullOrEmpty(bindingValue.Binding.ElementName)) initializers.Add($"ElementName = \"{bindingValue.Binding.ElementName}\"");
-                    if (!string.IsNullOrEmpty(bindingValue.Binding.ConverterKey)) initializers.Add($"Converter = (global::Avalonia.Data.Converters.IValueConverter)this.FindResource(\"{bindingValue.Binding.ConverterKey}\")");
+                    if (!string.IsNullOrEmpty(bindingValue.Binding.StringFormat)) initializers.Add($"StringFormat = {CSharpCode.StringLiteral(bindingValue.Binding.StringFormat!)}");
+                    if (!string.IsNullOrEmpty(bindingValue.Binding.ElementName)) initializers.Add($"ElementName = {CSharpCode.StringLiteral(bindingValue.Binding.ElementName!)}");
+                    if (!string.IsNullOrEmpty(bindingValue.Binding.ConverterKey)) initializers.Add($"Converter = (global::Avalonia.Data.Converters.IValueConverter)this.FindResource({CSharpCode.StringLiteral(bindingValue.Binding.ConverterKey!)})");
                     
                     if (bindingValue.Binding.ConverterParameter != null)
                         initializers.Add($"ConverterParameter = {_formatter.Format(bindingValue.Binding.ConverterParameter, null)}");
@@ -117,12 +115,12 @@ namespace ArxisStudio.Markup.Generator.Services
                 if (avaloniaProp != null)
                 {
                     string propField = $"{targetTypeSymbol.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat)}.{avaloniaProp.Name}";
-                    writer.WriteLine($"{targetName}.Bind({propField}, this.GetResourceObservable(\"{resourceValue.Key}\"));");
+                    writer.WriteLine($"{targetName}.Bind({propField}, this.GetResourceObservable({CSharpCode.StringLiteral(resourceValue.Key)}));");
                 }
                 else if (targetPropSymbol != null)
                 {
                     string typeName = targetPropSymbol.Type.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat);
-                    writer.WriteLine($"{targetName}.{propertyName} = ({typeName})this.FindResource(\"{resourceValue.Key}\");");
+                    writer.WriteLine($"{targetName}.{propertyName} = ({typeName})this.FindResource({CSharpCode.StringLiteral(resourceValue.Key)});");
                 }
                 return;
             }
@@ -135,7 +133,7 @@ namespace ArxisStudio.Markup.Generator.Services
                     string targetAssembly = !string.IsNullOrEmpty(assetReference.Assembly) ? assetReference.Assembly! : _assemblyName;
                     string cleanPath = assetReference.Path.TrimStart('/');
                     string uriString = $"avares://{targetAssembly}/{cleanPath}";
-                    string streamCode = $"global::Avalonia.Platform.AssetLoader.Open(new global::System.Uri(\"{uriString}\"))";
+                    string streamCode = $"global::Avalonia.Platform.AssetLoader.Open(new global::System.Uri({CSharpCode.StringLiteral(uriString)}))";
 
                     if (_resolver.IsAssignableTo(targetPropSymbol.Type, "Avalonia.Media.IImage") || 
                         _resolver.IsAssignableTo(targetPropSymbol.Type, "Avalonia.Media.Imaging.Bitmap"))
@@ -207,7 +205,7 @@ namespace ArxisStudio.Markup.Generator.Services
                         if (parseMethod != null && _resolver.IsCollectionType(targetPropSymbol.Type))
                         {
                             string typeName = targetPropSymbol.Type.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat);
-                            writer.WriteLine($"{targetName}.{propertyName}.AddRange({typeName}.Parse(\"{scalarValue.Value}\"));");
+                            writer.WriteLine($"{targetName}.{propertyName}.AddRange({typeName}.Parse({_formatter.Format(scalarValue.Value, null)}));");
                             handled = true;
                         }
                     }
@@ -230,17 +228,16 @@ namespace ArxisStudio.Markup.Generator.Services
 
             foreach (var include in resources.MergedDictionaries)
             {
-                var source = EscapeStringLiteral(include.Source);
                 writer.WriteLine(
-                    $"{targetName}.Resources.MergedDictionaries.Add(new global::Avalonia.Markup.Xaml.Styling.ResourceInclude(new global::System.Uri(\"{source}\")) {{ Source = new global::System.Uri(\"{source}\") }});");
+                    $"{targetName}.Resources.MergedDictionaries.Add(new global::Avalonia.Markup.Xaml.Styling.ResourceInclude(new global::System.Uri({CSharpCode.StringLiteral(include.Source)})) {{ Source = new global::System.Uri({CSharpCode.StringLiteral(include.Source)}) }});");
             }
 
             foreach (var entry in resources.Values)
             {
-                var assignment = GenerateResourceValueExpression(writer, entry.Value, $"resource_{SanitizeIdentifier(entry.Key)}");
+                var assignment = GenerateResourceValueExpression(writer, entry.Value, $"resource_{CSharpCode.SanitizeIdentifierPart(entry.Key)}");
                 if (assignment != null)
                 {
-                    writer.WriteLine($"{targetName}.Resources[\"{EscapeStringLiteral(entry.Key)}\"] = {assignment};");
+                    writer.WriteLine($"{targetName}.Resources[{CSharpCode.StringLiteral(entry.Key)}] = {assignment};");
                 }
             }
         }
@@ -259,9 +256,8 @@ namespace ArxisStudio.Markup.Generator.Services
                 {
                     case StyleIncludeValue include:
                     {
-                        var source = EscapeStringLiteral(include.Source);
                         writer.WriteLine(
-                            $"{targetName}.Styles.Add(new global::Avalonia.Markup.Xaml.Styling.StyleInclude(new global::System.Uri(\"{source}\")) {{ Source = new global::System.Uri(\"{source}\") }});");
+                            $"{targetName}.Styles.Add(new global::Avalonia.Markup.Xaml.Styling.StyleInclude(new global::System.Uri({CSharpCode.StringLiteral(include.Source)})) {{ Source = new global::System.Uri({CSharpCode.StringLiteral(include.Source)}) }});");
                         break;
                     }
                     case StyleNodeValue node:
@@ -286,7 +282,7 @@ namespace ArxisStudio.Markup.Generator.Services
             {
                 ScalarValue scalar => scalar.Value != null ? _formatter.Format(scalar.Value, null) : "null",
                 NodeValue node => GenerateNestedObject(writer, node.Node, identifierHint),
-                ResourceValue resource => $"this.FindResource(\"{EscapeStringLiteral(resource.Key)}\")",
+                ResourceValue resource => $"this.FindResource({CSharpCode.StringLiteral(resource.Key)})",
                 UriReferenceValue asset => GenerateAssetExpression(asset),
                 _ => null
             };
@@ -297,8 +293,7 @@ namespace ArxisStudio.Markup.Generator.Services
             string targetAssembly = !string.IsNullOrEmpty(assetReference.Assembly) ? assetReference.Assembly! : _assemblyName;
             string cleanPath = assetReference.Path.TrimStart('/');
             string uriString = $"avares://{targetAssembly}/{cleanPath}";
-            string escapedUri = EscapeStringLiteral(uriString);
-            string streamCode = $"global::Avalonia.Platform.AssetLoader.Open(new global::System.Uri(\"{escapedUri}\"))";
+            string streamCode = $"global::Avalonia.Platform.AssetLoader.Open(new global::System.Uri({CSharpCode.StringLiteral(uriString)}))";
 
             return $"new global::Avalonia.Media.Imaging.Bitmap({streamCode})";
         }
@@ -321,13 +316,13 @@ namespace ArxisStudio.Markup.Generator.Services
             string assignedVarName;
             if (!string.IsNullOrEmpty(controlName))
             {
-                assignedVarName = $"this.{controlName}";
+                assignedVarName = $"this.{CSharpCode.Identifier(controlName)}";
                 writer.WriteLine($"{assignedVarName} = new {fullTypeName}();");
             }
             else
             {
-                assignedVarName = $"_gen_{SanitizeIdentifier(propertyName)}_{_generatedObjectCounter++:D4}";
-                writer.WriteLine($"{fullTypeName} {assignedVarName} = new {fullTypeName}();");
+                assignedVarName = NextLocalName(node.TypeName, propertyName);
+                writer.WriteLine($"var {assignedVarName} = new {fullTypeName}();");
             }
 
             GenerateHostResources(writer, assignedVarName, node.Resources);
@@ -369,19 +364,21 @@ namespace ArxisStudio.Markup.Generator.Services
             }
         }
 
-        private static string EscapeStringLiteral(string value)
+        private string NextLocalName(string typeName, string propertyName)
         {
-            return value.Replace("\\", "\\\\")
-                .Replace("\"", "\\\"")
-                .Replace("\r", "\\r")
-                .Replace("\n", "\\n")
-                .Replace("\t", "\\t");
-        }
+            var shortTypeName = typeName.Split('.').LastOrDefault();
+            var baseName = !string.IsNullOrWhiteSpace(shortTypeName)
+                ? CSharpCode.LowerCamelIdentifierPart(shortTypeName!)
+                : CSharpCode.LowerCamelIdentifierPart(propertyName);
 
-        private static string SanitizeIdentifier(string value)
-        {
-            var chars = value.Select(ch => char.IsLetterOrDigit(ch) ? ch : '_').ToArray();
-            return chars.Length == 0 ? "item" : new string(chars);
+            if (!_generatedLocalCounters.TryGetValue(baseName, out var count))
+            {
+                count = 0;
+            }
+
+            count++;
+            _generatedLocalCounters[baseName] = count;
+            return $"{baseName}{count}";
         }
     }
 }

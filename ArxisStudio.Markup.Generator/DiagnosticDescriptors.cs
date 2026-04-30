@@ -63,6 +63,16 @@ namespace ArxisStudio.Markup.Generator
         public static readonly DiagnosticDescriptor RootTypeTargetClassMismatch = new DiagnosticDescriptor("ADG0011", "Root Type Target Class Mismatch", "Asset file '{0}' declares root type '{1}' which is not compatible with target CLR type '{2}'", "Design", DiagnosticSeverity.Error, true);
 
         /// <summary>
+        /// Ошибка некорректного имени элемента.
+        /// </summary>
+        public static readonly DiagnosticDescriptor InvalidElementName = new DiagnosticDescriptor("ADG0012", "Invalid Element Name", "Element name '{0}' in asset file '{1}' is not a valid C# identifier", "Design", DiagnosticSeverity.Error, true);
+
+        /// <summary>
+        /// Ошибка дублирования имени элемента.
+        /// </summary>
+        public static readonly DiagnosticDescriptor DuplicateElementName = new DiagnosticDescriptor("ADG0013", "Duplicate Element Name", "Element name '{0}' is declared multiple times in asset file '{1}'", "Design", DiagnosticSeverity.Error, true);
+
+        /// <summary>
         /// Неперехваченное исключение во время генерации.
         /// </summary>
         public static readonly DiagnosticDescriptor GeneratorCrash = new DiagnosticDescriptor("ADG9999", "Generator Crash", "Unhandled exception while generating '{0}': {1}", "Gen", DiagnosticSeverity.Error, true);

@@ -45,7 +45,10 @@ namespace ArxisStudio.Markup.Generator.Builders
             var controls = CollectFields(document, classInfo.BaseClass);
             foreach (var control in controls.DistinctBy(c => c.Name))
             {
-                writer.WriteLine($"internal global::{control.Type} {control.Name};");
+                writer.WriteLine("/// <summary>");
+                writer.WriteLine($"/// Именованный элемент <c>{control.Name}</c>, сгенерированный из .arxui-документа.");
+                writer.WriteLine("/// </summary>");
+                writer.WriteLine($"public global::{control.Type} {CSharpCode.Identifier(control.Name)};");
             }
             writer.WriteLine();
 

@@ -163,5 +163,54 @@ namespace TestApp.Views
             Assert.Contains("\\t", source);
             Assert.Contains("Первая строка\\nВторая строка\\tс табом", source);
         }
+
+        /// <summary>
+        /// Проверяет экранирование строк в специальных ветках генерации binding/resource/asset.
+        /// </summary>
+        [Fact]
+        public void Binding_resource_and_asset_string_values_should_be_escaped_in_generated_code()
+        {
+            const string json = @"
+{
+  ""SchemaVersion"": 1,
+  ""Kind"": ""Control"",
+  ""Class"": ""TestApp.Views.BindingResourceAssetControl"",
+  ""Root"": {
+    ""TypeName"": ""Avalonia.Controls.UserControl"",
+    ""Properties"": {
+      ""Content"": {
+        ""TypeName"": ""Avalonia.Controls.TextBlock"",
+        ""Properties"": {
+          ""Foreground"": {
+            ""$resource"": ""Brush\""Key""
+          },
+          ""Text"": {
+            ""$binding"": ""User\""Name"",
+            ""StringFormat"": ""Hello \""{0}\""""
+          },
+          ""Tag"": {
+            ""$asset"": {
+              ""Path"": ""/Assets/avatar\""icon.png"",
+              ""Assembly"": ""Sample.Assembly""
+            }
+          }
+        }
+      }
+    }
+  }
+}
+";
+
+            var source = GeneratorTestHelper.GetGeneratedSource(
+                DummyUserControlSource,
+                "BindingResourceAssetControl.arxui.cs",
+                "TestApp.Views.BindingResourceAssetControl.g.cs",
+                ("BindingResourceAssetControl.arxui", json));
+
+            Assert.Contains("this.GetResourceObservable(\"Brush\\\"Key\")", source);
+            Assert.Contains("new global::Avalonia.Data.Binding(\"User\\\"Name\")", source);
+            Assert.Contains("StringFormat = \"Hello \\\"{0}\\\"\"", source);
+            Assert.Contains("avares://Sample.Assembly/Assets/avatar\\\"icon.png", source);
+        }
     }
 }

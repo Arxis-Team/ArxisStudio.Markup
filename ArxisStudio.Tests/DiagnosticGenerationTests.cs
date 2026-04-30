@@ -311,5 +311,84 @@ namespace TestApp
 
             Assert.DoesNotContain(diagnostics, d => d.Id is "ADG0008" or "ADG0010" or "ADG0011");
         }
+
+        /// <summary>
+        /// Проверяет выдачу ADG0012 для имени элемента, которое нельзя сгенерировать как C# identifier.
+        /// </summary>
+        [Fact]
+        public void Invalid_element_name_should_report_ADG0012()
+        {
+            const string json = @"
+{
+  ""SchemaVersion"": 1,
+  ""Kind"": ""Control"",
+  ""Class"": ""TestApp.Views.ValidControl"",
+  ""Root"": {
+    ""TypeName"": ""Avalonia.Controls.UserControl"",
+    ""Properties"": {
+      ""Content"": {
+        ""TypeName"": ""Avalonia.Controls.Button"",
+        ""Properties"": {
+          ""Name"": ""Save-Button""
+        }
+      }
+    }
+  }
+}
+";
+
+            var diagnostics = GeneratorTestHelper.GetGeneratorDiagnostics(
+                PartialUserControlSource,
+                "ValidControl.arxui.cs",
+                ("ValidControl.arxui", json));
+
+            Assert.Contains(diagnostics, d => d.Id == "ADG0012" && d.Severity == DiagnosticSeverity.Error);
+        }
+
+        /// <summary>
+        /// Проверяет выдачу ADG0013 для повторяющегося имени элемента.
+        /// </summary>
+        [Fact]
+        public void Duplicate_element_name_should_report_ADG0013()
+        {
+            const string json = @"
+{
+  ""SchemaVersion"": 1,
+  ""Kind"": ""Control"",
+  ""Class"": ""TestApp.Views.ValidControl"",
+  ""Root"": {
+    ""TypeName"": ""Avalonia.Controls.UserControl"",
+    ""Properties"": {
+      ""Content"": {
+        ""TypeName"": ""Avalonia.Controls.StackPanel"",
+        ""Properties"": {
+          ""Children"": [
+            {
+              ""TypeName"": ""Avalonia.Controls.Button"",
+              ""Properties"": {
+                ""Name"": ""SaveButton""
+              }
+            },
+            {
+              ""TypeName"": ""Avalonia.Controls.Button"",
+              ""Properties"": {
+                ""Name"": ""SaveButton""
+              }
+            }
+          ]
+        }
+      }
+    }
+  }
+}
+";
+
+            var diagnostics = GeneratorTestHelper.GetGeneratorDiagnostics(
+                PartialUserControlSource,
+                "ValidControl.arxui.cs",
+                ("ValidControl.arxui", json));
+
+            Assert.Contains(diagnostics, d => d.Id == "ADG0013" && d.Severity == DiagnosticSeverity.Error);
+        }
     }
 }

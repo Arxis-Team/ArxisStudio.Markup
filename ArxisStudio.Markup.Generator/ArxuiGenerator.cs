@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Collections.Generic;
 using System.Collections.Immutable;
 using System.IO;
 using System.Linq;
@@ -168,6 +169,11 @@ namespace ArxisStudio.Markup.Generator
                     continue;
                 }
 
+                if (!ValidateElementNames(context, input.Document, input.FileName))
+                {
+                    continue;
+                }
+
                 try
                 {
                     string code = builder.Build(input.Document, classInfo, assemblyName, input.FileName);
@@ -181,6 +187,97 @@ namespace ArxisStudio.Markup.Generator
                         Location.None,
                         input.FileName,
                         ex.Message));
+                }
+            }
+        }
+
+        private static bool ValidateElementNames(SourceProductionContext context, UiDocument document, string fileName)
+        {
+            var names = new HashSet<string>(StringComparer.Ordinal);
+            var duplicateNames = new HashSet<string>(StringComparer.Ordinal);
+            var hasErrors = false;
+
+            VisitNode(document.Root);
+            return !hasErrors;
+
+            void VisitNode(UiNode node)
+            {
+                if (node.Properties.TryGetValue("Name", out var nameValue) &&
+                    nameValue is ScalarValue { Value: string name } &&
+                    !string.IsNullOrWhiteSpace(name))
+                {
+                    if (!CSharpCode.IsValidIdentifier(name))
+                    {
+                        context.ReportDiagnostic(Diagnostic.Create(
+                            DiagnosticDescriptors.InvalidElementName,
+                            Location.None,
+                            name,
+                            fileName));
+                        hasErrors = true;
+                    }
+
+                    if (!names.Add(name) && duplicateNames.Add(name))
+                    {
+                        context.ReportDiagnostic(Diagnostic.Create(
+                            DiagnosticDescriptors.DuplicateElementName,
+                            Location.None,
+                            name,
+                            fileName));
+                        hasErrors = true;
+                    }
+                }
+
+                VisitStyles(node.Styles);
+                VisitResources(node.Resources);
+
+                foreach (var property in node.Properties)
+                {
+                    VisitValue(property.Value);
+                }
+            }
+
+            void VisitValue(UiValue value)
+            {
+                switch (value)
+                {
+                    case NodeValue nodeValue:
+                        VisitNode(nodeValue.Node);
+                        break;
+                    case CollectionValue collectionValue:
+                        foreach (var item in collectionValue.Items)
+                        {
+                            VisitValue(item);
+                        }
+                        break;
+                }
+            }
+
+            void VisitStyles(UiStyles? styles)
+            {
+                if (styles == null)
+                {
+                    return;
+                }
+
+                foreach (var item in styles.Items)
+                {
+                    if (item is StyleNodeValue styleNode)
+                    {
+                        VisitNode(styleNode.Node);
+                    }
+                }
+            }
+
+            void VisitResources(UiResources? resources)
+            {
+                if (resources == null)
+                {
+                    return;
+                }
+
+                foreach (var value in resources.Values.Values)
+                {
+                    VisitValue(value);
                 }
             }
         }

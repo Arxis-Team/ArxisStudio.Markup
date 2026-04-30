@@ -104,7 +104,7 @@ namespace TestApp.Forms
                 "TestApp.Forms.EnumTestControl.g.cs",
                 ("EnumTestControl.arxui", EnumJsonModel));
 
-            Assert.Contains("internal global::Avalonia.Controls.TextBlock EnumText;", source);
+            Assert.Contains("public global::Avalonia.Controls.TextBlock EnumText;", source);
             Assert.Contains(
                 "this.EnumText.HorizontalAlignment = global::Avalonia.Layout.HorizontalAlignment.Center;",
                 source);
@@ -142,7 +142,7 @@ namespace TestApp.Forms
                 "TestApp.Forms.DockPanelControl.g.cs",
                 ("DockPanelControl.arxui", DockPanelJsonModel));
             
-            Assert.Contains("internal global::Avalonia.Controls.Border TopBorder;", source);
+            Assert.Contains("public global::Avalonia.Controls.Border TopBorder;", source);
             Assert.Contains(
                 "global::Avalonia.Controls.DockPanel.SetDock(this.TopBorder, global::Avalonia.Controls.Dock.Top);",
                 source);

@@ -28,10 +28,10 @@ namespace ArxisStudio.Markup.Generator.Services
             if (element is string s)
             {
                 if (IsNumeric(targetType)) return s;
-                string escapedString = Escape(s);
-                if (IsBrush(targetType)) return $"global::Avalonia.Media.Brush.Parse(\"{escapedString}\")";
-                if (HasStaticParseMethod(targetType)) return $"{targetTypeName}.Parse(\"{escapedString}\")";
-                return $"\"{escapedString}\"";
+                string stringLiteral = CSharpCode.StringLiteral(s);
+                if (IsBrush(targetType)) return $"global::Avalonia.Media.Brush.Parse({stringLiteral})";
+                if (HasStaticParseMethod(targetType)) return $"{targetTypeName}.Parse({stringLiteral})";
+                return stringLiteral;
             }
 
             if (targetType.SpecialType == SpecialType.System_Boolean && element is bool b)
@@ -47,23 +47,16 @@ namespace ArxisStudio.Markup.Generator.Services
                 {
                     string ts = token.ToString();
                     if (IsNumeric(targetType)) return ts;
-                    string escaped = Escape(ts);
-                    if (IsBrush(targetType)) return $"global::Avalonia.Media.Brush.Parse(\"{escaped}\")";
-                    if (HasStaticParseMethod(targetType)) return $"{targetTypeName}.Parse(\"{escaped}\")";
-                    return $"\"{escaped}\"";
+                    string stringLiteral = CSharpCode.StringLiteral(ts);
+                    if (IsBrush(targetType)) return $"global::Avalonia.Media.Brush.Parse({stringLiteral})";
+                    if (HasStaticParseMethod(targetType)) return $"{targetTypeName}.Parse({stringLiteral})";
+                    return stringLiteral;
                 }
                 if (IsNumeric(targetType)) return Convert.ToString(token, CultureInfo.InvariantCulture) ?? "0";
             }
 
             return FormatLegacy(element);
         }
-
-        private string Escape(string s)
-            => s.Replace("\\", "\\\\")
-                .Replace("\"", "\\\"")
-                .Replace("\r", "\\r")
-                .Replace("\n", "\\n")
-                .Replace("\t", "\\t");
 
         private string FormatEnum(object el, ITypeSymbol type)
         {
@@ -81,7 +74,7 @@ namespace ArxisStudio.Markup.Generator.Services
 
         private string FormatLegacy(object? element)
         {
-            if (element is string s) return $"\"{Escape(s)}\"";
+            if (element is string s) return CSharpCode.StringLiteral(s);
             if (element is bool b) return b ? "true" : "false";
             if (element is IFormattable f) return f.ToString(null, CultureInfo.InvariantCulture);
             return element?.ToString() ?? "null";
