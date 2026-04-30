@@ -6,7 +6,6 @@ using ArxisStudio.Markup;
 using ArxisStudio.Markup.Json;
 using ArxisStudio.Markup.Generator.Models;
 using ArxisStudio.Markup.Generator.Services;
-using ArxisStudio.Markup.Generator.Utility;
 using Microsoft.CodeAnalysis;
 
 namespace ArxisStudio.Markup.Generator.Builders

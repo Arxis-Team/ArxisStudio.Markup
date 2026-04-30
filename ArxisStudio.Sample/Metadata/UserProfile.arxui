@@ -75,7 +75,7 @@
                           "TypeName": "Avalonia.Controls.TextBox",
                           "Properties": {
                             "Name": "UsernameInput",
-                            "Watermark": "Enter username",
+                            "PlaceholderText": "Enter username",
                             "Text": {
                               "$binding": "UserName"
                             }

@@ -67,7 +67,7 @@ namespace ArxisStudio.Markup.Generator.Services
 
         private string FormatEnum(object el, ITypeSymbol type)
         {
-            string s = el.ToString();
+            string s = el.ToString() ?? string.Empty;
             return $"{type.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat)}.{s}";
         }
 

@@ -1,7 +1,7 @@
 ﻿# ArxisStudio.Markup
 
-![.NET](https://img.shields.io/badge/.NET-9.0-512BD4)
-![Avalonia](https://img.shields.io/badge/Avalonia-11.x-2E8B57)
+![.NET](https://img.shields.io/badge/.NET-10.0-512BD4)
+![Avalonia](https://img.shields.io/badge/Avalonia-12.x-2E8B57)
 ![Status](https://img.shields.io/badge/status-pre--MVP-orange)
 
 `ArxisStudio.Markup` — набор библиотек для model-driven описания Avalonia UI через `.arxui`, включая inline-поле `$design` и генерацию кода.
@@ -81,5 +81,4 @@ File.WriteAllText("MainView.arxui", ArxuiSerializer.Serialize(updatedDocument));
 dotnet build ArxisStudio.Markup.sln
 dotnet test ArxisStudio.Tests/ArxisStudio.Markup.Generator.Tests.csproj
 ```
-
 

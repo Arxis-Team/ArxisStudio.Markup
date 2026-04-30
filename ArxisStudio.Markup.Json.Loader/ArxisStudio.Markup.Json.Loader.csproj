@@ -1,17 +1,14 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
-    <TargetFramework>net9.0</TargetFramework>
-    <Nullable>enable</Nullable>
-    <LangVersion>latest</LangVersion>
+    <TargetFramework>net10.0</TargetFramework>
     <RootNamespace>ArxisStudio.Markup.Json.Loader</RootNamespace>
     <AssemblyName>ArxisStudio.Markup.Json.Loader</AssemblyName>
-    <GenerateDocumentationFile>true</GenerateDocumentationFile>
   </PropertyGroup>
 
   <ItemGroup>
-    <PackageReference Include="Avalonia" Version="11.3.8" />
-    <PackageReference Include="Avalonia.Markup.Xaml.Loader" Version="11.3.8" />
+    <PackageReference Include="Avalonia" Version="$(AvaloniaVersion)" />
+    <PackageReference Include="Avalonia.Markup.Xaml.Loader" Version="$(AvaloniaVersion)" />
   </ItemGroup>
 
   <ItemGroup>

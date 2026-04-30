@@ -1,0 +1,22 @@
+<Project>
+  <PropertyGroup>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <LangVersion>latest</LangVersion>
+    <GenerateDocumentationFile>true</GenerateDocumentationFile>
+
+    <AvaloniaVersion>12.0.0</AvaloniaVersion>
+    <AvaloniaDiagnosticsSupportVersion>2.2.0</AvaloniaDiagnosticsSupportVersion>
+    <CommunityToolkitMvvmVersion>8.2.1</CommunityToolkitMvvmVersion>
+    <NewtonsoftJsonVersion>13.0.4</NewtonsoftJsonVersion>
+
+    <MicrosoftCodeAnalysisVersion>4.3.0</MicrosoftCodeAnalysisVersion>
+    <MicrosoftCodeAnalysisAnalyzersVersion>3.3.4</MicrosoftCodeAnalysisAnalyzersVersion>
+    <SourceGeneratorsTestingXunitVersion>1.1.1</SourceGeneratorsTestingXunitVersion>
+
+    <CoverletCollectorVersion>6.0.2</CoverletCollectorVersion>
+    <MicrosoftNetTestSdkVersion>17.12.0</MicrosoftNetTestSdkVersion>
+    <XunitVersion>2.9.2</XunitVersion>
+    <XunitRunnerVisualStudioVersion>2.8.2</XunitRunnerVisualStudioVersion>
+  </PropertyGroup>
+</Project>
