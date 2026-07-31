@@ -34,19 +34,41 @@ internal static class ObjectsTab
         }
 
         var rows = new StackPanel { Spacing = 2 };
+        int anonymous = 0;
 
         foreach (object target in session.Objects.Objects)
         {
             XamlElement? element = session.GetElement(target);
             Uri? source = session.GetSourceUri(target);
 
+            // Every control carries a Resources dictionary whether the document mentions one or
+            // not, and the walk reaches all of them. Listing a dozen empty dictionaries nothing
+            // declared buries the rows that say something.
+            if (element is null && source is null)
+            {
+                anonymous++;
+
+                continue;
+            }
+
             rows.Children.Add(Ui.Field(
                 target.GetType().Name,
-                $"{session.GetOrigin(target),-16} " +
+                $"{session.GetOrigin(target),-10} " +
                 (element is null
-                    ? $"no declaration here — {source?.Segments[^1] ?? "unknown"}"
+                    ? $"declared in {source?.Segments[^1]}"
                     : $"line {Line(session, element)} of {source?.Segments[^1] ?? "this document"}: <{element.Name}>")));
         }
+
+        rows.Children.Add(new TextBlock
+        {
+            Text = $"and {anonymous} more the walk reached that no markup declares — the empty " +
+                "Resources dictionary every control carries, and the default template the theme " +
+                "gave the button.",
+            FontSize = 11,
+            Opacity = 0.5,
+            TextWrapping = Avalonia.Media.TextWrapping.Wrap,
+            Margin = new Avalonia.Thickness(0, 8, 0, 0),
+        });
 
         Control content = Ui.Page(Ui.Stack(
             Ui.Heading("Which markup each object came from"),
@@ -56,7 +78,7 @@ internal static class ObjectsTab
                 "declared in an included file attributed to that file rather than to whichever " +
                 "line of this one sits at the same number — and what stops a template's output " +
                 "being passed off as the control's own declaration."),
-            Ui.Caption($"{session.Objects.Objects.Count} objects, in the order the walk reached them"),
+            Ui.Caption($"{session.Objects.Objects.Count} objects reached; those with markup behind them, in walk order"),
             rows,
             Ui.Caption("diagnostics"),
             Ui.Diagnostics(result.Diagnostics)));
