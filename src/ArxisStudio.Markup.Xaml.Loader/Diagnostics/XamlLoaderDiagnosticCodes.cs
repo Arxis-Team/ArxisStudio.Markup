@@ -98,4 +98,13 @@ public static class XamlLoaderDiagnosticCodes
 
     /// <summary>A design-time value was found but could not be applied to anything.</summary>
     public const string DesignValueNotApplied = "AXM3031";
+
+    /// <summary>An update changed the root element or <c>x:Class</c>, which needs a new session.</summary>
+    public const string UpdateRequiresNewSession = "AXM3040";
+
+    /// <summary>An update was not applied, and the objects are as they were.</summary>
+    public const string UpdateNotApplied = "AXM3041";
+
+    /// <summary>An update was refused because the document offered does not parse.</summary>
+    public const string UpdateRejected = "AXM3042";
 }

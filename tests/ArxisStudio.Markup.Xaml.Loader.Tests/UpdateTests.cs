@@ -1,0 +1,406 @@
+using System;
+using System.Linq;
+using System.Threading.Tasks;
+using ArxisStudio.Markup.Xaml.Loader.TestControls;
+using Avalonia.Controls;
+using Avalonia.Headless.XUnit;
+using Xunit;
+
+namespace ArxisStudio.Markup.Xaml.Loader.Tests;
+
+/// <summary>
+/// Bringing a loaded tree in line with a document that changed under it, without compiling
+/// anything and without recreating what did not have to be recreated.
+/// </summary>
+public sealed class UpdateTests
+{
+    private const string AvaloniaNamespace = "https://github.com/avaloniaui";
+    private const string DesignNamespace = "http://schemas.microsoft.com/expression/blend/2008";
+
+    private static readonly Uri ViewUri = new("file:///Views/View.axaml");
+    private static readonly Uri ColorsUri = new("file:///Themes/Colors.axaml");
+
+    private static XamlDocument Parse(string xaml) =>
+        XamlDocument.Parse(xaml, new XamlParseOptions { DocumentUri = ViewUri });
+
+    private static ValueTask<XamlLoadSession> Load(string xaml, XamlLoadMode mode = XamlLoadMode.Runtime) =>
+        XamlLoadSession.CreateAsync(
+            Parse(xaml),
+            XamlLoadEnvironment.CreateDefault([typeof(CustomBadge).Assembly]),
+            new XamlLoadOptions { Mode = mode },
+            TestContext.Current.CancellationToken);
+
+    private static ValueTask<XamlUpdateResult> Update(XamlLoadSession session, string xaml) =>
+        session.ApplyDocumentUpdateAsync(Parse(xaml), TestContext.Current.CancellationToken);
+
+    private static string View(string attributes) =>
+        $"<Border xmlns=\"{AvaloniaNamespace}\"\n" +
+        "        xmlns:x=\"http://schemas.microsoft.com/winfx/2006/xaml\"\n" +
+        $"        xmlns:d=\"{DesignNamespace}\">\n" +
+        $"  <TextBlock {attributes} />\n" +
+        "</Border>";
+
+    [AvaloniaFact]
+    public async Task ALiteralPropertyIsSetOnTheObjectThatAlreadyExists()
+    {
+        await using XamlLoadSession session = await Load(View("Text=\"before\""));
+
+        var border = session.GetRoot<Border>();
+        var text = (TextBlock)border.Child!;
+
+        XamlUpdateResult result = await Update(session, View("Text=\"after\""));
+
+        Assert.True(result.Applied, string.Join(" | ", result.Diagnostics));
+        Assert.Equal(XamlUpdateStrategy.SetProperty, result.Strategy);
+
+        // The same object, not a new one: a caller holding it, or a selection pointing at it,
+        // survives the update.
+        Assert.Same(text, border.Child);
+        Assert.Equal("after", text.Text);
+    }
+
+    [AvaloniaFact]
+    public async Task ThePropertyIsConvertedToTheTypeTheMemberHolds()
+    {
+        await using XamlLoadSession session = await Load(View("Width=\"10\""));
+
+        XamlUpdateResult result = await Update(session, View("Width=\"320\""));
+
+        Assert.True(result.Applied, string.Join(" | ", result.Diagnostics));
+        Assert.Equal(320d, ((TextBlock)session.GetRoot<Border>().Child!).Width);
+    }
+
+    [AvaloniaFact]
+    public async Task TheSessionsDocumentAdvancesWithTheObjects()
+    {
+        await using XamlLoadSession session = await Load(View("Text=\"before\""));
+
+        string updated = View("Text=\"after\"");
+
+        Assert.True((await Update(session, updated)).Applied);
+
+        Assert.Equal(updated, session.Document.GetText());
+        Assert.Null(session.PendingDocument);
+
+        // And the map advanced with it, so the next edit reaches the element it names.
+        XamlElement element = Assert.IsType<XamlElement>(session.GetElement(session.GetRoot<Border>().Child!));
+
+        Assert.Contains("after", element.GetSourceText(), StringComparison.Ordinal);
+    }
+
+    [AvaloniaFact]
+    public async Task ReformattingIsNotAChange()
+    {
+        await using XamlLoadSession session = await Load(View("Text=\"same\""));
+
+        // A comment, a blank line and a reflowed attribute move every offset in the file and
+        // change nothing about the objects. Comparing trees rather than text is what sees that.
+        XamlUpdateResult result = await Update(
+            session,
+            $"<Border xmlns=\"{AvaloniaNamespace}\"\n" +
+            "        xmlns:x=\"http://schemas.microsoft.com/winfx/2006/xaml\"\n" +
+            $"        xmlns:d=\"{DesignNamespace}\">\n" +
+            "  <!-- the label -->\n" +
+            "\n" +
+            "  <TextBlock\n" +
+            "      Text=\"same\" />\n" +
+            "</Border>");
+
+        Assert.True(result.Applied);
+        Assert.Equal(XamlUpdateStrategy.None, result.Strategy);
+        Assert.Empty(result.Changes);
+    }
+
+    [AvaloniaFact]
+    public async Task ADesignValueIsUpdatedInDesignMode()
+    {
+        await using XamlLoadSession session = await Load(
+            View("d:Text=\"design before\" Text=\"real\""), XamlLoadMode.Design);
+
+        var text = (TextBlock)session.GetRoot<Border>().Child!;
+
+        Assert.Equal("design before", text.Text);
+
+        XamlUpdateResult result = await Update(session, View("d:Text=\"design after\" Text=\"real\""));
+
+        Assert.True(result.Applied, string.Join(" | ", result.Diagnostics));
+        Assert.Equal(XamlUpdateStrategy.UpdateDesignValue, result.Strategy);
+        Assert.Equal("design after", text.Text);
+    }
+
+    [AvaloniaFact]
+    public async Task AChangedDesignSizeReachesTheRoot()
+    {
+        await using XamlLoadSession session = await XamlLoadSession.CreateAsync(
+            Parse($"<Border xmlns=\"{AvaloniaNamespace}\" xmlns:d=\"{DesignNamespace}\" d:DesignWidth=\"100\" />"),
+            XamlLoadEnvironment.CreateDefault(),
+            new XamlLoadOptions { Mode = XamlLoadMode.Design },
+            TestContext.Current.CancellationToken);
+
+        Assert.Equal(100d, session.GetRoot<Border>().Width);
+
+        XamlUpdateResult result = await session.ApplyDocumentUpdateAsync(
+            Parse($"<Border xmlns=\"{AvaloniaNamespace}\" xmlns:d=\"{DesignNamespace}\" d:DesignWidth=\"640\" />"),
+            TestContext.Current.CancellationToken);
+
+        // Avalonia evaluated the original into Design.Width and nothing re-evaluates on an
+        // update, so reading the attached property alone would keep answering 100.
+        Assert.True(result.Applied, string.Join(" | ", result.Diagnostics));
+        Assert.Equal(640d, session.GetRoot<Border>().Width);
+    }
+
+    [AvaloniaFact]
+    public async Task ADesignValueIsNotAppliedInRunMode()
+    {
+        await using XamlLoadSession session = await Load(View("d:Text=\"design\" Text=\"real\""));
+
+        var text = (TextBlock)session.GetRoot<Border>().Child!;
+
+        XamlUpdateResult result = await Update(session, View("d:Text=\"design changed\" Text=\"real\""));
+
+        Assert.True(result.Applied, string.Join(" | ", result.Diagnostics));
+        Assert.Equal("real", text.Text);
+    }
+
+    [AvaloniaFact]
+    public async Task AChangedRootNeedsANewSession()
+    {
+        await using XamlLoadSession session = await Load(View("Text=\"x\""));
+
+        var border = session.GetRoot<Border>();
+
+        XamlUpdateResult result = await Update(
+            session, $"<StackPanel xmlns=\"{AvaloniaNamespace}\" />");
+
+        Assert.False(result.Applied);
+        Assert.Equal(XamlUpdateStrategy.RecreateSession, result.Strategy);
+        Assert.Contains(
+            result.Diagnostics,
+            static diagnostic => diagnostic.Code == XamlLoaderDiagnosticCodes.UpdateRequiresNewSession);
+
+        // The last tree that worked is still the tree.
+        Assert.Same(border, session.RootObject);
+    }
+
+    [AvaloniaFact]
+    public async Task AStructuralChangeIsReportedAsNeedingASubtreeReload()
+    {
+        await using XamlLoadSession session = await Load(View("Text=\"x\""));
+
+        XamlUpdateResult result = await Update(
+            session,
+            $"<Border xmlns=\"{AvaloniaNamespace}\"\n" +
+            "        xmlns:x=\"http://schemas.microsoft.com/winfx/2006/xaml\"\n" +
+            $"        xmlns:d=\"{DesignNamespace}\">\n" +
+            "  <StackPanel><TextBlock Text=\"x\" /></StackPanel>\n" +
+            "</Border>");
+
+        Assert.Equal(XamlUpdateStrategy.ReloadSubtree, result.Strategy);
+    }
+
+    [AvaloniaFact]
+    public async Task AChangedSetterIsReportedAgainstTheStyleThatOwnsIt()
+    {
+        await using XamlLoadSession session = await Load(
+            $"<Border xmlns=\"{AvaloniaNamespace}\">\n" +
+            "  <Border.Styles>\n" +
+            "    <Style Selector=\"TextBlock\"><Setter Property=\"Width\" Value=\"10\" /></Style>\n" +
+            "  </Border.Styles>\n" +
+            "  <TextBlock />\n" +
+            "</Border>");
+
+        XamlUpdateResult result = await Update(
+            session,
+            $"<Border xmlns=\"{AvaloniaNamespace}\">\n" +
+            "  <Border.Styles>\n" +
+            "    <Style Selector=\"TextBlock\"><Setter Property=\"Width\" Value=\"20\" /></Style>\n" +
+            "  </Border.Styles>\n" +
+            "  <TextBlock />\n" +
+            "</Border>");
+
+        // Setting Value on the Setter object would not restyle anything; the style is the
+        // smallest thing that can actually be rebuilt.
+        Assert.Equal(XamlUpdateStrategy.ReloadStyle, result.Strategy);
+        Assert.Equal("Style", Assert.Single(result.Changes).OldElement?.Name.LocalName);
+    }
+
+    [AvaloniaFact]
+    public async Task AChangedResourceIsReportedAgainstTheKeyedElement()
+    {
+        await using XamlLoadSession session = await Load(
+            $"<Border xmlns=\"{AvaloniaNamespace}\" xmlns:x=\"http://schemas.microsoft.com/winfx/2006/xaml\">\n" +
+            "  <Border.Resources>\n" +
+            "    <SolidColorBrush x:Key=\"Accent\" Color=\"Red\" />\n" +
+            "  </Border.Resources>\n" +
+            "</Border>");
+
+        XamlUpdateResult result = await Update(
+            session,
+            $"<Border xmlns=\"{AvaloniaNamespace}\" xmlns:x=\"http://schemas.microsoft.com/winfx/2006/xaml\">\n" +
+            "  <Border.Resources>\n" +
+            "    <SolidColorBrush x:Key=\"Accent\" Color=\"Blue\" />\n" +
+            "  </Border.Resources>\n" +
+            "</Border>");
+
+        Assert.Equal(XamlUpdateStrategy.ReplaceResource, result.Strategy);
+        Assert.Equal("SolidColorBrush", Assert.Single(result.Changes).OldElement?.Name.LocalName);
+    }
+
+    [AvaloniaFact]
+    public async Task AChangedTemplateIsReportedAgainstTheTemplate()
+    {
+        await using XamlLoadSession session = await Load(
+            $"<Button xmlns=\"{AvaloniaNamespace}\">\n" +
+            "  <Button.Template><ControlTemplate><Border Width=\"10\" /></ControlTemplate></Button.Template>\n" +
+            "</Button>");
+
+        XamlUpdateResult result = await Update(
+            session,
+            $"<Button xmlns=\"{AvaloniaNamespace}\">\n" +
+            "  <Button.Template><ControlTemplate><Border Width=\"20\" /></ControlTemplate></Button.Template>\n" +
+            "</Button>");
+
+        Assert.Equal(XamlUpdateStrategy.ReloadTemplate, result.Strategy);
+    }
+
+    [AvaloniaFact]
+    public async Task ATemplateInsideAStyleIsReportedAgainstTheStyle()
+    {
+        await using XamlLoadSession session = await Load(
+            $"<Border xmlns=\"{AvaloniaNamespace}\">\n" +
+            "  <Border.Styles>\n" +
+            "    <Style Selector=\"Button\">\n" +
+            "      <Setter Property=\"Template\">\n" +
+            "        <ControlTemplate><Border Width=\"10\" /></ControlTemplate>\n" +
+            "      </Setter>\n" +
+            "    </Style>\n" +
+            "  </Border.Styles>\n" +
+            "</Border>");
+
+        XamlUpdateResult result = await Update(
+            session,
+            $"<Border xmlns=\"{AvaloniaNamespace}\">\n" +
+            "  <Border.Styles>\n" +
+            "    <Style Selector=\"Button\">\n" +
+            "      <Setter Property=\"Template\">\n" +
+            "        <ControlTemplate><Border Width=\"20\" /></ControlTemplate>\n" +
+            "      </Setter>\n" +
+            "    </Style>\n" +
+            "  </Border.Styles>\n" +
+            "</Border>");
+
+        // The template belongs to the style and cannot be replaced without it, so the outermost
+        // container is the one that has to be rebuilt.
+        Assert.Equal(XamlUpdateStrategy.ReloadStyle, result.Strategy);
+    }
+
+    [AvaloniaFact]
+    public async Task ADocumentThatDoesNotParseIsRefusedAndKept()
+    {
+        await using XamlLoadSession session = await Load(View("Text=\"good\""));
+
+        var text = (TextBlock)session.GetRoot<Border>().Child!;
+        XamlDocument before = session.Document;
+
+        XamlDocument broken = Parse($"<Border xmlns=\"{AvaloniaNamespace}\"><TextBlock Text=\"half");
+        XamlUpdateResult result = await session.ApplyDocumentUpdateAsync(
+            broken, TestContext.Current.CancellationToken);
+
+        Assert.False(result.Applied);
+        Assert.Contains(
+            result.Diagnostics,
+            static diagnostic => diagnostic.Code == XamlLoaderDiagnosticCodes.UpdateRejected);
+
+        // The last tree that worked survives, and what was offered is kept rather than dropped.
+        Assert.Equal("good", text.Text);
+        Assert.Same(before, session.Document);
+        Assert.Same(broken, session.PendingDocument);
+    }
+
+    [AvaloniaFact]
+    public async Task ACorrectedUpdateLandsAfterARefusedOne()
+    {
+        await using XamlLoadSession session = await Load(View("Text=\"good\""));
+
+        var text = (TextBlock)session.GetRoot<Border>().Child!;
+
+        await session.ApplyDocumentUpdateAsync(
+            Parse($"<Border xmlns=\"{AvaloniaNamespace}\"><TextBlock Text=\"half"),
+            TestContext.Current.CancellationToken);
+
+        Assert.NotNull(session.PendingDocument);
+
+        // The usual reason an update is refused is that the author is halfway through typing it.
+        XamlUpdateResult result = await Update(session, View("Text=\"corrected\""));
+
+        Assert.True(result.Applied, string.Join(" | ", result.Diagnostics));
+        Assert.Equal("corrected", text.Text);
+        Assert.Null(session.PendingDocument);
+    }
+
+    [AvaloniaFact]
+    public async Task AnUnchangedIncludeMakesASourceUpdateANoOperation()
+    {
+        var resources = new InMemoryResourceResolver();
+        XamlLoadEnvironment defaults = XamlLoadEnvironment.CreateDefault();
+
+        resources.Update(
+            ColorsUri,
+            $"<ResourceDictionary xmlns=\"{AvaloniaNamespace}\"\n" +
+            "                    xmlns:x=\"http://schemas.microsoft.com/winfx/2006/xaml\">\n" +
+            "  <SolidColorBrush x:Key=\"Accent\" Color=\"Red\" />\n" +
+            "</ResourceDictionary>");
+
+        var environment = new XamlLoadEnvironment
+        {
+            SourceProvider = defaults.SourceProvider,
+            AssemblyResolver = defaults.AssemblyResolver,
+            TypeResolver = defaults.TypeResolver,
+            ResourceResolver = new CompositeResourceResolver(resources, defaults.ResourceResolver),
+        };
+
+        string xaml =
+            $"<Border xmlns=\"{AvaloniaNamespace}\" xmlns:x=\"http://schemas.microsoft.com/winfx/2006/xaml\">\n" +
+            "  <Border.Resources>\n" +
+            "    <ResourceDictionary>\n" +
+            "      <ResourceDictionary.MergedDictionaries>\n" +
+            "        <ResourceInclude Source=\"/Themes/Colors.axaml\" />\n" +
+            "      </ResourceDictionary.MergedDictionaries>\n" +
+            "    </ResourceDictionary>\n" +
+            "  </Border.Resources>\n" +
+            "</Border>";
+
+        await using XamlLoadSession session = await XamlLoadSession.CreateAsync(
+            Parse(xaml), environment, cancellationToken: TestContext.Current.CancellationToken);
+
+        XamlUpdateResult unchanged = await session.ApplySourceUpdateAsync(
+            ColorsUri, TestContext.Current.CancellationToken);
+
+        // Being told a file changed is not evidence that anything the document reaches did.
+        Assert.True(unchanged.Applied);
+        Assert.Equal(XamlUpdateStrategy.None, unchanged.Strategy);
+
+        resources.Update(
+            ColorsUri,
+            $"<ResourceDictionary xmlns=\"{AvaloniaNamespace}\"\n" +
+            "                    xmlns:x=\"http://schemas.microsoft.com/winfx/2006/xaml\">\n" +
+            "  <SolidColorBrush x:Key=\"Accent\" Color=\"Blue\" />\n" +
+            "</ResourceDictionary>");
+
+        XamlUpdateResult changed = await session.ApplySourceUpdateAsync(
+            ColorsUri, TestContext.Current.CancellationToken);
+
+        Assert.Equal(XamlUpdateStrategy.ReplaceResource, changed.Strategy);
+    }
+
+    [AvaloniaFact]
+    public async Task AnUpdateOnADisposedSessionThrows()
+    {
+        XamlLoadSession session = await Load(View("Text=\"x\""));
+
+        await session.DisposeAsync();
+
+        await Assert.ThrowsAsync<ObjectDisposedException>(
+            async () => await Update(session, View("Text=\"y\"")));
+    }
+}

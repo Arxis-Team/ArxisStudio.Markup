@@ -52,6 +52,11 @@ ArxisStudio.Markup.Xaml.Loader.InMemoryResourceResolver.Update(System.Uri! uri, 
 ArxisStudio.Markup.Xaml.Loader.LoadedAssemblyResolver
 ArxisStudio.Markup.Xaml.Loader.LoadedAssemblyResolver.LoadedAssemblyResolver() -> void
 ArxisStudio.Markup.Xaml.Loader.LoadedAssemblyResolver.ResolveAsync(System.Reflection.AssemblyName! assemblyName, System.Threading.CancellationToken cancellationToken) -> System.Threading.Tasks.ValueTask<System.Reflection.Assembly?>
+ArxisStudio.Markup.Xaml.Loader.XamlDocumentChange
+ArxisStudio.Markup.Xaml.Loader.XamlDocumentChange.MemberName.get -> string?
+ArxisStudio.Markup.Xaml.Loader.XamlDocumentChange.NewElement.get -> ArxisStudio.Markup.Xaml.XamlElement?
+ArxisStudio.Markup.Xaml.Loader.XamlDocumentChange.OldElement.get -> ArxisStudio.Markup.Xaml.XamlElement?
+ArxisStudio.Markup.Xaml.Loader.XamlDocumentChange.Strategy.get -> ArxisStudio.Markup.Xaml.Loader.XamlUpdateStrategy
 ArxisStudio.Markup.Xaml.Loader.XamlEditResult
 ArxisStudio.Markup.Xaml.Loader.XamlEditResult.Applied.get -> bool
 ArxisStudio.Markup.Xaml.Loader.XamlEditResult.Applied.init -> void
@@ -94,6 +99,8 @@ ArxisStudio.Markup.Xaml.Loader.XamlLoadResult.RootObject.init -> void
 ArxisStudio.Markup.Xaml.Loader.XamlLoadResult.Success.get -> bool
 ArxisStudio.Markup.Xaml.Loader.XamlLoadResult.XamlLoadResult() -> void
 ArxisStudio.Markup.Xaml.Loader.XamlLoadSession
+ArxisStudio.Markup.Xaml.Loader.XamlLoadSession.ApplyDocumentUpdateAsync(ArxisStudio.Markup.Xaml.XamlDocument! updated, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.ValueTask<ArxisStudio.Markup.Xaml.Loader.XamlUpdateResult!>
+ArxisStudio.Markup.Xaml.Loader.XamlLoadSession.ApplySourceUpdateAsync(System.Uri! resourceUri, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.ValueTask<ArxisStudio.Markup.Xaml.Loader.XamlUpdateResult!>
 ArxisStudio.Markup.Xaml.Loader.XamlLoadSession.Diagnostics.get -> System.Collections.Immutable.ImmutableArray<ArxisStudio.Markup.MarkupDiagnostic!>
 ArxisStudio.Markup.Xaml.Loader.XamlLoadSession.DisposeAsync() -> System.Threading.Tasks.ValueTask
 ArxisStudio.Markup.Xaml.Loader.XamlLoadSession.Document.get -> ArxisStudio.Markup.Xaml.XamlDocument!
@@ -107,6 +114,7 @@ ArxisStudio.Markup.Xaml.Loader.XamlLoadSession.GetSourceUri(object! runtimeObjec
 ArxisStudio.Markup.Xaml.Loader.XamlLoadSession.GetValueInfo(Avalonia.AvaloniaObject! target, Avalonia.AvaloniaProperty! property) -> ArxisStudio.Markup.Xaml.Loader.XamlValueInfo!
 ArxisStudio.Markup.Xaml.Loader.XamlLoadSession.Objects.get -> ArxisStudio.Markup.Xaml.Loader.XamlObjectMap!
 ArxisStudio.Markup.Xaml.Loader.XamlLoadSession.Options.get -> ArxisStudio.Markup.Xaml.Loader.XamlLoadOptions!
+ArxisStudio.Markup.Xaml.Loader.XamlLoadSession.PendingDocument.get -> ArxisStudio.Markup.Xaml.XamlDocument?
 ArxisStudio.Markup.Xaml.Loader.XamlLoadSession.Projection.get -> ArxisStudio.Markup.TextProjection!
 ArxisStudio.Markup.Xaml.Loader.XamlLoadSession.RootObject.get -> object!
 ArxisStudio.Markup.Xaml.Loader.XamlLoadSession.SetValue(Avalonia.AvaloniaObject! target, Avalonia.AvaloniaProperty! property, object? value) -> ArxisStudio.Markup.Xaml.Loader.XamlEditResult!
@@ -192,6 +200,26 @@ ArxisStudio.Markup.Xaml.Loader.XamlTypeResolution.Type.get -> System.Type?
 ArxisStudio.Markup.Xaml.Loader.XamlTypeResolver
 ArxisStudio.Markup.Xaml.Loader.XamlTypeResolver.ResolveAsync(ArxisStudio.Markup.Xaml.Loader.XamlTypeName typeName, ArxisStudio.Markup.Xaml.XamlNamespaceContext! namespaceContext, System.Threading.CancellationToken cancellationToken) -> System.Threading.Tasks.ValueTask<ArxisStudio.Markup.Xaml.Loader.XamlTypeResolution!>
 ArxisStudio.Markup.Xaml.Loader.XamlTypeResolver.XamlTypeResolver(ArxisStudio.Markup.Xaml.Loader.IXamlAssemblyResolver! assemblyResolver, System.Collections.Generic.IEnumerable<System.Reflection.Assembly!>? searchAssemblies = null) -> void
+ArxisStudio.Markup.Xaml.Loader.XamlUpdateResult
+ArxisStudio.Markup.Xaml.Loader.XamlUpdateResult.Applied.get -> bool
+ArxisStudio.Markup.Xaml.Loader.XamlUpdateResult.Applied.init -> void
+ArxisStudio.Markup.Xaml.Loader.XamlUpdateResult.Changes.get -> System.Collections.Immutable.ImmutableArray<ArxisStudio.Markup.Xaml.Loader.XamlDocumentChange!>
+ArxisStudio.Markup.Xaml.Loader.XamlUpdateResult.Changes.init -> void
+ArxisStudio.Markup.Xaml.Loader.XamlUpdateResult.Diagnostics.get -> System.Collections.Immutable.ImmutableArray<ArxisStudio.Markup.MarkupDiagnostic!>
+ArxisStudio.Markup.Xaml.Loader.XamlUpdateResult.Diagnostics.init -> void
+ArxisStudio.Markup.Xaml.Loader.XamlUpdateResult.Strategy.get -> ArxisStudio.Markup.Xaml.Loader.XamlUpdateStrategy
+ArxisStudio.Markup.Xaml.Loader.XamlUpdateResult.Strategy.init -> void
+ArxisStudio.Markup.Xaml.Loader.XamlUpdateResult.XamlUpdateResult() -> void
+ArxisStudio.Markup.Xaml.Loader.XamlUpdateStrategy
+ArxisStudio.Markup.Xaml.Loader.XamlUpdateStrategy.None = 0 -> ArxisStudio.Markup.Xaml.Loader.XamlUpdateStrategy
+ArxisStudio.Markup.Xaml.Loader.XamlUpdateStrategy.RecreateSession = 8 -> ArxisStudio.Markup.Xaml.Loader.XamlUpdateStrategy
+ArxisStudio.Markup.Xaml.Loader.XamlUpdateStrategy.ReloadStyle = 4 -> ArxisStudio.Markup.Xaml.Loader.XamlUpdateStrategy
+ArxisStudio.Markup.Xaml.Loader.XamlUpdateStrategy.ReloadSubtree = 7 -> ArxisStudio.Markup.Xaml.Loader.XamlUpdateStrategy
+ArxisStudio.Markup.Xaml.Loader.XamlUpdateStrategy.ReloadTemplate = 6 -> ArxisStudio.Markup.Xaml.Loader.XamlUpdateStrategy
+ArxisStudio.Markup.Xaml.Loader.XamlUpdateStrategy.ReloadTheme = 5 -> ArxisStudio.Markup.Xaml.Loader.XamlUpdateStrategy
+ArxisStudio.Markup.Xaml.Loader.XamlUpdateStrategy.ReplaceResource = 3 -> ArxisStudio.Markup.Xaml.Loader.XamlUpdateStrategy
+ArxisStudio.Markup.Xaml.Loader.XamlUpdateStrategy.SetProperty = 1 -> ArxisStudio.Markup.Xaml.Loader.XamlUpdateStrategy
+ArxisStudio.Markup.Xaml.Loader.XamlUpdateStrategy.UpdateDesignValue = 2 -> ArxisStudio.Markup.Xaml.Loader.XamlUpdateStrategy
 ArxisStudio.Markup.Xaml.Loader.XamlValueInfo
 ArxisStudio.Markup.Xaml.Loader.XamlValueInfo.EffectiveValue.get -> object?
 ArxisStudio.Markup.Xaml.Loader.XamlValueInfo.HasBinding.get -> bool
@@ -236,6 +264,10 @@ const ArxisStudio.Markup.Xaml.Loader.XamlLoaderDiagnosticCodes.UnresolvedResourc
 const ArxisStudio.Markup.Xaml.Loader.XamlLoaderDiagnosticCodes.UnresolvedRootType = "AXM3020" -> string!
 const ArxisStudio.Markup.Xaml.Loader.XamlLoaderDiagnosticCodes.UnresolvedType = "AXM2002" -> string!
 const ArxisStudio.Markup.Xaml.Loader.XamlLoaderDiagnosticCodes.UnsupportedGenericType = "AXM2006" -> string!
+const ArxisStudio.Markup.Xaml.Loader.XamlLoaderDiagnosticCodes.UpdateNotApplied = "AXM3041" -> string!
+const ArxisStudio.Markup.Xaml.Loader.XamlLoaderDiagnosticCodes.UpdateRejected = "AXM3042" -> string!
+const ArxisStudio.Markup.Xaml.Loader.XamlLoaderDiagnosticCodes.UpdateRequiresNewSession = "AXM3040" -> string!
+override ArxisStudio.Markup.Xaml.Loader.XamlDocumentChange.ToString() -> string!
 override ArxisStudio.Markup.Xaml.Loader.XamlEditResult.ToString() -> string!
 override ArxisStudio.Markup.Xaml.Loader.XamlMemberDescriptor.ToString() -> string!
 override ArxisStudio.Markup.Xaml.Loader.XamlResource.ToString() -> string!

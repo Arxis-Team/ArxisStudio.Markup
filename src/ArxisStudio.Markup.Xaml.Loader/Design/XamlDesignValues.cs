@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Globalization;
 using System.Linq;
 using Avalonia;
 using Avalonia.Controls;
@@ -84,12 +85,29 @@ internal static class XamlDesignValues
 
         foreach (XamlElement element in document.DescendantElements())
         {
+            bool isRoot = ReferenceEquals(element, document.Root);
+
             foreach (XamlAttribute attribute in element.Attributes)
             {
-                if (attribute.IsDesignTime && !IsUnderstood(attribute.Name.LocalName))
+                if (!attribute.IsDesignTime)
+                {
+                    continue;
+                }
+
+                if (!IsUnderstood(attribute.Name.LocalName))
                 {
                     ApplyShadowValue(document, objects, element, attribute, diagnostics);
                 }
+                else if (isRoot)
+                {
+                    // Avalonia evaluated these into the Design attached properties, which is
+                    // what ApplyDesignSurface just read. Reading the document as well is what
+                    // makes a later update to one of them land: nothing re-evaluates on an
+                    // update, so the attached property still holds what the load put there.
+                    ApplySurfaceValue(root, attribute);
+                }
+
+                // Avalonia ignores these names anywhere but the root, and so does this.
             }
         }
     }
@@ -119,6 +137,36 @@ internal static class XamlDesignValues
         if (control.IsSet(Design.DataContextProperty))
         {
             control.DataContext = Design.GetDataContext(control);
+        }
+    }
+
+    /// <summary>Applies one of the surface values the document states as a literal.</summary>
+    private static void ApplySurfaceValue(object root, XamlAttribute attribute)
+    {
+        if (root is not Control control || attribute.GetValue() is not XamlLiteralValue literal)
+        {
+            return;
+        }
+
+        switch (attribute.Name.LocalName)
+        {
+            case "DesignWidth" when double.TryParse(literal.Text, CultureInfo.InvariantCulture, out double width):
+                control.Width = width;
+
+                break;
+
+            case "DesignHeight" when double.TryParse(literal.Text, CultureInfo.InvariantCulture, out double height):
+                control.Height = height;
+
+                break;
+
+            case "DataContext":
+                control.DataContext = literal.Text;
+
+                break;
+
+            default:
+                break;
         }
     }
 
@@ -194,7 +242,7 @@ internal static class XamlDesignValues
     }
 
     /// <summary>Writes a value through whichever accessor the member actually has.</summary>
-    private static void Write(object target, XamlMemberDescriptor member, object? value)
+    internal static void Write(object target, XamlMemberDescriptor member, object? value)
     {
         if (member.AvaloniaProperty is { } property && target is AvaloniaObject avaloniaObject)
         {

@@ -75,7 +75,7 @@ public sealed partial class XamlLoadSession : IAsyncDisposable
     /// they get one. <see cref="TextProjection"/> carries the map back, which is what keeps
     /// positions Avalonia reports attributable to the file they are really in.
     /// </remarks>
-    public TextProjection Projection { get; }
+    public TextProjection Projection { get; private set; }
 
     /// <summary>Gets the environment the document was loaded through.</summary>
     public XamlLoadEnvironment Environment { get; }
