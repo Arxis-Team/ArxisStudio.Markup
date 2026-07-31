@@ -1,1 +1,193 @@
 #nullable enable
+ArxisStudio.Markup.CompositeMarkupSourceProvider
+ArxisStudio.Markup.CompositeMarkupSourceProvider.CompositeMarkupSourceProvider(System.Collections.Generic.IEnumerable<ArxisStudio.Markup.IMarkupSourceProvider!>! providers) -> void
+ArxisStudio.Markup.CompositeMarkupSourceProvider.CompositeMarkupSourceProvider(params ArxisStudio.Markup.IMarkupSourceProvider![]! providers) -> void
+ArxisStudio.Markup.CompositeMarkupSourceProvider.Providers.get -> System.Collections.Generic.IReadOnlyList<ArxisStudio.Markup.IMarkupSourceProvider!>!
+ArxisStudio.Markup.CompositeMarkupSourceProvider.TryGetSourceAsync(System.Uri! uri, System.Threading.CancellationToken cancellationToken) -> System.Threading.Tasks.ValueTask<ArxisStudio.Markup.MarkupSource?>
+ArxisStudio.Markup.DocumentChangeKind
+ArxisStudio.Markup.DocumentChangeKind.Changed = 1 -> ArxisStudio.Markup.DocumentChangeKind
+ArxisStudio.Markup.DocumentChangeKind.Closed = 2 -> ArxisStudio.Markup.DocumentChangeKind
+ArxisStudio.Markup.DocumentChangeKind.Opened = 0 -> ArxisStudio.Markup.DocumentChangeKind
+ArxisStudio.Markup.DocumentChangedEventArgs
+ArxisStudio.Markup.DocumentChangedEventArgs.DocumentChangedEventArgs(ArxisStudio.Markup.DocumentChangeKind kind, ArxisStudio.Markup.MarkupDocument? oldDocument, ArxisStudio.Markup.MarkupDocument? newDocument) -> void
+ArxisStudio.Markup.DocumentChangedEventArgs.DocumentId.get -> ArxisStudio.Markup.MarkupDocumentId
+ArxisStudio.Markup.DocumentChangedEventArgs.Kind.get -> ArxisStudio.Markup.DocumentChangeKind
+ArxisStudio.Markup.DocumentChangedEventArgs.NewDocument.get -> ArxisStudio.Markup.MarkupDocument?
+ArxisStudio.Markup.DocumentChangedEventArgs.OldDocument.get -> ArxisStudio.Markup.MarkupDocument?
+ArxisStudio.Markup.DocumentVersion
+ArxisStudio.Markup.DocumentVersion.CompareTo(ArxisStudio.Markup.DocumentVersion other) -> int
+ArxisStudio.Markup.DocumentVersion.Deconstruct(out long Value) -> void
+ArxisStudio.Markup.DocumentVersion.DocumentVersion() -> void
+ArxisStudio.Markup.DocumentVersion.DocumentVersion(long Value) -> void
+ArxisStudio.Markup.DocumentVersion.Equals(ArxisStudio.Markup.DocumentVersion other) -> bool
+ArxisStudio.Markup.DocumentVersion.Next() -> ArxisStudio.Markup.DocumentVersion
+ArxisStudio.Markup.DocumentVersion.Value.get -> long
+ArxisStudio.Markup.DocumentVersion.Value.init -> void
+ArxisStudio.Markup.FileMarkupSource
+ArxisStudio.Markup.FileMarkupSource.FileMarkupSource(System.Uri! uri, System.Text.Encoding? defaultEncoding = null) -> void
+ArxisStudio.Markup.FileMarkupSource.Path.get -> string!
+ArxisStudio.Markup.FileMarkupSourceProvider
+ArxisStudio.Markup.FileMarkupSourceProvider.FileMarkupSourceProvider(System.Text.Encoding? defaultEncoding = null) -> void
+ArxisStudio.Markup.FileMarkupSourceProvider.TryGetSourceAsync(System.Uri! uri, System.Threading.CancellationToken cancellationToken) -> System.Threading.Tasks.ValueTask<ArxisStudio.Markup.MarkupSource?>
+ArxisStudio.Markup.IMarkupSourceProvider
+ArxisStudio.Markup.IMarkupSourceProvider.TryGetSourceAsync(System.Uri! uri, System.Threading.CancellationToken cancellationToken) -> System.Threading.Tasks.ValueTask<ArxisStudio.Markup.MarkupSource?>
+ArxisStudio.Markup.InMemoryMarkupSourceProvider
+ArxisStudio.Markup.InMemoryMarkupSourceProvider.Clear() -> void
+ArxisStudio.Markup.InMemoryMarkupSourceProvider.Contains(System.Uri! uri) -> bool
+ArxisStudio.Markup.InMemoryMarkupSourceProvider.InMemoryMarkupSourceProvider() -> void
+ArxisStudio.Markup.InMemoryMarkupSourceProvider.Remove(System.Uri! uri) -> bool
+ArxisStudio.Markup.InMemoryMarkupSourceProvider.TryGetSourceAsync(System.Uri! uri, System.Threading.CancellationToken cancellationToken) -> System.Threading.Tasks.ValueTask<ArxisStudio.Markup.MarkupSource?>
+ArxisStudio.Markup.InMemoryMarkupSourceProvider.Update(System.Uri! uri, ArxisStudio.Markup.SourceText! text) -> void
+ArxisStudio.Markup.InMemoryMarkupSourceProvider.Update(System.Uri! uri, string! text) -> void
+ArxisStudio.Markup.InMemoryMarkupSourceProvider.Uris.get -> System.Collections.Generic.IReadOnlyCollection<System.Uri!>!
+ArxisStudio.Markup.MarkupDocument
+ArxisStudio.Markup.MarkupDocument.Id.get -> ArxisStudio.Markup.MarkupDocumentId
+ArxisStudio.Markup.MarkupDocument.MarkupDocument(ArxisStudio.Markup.MarkupDocumentId id, System.Uri! uri, ArxisStudio.Markup.SourceText! text) -> void
+ArxisStudio.Markup.MarkupDocument.Text.get -> ArxisStudio.Markup.SourceText!
+ArxisStudio.Markup.MarkupDocument.Uri.get -> System.Uri!
+ArxisStudio.Markup.MarkupDocument.Version.get -> ArxisStudio.Markup.DocumentVersion
+ArxisStudio.Markup.MarkupDocument.WithChanges(System.Collections.Generic.IReadOnlyList<ArxisStudio.Markup.TextChange>! changes) -> ArxisStudio.Markup.MarkupDocument!
+ArxisStudio.Markup.MarkupDocument.WithText(ArxisStudio.Markup.SourceText! text) -> ArxisStudio.Markup.MarkupDocument!
+ArxisStudio.Markup.MarkupDocument.WithUri(System.Uri! uri) -> ArxisStudio.Markup.MarkupDocument!
+ArxisStudio.Markup.MarkupDocumentId
+ArxisStudio.Markup.MarkupDocumentId.Deconstruct(out System.Guid Value) -> void
+ArxisStudio.Markup.MarkupDocumentId.Equals(ArxisStudio.Markup.MarkupDocumentId other) -> bool
+ArxisStudio.Markup.MarkupDocumentId.MarkupDocumentId() -> void
+ArxisStudio.Markup.MarkupDocumentId.MarkupDocumentId(System.Guid Value) -> void
+ArxisStudio.Markup.MarkupDocumentId.Value.get -> System.Guid
+ArxisStudio.Markup.MarkupDocumentId.Value.init -> void
+ArxisStudio.Markup.MarkupSource
+ArxisStudio.Markup.MarkupSource.MarkupSource(System.Uri! uri) -> void
+ArxisStudio.Markup.MarkupSource.Uri.get -> System.Uri!
+ArxisStudio.Markup.MarkupWorkspace
+ArxisStudio.Markup.MarkupWorkspace.AddDocument(System.Uri! uri, ArxisStudio.Markup.SourceText! text) -> ArxisStudio.Markup.MarkupDocument!
+ArxisStudio.Markup.MarkupWorkspace.ApplyChanges(ArxisStudio.Markup.MarkupDocumentId id, System.Collections.Generic.IReadOnlyList<ArxisStudio.Markup.TextChange>! changes) -> ArxisStudio.Markup.MarkupDocument!
+ArxisStudio.Markup.MarkupWorkspace.CloseDocument(ArxisStudio.Markup.MarkupDocumentId id) -> bool
+ArxisStudio.Markup.MarkupWorkspace.Count.get -> int
+ArxisStudio.Markup.MarkupWorkspace.DocumentChanged -> System.EventHandler<ArxisStudio.Markup.DocumentChangedEventArgs!>?
+ArxisStudio.Markup.MarkupWorkspace.Documents.get -> System.Collections.Generic.IReadOnlyCollection<ArxisStudio.Markup.MarkupDocument!>!
+ArxisStudio.Markup.MarkupWorkspace.GetDocument(ArxisStudio.Markup.MarkupDocumentId id) -> ArxisStudio.Markup.MarkupDocument!
+ArxisStudio.Markup.MarkupWorkspace.MarkupWorkspace(ArxisStudio.Markup.IMarkupSourceProvider! sourceProvider) -> void
+ArxisStudio.Markup.MarkupWorkspace.OpenDocumentAsync(System.Uri! uri, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.ValueTask<ArxisStudio.Markup.MarkupDocument!>
+ArxisStudio.Markup.MarkupWorkspace.SourceProvider.get -> ArxisStudio.Markup.IMarkupSourceProvider!
+ArxisStudio.Markup.MarkupWorkspace.TryGetDocument(ArxisStudio.Markup.MarkupDocumentId id, out ArxisStudio.Markup.MarkupDocument? document) -> bool
+ArxisStudio.Markup.MarkupWorkspace.TryGetDocumentByUri(System.Uri! uri, out ArxisStudio.Markup.MarkupDocument? document) -> bool
+ArxisStudio.Markup.MarkupWorkspace.UpdateDocument(ArxisStudio.Markup.MarkupDocumentId id, ArxisStudio.Markup.SourceText! text) -> ArxisStudio.Markup.MarkupDocument!
+ArxisStudio.Markup.SourceText
+ArxisStudio.Markup.SourceText.Encoding.get -> System.Text.Encoding!
+ArxisStudio.Markup.SourceText.HasByteOrderMark.get -> bool
+ArxisStudio.Markup.SourceText.IsEmpty.get -> bool
+ArxisStudio.Markup.SourceText.Lines.get -> ArxisStudio.Markup.TextLineCollection!
+ArxisStudio.Markup.SourceText.SourceText(System.Text.Encoding! encoding, bool hasByteOrderMark) -> void
+ArxisStudio.Markup.SourceText.WithChange(ArxisStudio.Markup.TextChange change) -> ArxisStudio.Markup.SourceText!
+ArxisStudio.Markup.StreamMarkupSource
+ArxisStudio.Markup.StreamMarkupSource.Dispose() -> void
+ArxisStudio.Markup.StreamMarkupSource.StreamMarkupSource(System.Uri! uri, System.IO.Stream! stream, System.Text.Encoding? defaultEncoding = null, bool leaveOpen = false) -> void
+ArxisStudio.Markup.TextChange
+ArxisStudio.Markup.TextChange.Deconstruct(out ArxisStudio.Markup.TextSpan Span, out string! NewText) -> void
+ArxisStudio.Markup.TextChange.Delta.get -> int
+ArxisStudio.Markup.TextChange.Equals(ArxisStudio.Markup.TextChange other) -> bool
+ArxisStudio.Markup.TextChange.IsDeletion.get -> bool
+ArxisStudio.Markup.TextChange.IsInsertion.get -> bool
+ArxisStudio.Markup.TextChange.NewText.get -> string!
+ArxisStudio.Markup.TextChange.Span.get -> ArxisStudio.Markup.TextSpan
+ArxisStudio.Markup.TextChange.Span.init -> void
+ArxisStudio.Markup.TextChange.TextChange() -> void
+ArxisStudio.Markup.TextChange.TextChange(ArxisStudio.Markup.TextSpan Span, string! NewText) -> void
+ArxisStudio.Markup.TextLine
+ArxisStudio.Markup.TextLine.End.get -> int
+ArxisStudio.Markup.TextLine.EndIncludingLineBreak.get -> int
+ArxisStudio.Markup.TextLine.GetLineBreak() -> string!
+ArxisStudio.Markup.TextLine.LineBreakLength.get -> int
+ArxisStudio.Markup.TextLine.LineNumber.get -> int
+ArxisStudio.Markup.TextLine.Span.get -> ArxisStudio.Markup.TextSpan
+ArxisStudio.Markup.TextLine.SpanIncludingLineBreak.get -> ArxisStudio.Markup.TextSpan
+ArxisStudio.Markup.TextLine.Start.get -> int
+ArxisStudio.Markup.TextLine.ToDebugString() -> string!
+ArxisStudio.Markup.TextLine.ToStringIncludingLineBreak() -> string!
+ArxisStudio.Markup.TextLineCollection
+ArxisStudio.Markup.TextLineCollection.Count.get -> int
+ArxisStudio.Markup.TextLineCollection.GetEnumerator() -> System.Collections.Generic.IEnumerator<ArxisStudio.Markup.TextLine!>!
+ArxisStudio.Markup.TextLineCollection.GetLineFromPosition(int position) -> ArxisStudio.Markup.TextLine!
+ArxisStudio.Markup.TextLineCollection.GetLineNumberFromPosition(int position) -> int
+ArxisStudio.Markup.TextLineCollection.GetOffset(ArxisStudio.Markup.TextPosition position) -> int
+ArxisStudio.Markup.TextLineCollection.GetPosition(int position) -> ArxisStudio.Markup.TextPosition
+ArxisStudio.Markup.TextLineCollection.this[int index].get -> ArxisStudio.Markup.TextLine!
+ArxisStudio.Markup.TextMarkupSource
+ArxisStudio.Markup.TextMarkupSource.TextMarkupSource(System.Uri! uri, ArxisStudio.Markup.SourceText! text) -> void
+ArxisStudio.Markup.TextMarkupSource.TextMarkupSource(System.Uri! uri, string! text) -> void
+ArxisStudio.Markup.TextPosition
+ArxisStudio.Markup.TextPosition.Column.get -> int
+ArxisStudio.Markup.TextPosition.CompareTo(ArxisStudio.Markup.TextPosition other) -> int
+ArxisStudio.Markup.TextPosition.Deconstruct(out int Line, out int Column) -> void
+ArxisStudio.Markup.TextPosition.Equals(ArxisStudio.Markup.TextPosition other) -> bool
+ArxisStudio.Markup.TextPosition.Line.get -> int
+ArxisStudio.Markup.TextPosition.TextPosition() -> void
+ArxisStudio.Markup.TextPosition.TextPosition(int Line, int Column) -> void
+ArxisStudio.Markup.TextSpan
+ArxisStudio.Markup.TextSpan.Contains(ArxisStudio.Markup.TextSpan span) -> bool
+ArxisStudio.Markup.TextSpan.Contains(int position) -> bool
+ArxisStudio.Markup.TextSpan.Deconstruct(out int Start, out int Length) -> void
+ArxisStudio.Markup.TextSpan.End.get -> int
+ArxisStudio.Markup.TextSpan.Equals(ArxisStudio.Markup.TextSpan other) -> bool
+ArxisStudio.Markup.TextSpan.IntersectsWith(ArxisStudio.Markup.TextSpan span) -> bool
+ArxisStudio.Markup.TextSpan.IsEmpty.get -> bool
+ArxisStudio.Markup.TextSpan.Length.get -> int
+ArxisStudio.Markup.TextSpan.Overlap(ArxisStudio.Markup.TextSpan span) -> ArxisStudio.Markup.TextSpan?
+ArxisStudio.Markup.TextSpan.OverlapsWith(ArxisStudio.Markup.TextSpan span) -> bool
+ArxisStudio.Markup.TextSpan.Start.get -> int
+ArxisStudio.Markup.TextSpan.TextSpan() -> void
+ArxisStudio.Markup.TextSpan.TextSpan(int Start, int Length) -> void
+abstract ArxisStudio.Markup.MarkupSource.GetTextAsync(System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.ValueTask<ArxisStudio.Markup.SourceText!>
+abstract ArxisStudio.Markup.SourceText.GetText(ArxisStudio.Markup.TextSpan span) -> string!
+abstract ArxisStudio.Markup.SourceText.Length.get -> int
+abstract ArxisStudio.Markup.SourceText.ToCharSpan() -> System.ReadOnlySpan<char>
+abstract ArxisStudio.Markup.SourceText.WithChanges(System.Collections.Generic.IReadOnlyList<ArxisStudio.Markup.TextChange>! changes) -> ArxisStudio.Markup.SourceText!
+abstract ArxisStudio.Markup.SourceText.this[int index].get -> char
+override ArxisStudio.Markup.DocumentVersion.GetHashCode() -> int
+override ArxisStudio.Markup.DocumentVersion.ToString() -> string!
+override ArxisStudio.Markup.FileMarkupSource.GetTextAsync(System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.ValueTask<ArxisStudio.Markup.SourceText!>
+override ArxisStudio.Markup.MarkupDocument.ToString() -> string!
+override ArxisStudio.Markup.MarkupDocumentId.GetHashCode() -> int
+override ArxisStudio.Markup.MarkupDocumentId.ToString() -> string!
+override ArxisStudio.Markup.MarkupSource.ToString() -> string!
+override ArxisStudio.Markup.SourceText.ToString() -> string!
+override ArxisStudio.Markup.StreamMarkupSource.GetTextAsync(System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.ValueTask<ArxisStudio.Markup.SourceText!>
+override ArxisStudio.Markup.TextChange.GetHashCode() -> int
+override ArxisStudio.Markup.TextChange.ToString() -> string!
+override ArxisStudio.Markup.TextLine.ToString() -> string!
+override ArxisStudio.Markup.TextMarkupSource.GetTextAsync(System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.ValueTask<ArxisStudio.Markup.SourceText!>
+override ArxisStudio.Markup.TextPosition.GetHashCode() -> int
+override ArxisStudio.Markup.TextPosition.ToString() -> string!
+override ArxisStudio.Markup.TextSpan.GetHashCode() -> int
+override ArxisStudio.Markup.TextSpan.ToString() -> string!
+static ArxisStudio.Markup.DocumentVersion.Initial.get -> ArxisStudio.Markup.DocumentVersion
+static ArxisStudio.Markup.DocumentVersion.operator !=(ArxisStudio.Markup.DocumentVersion left, ArxisStudio.Markup.DocumentVersion right) -> bool
+static ArxisStudio.Markup.DocumentVersion.operator <(ArxisStudio.Markup.DocumentVersion left, ArxisStudio.Markup.DocumentVersion right) -> bool
+static ArxisStudio.Markup.DocumentVersion.operator <=(ArxisStudio.Markup.DocumentVersion left, ArxisStudio.Markup.DocumentVersion right) -> bool
+static ArxisStudio.Markup.DocumentVersion.operator ==(ArxisStudio.Markup.DocumentVersion left, ArxisStudio.Markup.DocumentVersion right) -> bool
+static ArxisStudio.Markup.DocumentVersion.operator >(ArxisStudio.Markup.DocumentVersion left, ArxisStudio.Markup.DocumentVersion right) -> bool
+static ArxisStudio.Markup.DocumentVersion.operator >=(ArxisStudio.Markup.DocumentVersion left, ArxisStudio.Markup.DocumentVersion right) -> bool
+static ArxisStudio.Markup.MarkupDocumentId.New() -> ArxisStudio.Markup.MarkupDocumentId
+static ArxisStudio.Markup.MarkupDocumentId.operator !=(ArxisStudio.Markup.MarkupDocumentId left, ArxisStudio.Markup.MarkupDocumentId right) -> bool
+static ArxisStudio.Markup.MarkupDocumentId.operator ==(ArxisStudio.Markup.MarkupDocumentId left, ArxisStudio.Markup.MarkupDocumentId right) -> bool
+static ArxisStudio.Markup.SourceText.From(string! text, System.Text.Encoding? encoding = null, bool hasByteOrderMark = false) -> ArxisStudio.Markup.SourceText!
+static ArxisStudio.Markup.SourceText.FromAsync(System.IO.Stream! stream, System.Text.Encoding? encoding = null, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.ValueTask<ArxisStudio.Markup.SourceText!>
+static ArxisStudio.Markup.TextChange.Delete(ArxisStudio.Markup.TextSpan span) -> ArxisStudio.Markup.TextChange
+static ArxisStudio.Markup.TextChange.Insert(int position, string! text) -> ArxisStudio.Markup.TextChange
+static ArxisStudio.Markup.TextChange.operator !=(ArxisStudio.Markup.TextChange left, ArxisStudio.Markup.TextChange right) -> bool
+static ArxisStudio.Markup.TextChange.operator ==(ArxisStudio.Markup.TextChange left, ArxisStudio.Markup.TextChange right) -> bool
+static ArxisStudio.Markup.TextPosition.operator !=(ArxisStudio.Markup.TextPosition left, ArxisStudio.Markup.TextPosition right) -> bool
+static ArxisStudio.Markup.TextPosition.operator <(ArxisStudio.Markup.TextPosition left, ArxisStudio.Markup.TextPosition right) -> bool
+static ArxisStudio.Markup.TextPosition.operator <=(ArxisStudio.Markup.TextPosition left, ArxisStudio.Markup.TextPosition right) -> bool
+static ArxisStudio.Markup.TextPosition.operator ==(ArxisStudio.Markup.TextPosition left, ArxisStudio.Markup.TextPosition right) -> bool
+static ArxisStudio.Markup.TextPosition.operator >(ArxisStudio.Markup.TextPosition left, ArxisStudio.Markup.TextPosition right) -> bool
+static ArxisStudio.Markup.TextPosition.operator >=(ArxisStudio.Markup.TextPosition left, ArxisStudio.Markup.TextPosition right) -> bool
+static ArxisStudio.Markup.TextSpan.FromBounds(int start, int end) -> ArxisStudio.Markup.TextSpan
+static ArxisStudio.Markup.TextSpan.operator !=(ArxisStudio.Markup.TextSpan left, ArxisStudio.Markup.TextSpan right) -> bool
+static ArxisStudio.Markup.TextSpan.operator ==(ArxisStudio.Markup.TextSpan left, ArxisStudio.Markup.TextSpan right) -> bool
+~override ArxisStudio.Markup.DocumentVersion.Equals(object obj) -> bool
+~override ArxisStudio.Markup.MarkupDocumentId.Equals(object obj) -> bool
+~override ArxisStudio.Markup.TextChange.Equals(object obj) -> bool
+~override ArxisStudio.Markup.TextPosition.Equals(object obj) -> bool
+~override ArxisStudio.Markup.TextSpan.Equals(object obj) -> bool
