@@ -19,7 +19,12 @@ public sealed class InMemoryMarkupSourceProvider : IMarkupSourceProvider
     private readonly ConcurrentDictionary<Uri, SourceText> _sources = new();
 
     /// <summary>Gets the URIs this provider currently holds.</summary>
-    public IReadOnlyCollection<Uri> Uris => (IReadOnlyCollection<Uri>)_sources.Keys;
+    /// <remarks>
+    /// A point-in-time copy. Materialising it also avoids casting a dictionary's key view to a
+    /// collection interface, which happens to work for this dictionary type and fails at run
+    /// time for others.
+    /// </remarks>
+    public IReadOnlyCollection<Uri> Uris => [.. _sources.Keys];
 
     /// <summary>Adds or replaces the text held for a URI.</summary>
     /// <param name="uri">The URI to hold text for.</param>

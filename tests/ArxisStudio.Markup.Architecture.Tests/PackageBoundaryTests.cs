@@ -122,7 +122,7 @@ public sealed class PackageBoundaryTests
     {
         string[] offenders = RepositoryLayout.Packages
             .SelectMany(static package => RepositoryLayout.LoadAssembly(package).GetExportedTypes())
-            .Where(static type => type.Name.Contains("Axaml", StringComparison.OrdinalIgnoreCase))
+            .Where(static type => UsesAxamlNaming(type.Name))
             .Select(static type => type.FullName ?? type.Name)
             .ToArray();
 
@@ -131,4 +131,31 @@ public sealed class PackageBoundaryTests
             $"Public types use 'Axaml' naming ({string.Join(", ", offenders)}). " +
             "Follow Avalonia's own terminology and use 'Xaml'.");
     }
+
+    [Theory]
+    [InlineData("AxamlDocument", true)]
+    [InlineData("AXamlLoader", true)]
+    [InlineData("AXAMLDocument", true)]
+    [InlineData("XamlDocument", false)]
+    [InlineData("AvaloniaXamlDispatcher", false)]
+    [InlineData("AvaloniaXamlLoaderShim", false)]
+    public void TheAxamlNamingRule_MatchesTheThreeSpellingsAndNothingElse(string name, bool expected)
+    {
+        // The rule has to be exact. A case-insensitive search matches the "aXaml" inside
+        // "AvaloniaXaml", which is not what the contract forbids and would push perfectly good
+        // names out of the codebase.
+        Assert.Equal(expected, UsesAxamlNaming(name));
+    }
+
+    /// <summary>
+    /// Decides whether a type name uses the naming the contract rules out.
+    /// </summary>
+    /// <remarks>
+    /// Matched ordinally against the three spellings the contract names, so a lower-case
+    /// <c>a</c> — the one that appears mid-word in <c>Avalonia</c> — is not a match.
+    /// </remarks>
+    private static bool UsesAxamlNaming(string name) =>
+        name.Contains("Axaml", StringComparison.Ordinal)
+        || name.Contains("AXaml", StringComparison.Ordinal)
+        || name.Contains("AXAML", StringComparison.Ordinal);
 }

@@ -6,6 +6,7 @@
 
   <ItemGroup>
     <ProjectReference Include="../../src/ArxisStudio.Markup.Xaml.Loader/ArxisStudio.Markup.Xaml.Loader.csproj" />
+    <ProjectReference Include="../ArxisStudio.Markup.Xaml.Loader.TestControls/ArxisStudio.Markup.Xaml.Loader.TestControls.csproj" />
   </ItemGroup>
 
   <ItemGroup>

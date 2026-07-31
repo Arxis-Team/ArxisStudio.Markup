@@ -1,0 +1,17 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <RootNamespace>ArxisStudio.Markup.Xaml.Loader.TestControls</RootNamespace>
+  </PropertyGroup>
+
+  <!--
+    A library of custom controls that lives in its own assembly on purpose. The contract
+    requires the loader tests to prove that a control from an explicitly supplied assembly
+    loads; a control declared inside the test assembly would prove nothing, because the test
+    assembly is loaded either way.
+  -->
+  <ItemGroup>
+    <PackageReference Include="Avalonia" />
+  </ItemGroup>
+
+</Project>
