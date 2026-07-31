@@ -208,6 +208,7 @@ ArxisStudio.Markup.Xaml.Loader.XamlValueSource.Style = 3 -> ArxisStudio.Markup.X
 ArxisStudio.Markup.Xaml.Loader.XamlValueSource.StyleTrigger = 4 -> ArxisStudio.Markup.Xaml.Loader.XamlValueSource
 ArxisStudio.Markup.Xaml.Loader.XamlValueSource.Template = 5 -> ArxisStudio.Markup.Xaml.Loader.XamlValueSource
 ArxisStudio.Markup.Xaml.Loader.XamlValueSource.Unset = 0 -> ArxisStudio.Markup.Xaml.Loader.XamlValueSource
+const ArxisStudio.Markup.Xaml.Loader.XamlLoaderDiagnosticCodes.DesignValueNotApplied = "AXM3031" -> string!
 const ArxisStudio.Markup.Xaml.Loader.XamlLoaderDiagnosticCodes.ExpressionNotApplied = "AXM3015" -> string!
 const ArxisStudio.Markup.Xaml.Loader.XamlLoaderDiagnosticCodes.ExpressionReplaced = "AXM3014" -> string!
 const ArxisStudio.Markup.Xaml.Loader.XamlLoaderDiagnosticCodes.IncludeCycle = "AXM2007" -> string!
@@ -229,6 +230,7 @@ const ArxisStudio.Markup.Xaml.Loader.XamlLoaderDiagnosticCodes.UndeclaredPrefix 
 const ArxisStudio.Markup.Xaml.Loader.XamlLoaderDiagnosticCodes.UnknownNamespace = "AXM2004" -> string!
 const ArxisStudio.Markup.Xaml.Loader.XamlLoaderDiagnosticCodes.UnreadableInclude = "AXM2010" -> string!
 const ArxisStudio.Markup.Xaml.Loader.XamlLoaderDiagnosticCodes.UnresolvedAssembly = "AXM2001" -> string!
+const ArxisStudio.Markup.Xaml.Loader.XamlLoaderDiagnosticCodes.UnresolvedDesignMember = "AXM3030" -> string!
 const ArxisStudio.Markup.Xaml.Loader.XamlLoaderDiagnosticCodes.UnresolvedMember = "AXM3010" -> string!
 const ArxisStudio.Markup.Xaml.Loader.XamlLoaderDiagnosticCodes.UnresolvedResource = "AXM2005" -> string!
 const ArxisStudio.Markup.Xaml.Loader.XamlLoaderDiagnosticCodes.UnresolvedRootType = "AXM3020" -> string!

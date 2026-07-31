@@ -9,8 +9,8 @@ using System.Threading.Tasks;
 namespace ArxisStudio.Markup.Xaml.Loader;
 
 /// <summary>
-/// Resolves a document's includes through the environment and hands back a projection of the
-/// document with their content in place.
+/// Turns a document into the text Avalonia is actually given: includes resolved through the
+/// environment and spliced in, and markup its loader cannot accept taken back out.
 /// </summary>
 /// <remarks>
 /// <para>
@@ -20,6 +20,13 @@ namespace ArxisStudio.Markup.Xaml.Loader;
 /// throws if it cannot find it; there is no seam to substitute afterwards and no public way to
 /// put a bridging asset loader in front. <c>docs/adr/0005-resource-includes.md</c> records both
 /// dead ends and why this is the route instead.
+/// </para>
+/// <para>
+/// The same text is where design-time attributes are removed. Avalonia's runtime loader accepts
+/// four names in the design namespace and fails the entire document on any other — a single
+/// <c>d:Text</c> costs the whole tree, in run mode as much as in design mode. Removing them here
+/// is what lets a document carrying them load at all; applying the ones that mean something is
+/// <see cref="XamlDesignValues"/>'s job, once there are objects to apply them to.
 /// </para>
 /// <para>
 /// Nothing here writes anything back. The document keeps its own text, and the projection —
@@ -32,7 +39,7 @@ namespace ArxisStudio.Markup.Xaml.Loader;
 /// what it would have had if none of this existed.
 /// </para>
 /// </remarks>
-internal static class XamlIncludeProjector
+internal static class XamlDocumentProjector
 {
     /// <summary>Projects a document's includes into its text.</summary>
     /// <param name="document">The document to project.</param>
@@ -84,11 +91,6 @@ internal static class XamlIncludeProjector
         if (state.Described(document.Uri))
         {
             state.Diagnostics.AddRange(discovery);
-        }
-
-        if (references.IsEmpty && !isIncluded)
-        {
-            return TextProjection.Identity(document.SourceText, document.Uri);
         }
 
         var builder = new TextProjectionBuilder(document.SourceText, document.Uri);
@@ -147,9 +149,46 @@ internal static class XamlIncludeProjector
             spliced.Add(reference.Element.Span);
         }
 
+        Strip(document, builder, spliced);
         Rebind(document, builder, state, isIncluded);
 
         return builder.ToProjection();
+    }
+
+    /// <summary>
+    /// Takes out the attributes Avalonia's loader would refuse the whole document over.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// Its design transformer understands four names — <c>d:DesignWidth</c>, <c>d:DesignHeight</c>,
+    /// <c>d:DataContext</c> and <c>d:PreviewWith</c> — and has no emitter for anything else in
+    /// that namespace, so a <c>d:Text</c> anywhere costs the entire tree. Markup compatibility
+    /// says the same of a prefix listed in <c>mc:Ignorable</c>: it is content a reader that does
+    /// not know it should proceed without, which is exactly what Avalonia's reader is.
+    /// </para>
+    /// <para>
+    /// Removed from the projection only. The document keeps every one of them, which is what
+    /// makes them survive a save and lets design mode apply them afterwards.
+    /// </para>
+    /// </remarks>
+    private static void Strip(XamlDocument document, TextProjectionBuilder builder, List<TextSpan> spliced)
+    {
+        foreach (XamlElement element in document.DescendantElements())
+        {
+            // Inside an include that has already been replaced there is no text left to edit.
+            if (spliced.Exists(span => span.Contains(element.Span)))
+            {
+                continue;
+            }
+
+            foreach (XamlAttribute attribute in element.Attributes)
+            {
+                if (XamlDesignValues.IsHiddenFromLoader(attribute, element))
+                {
+                    builder.Replace(WithLeadingSpace(document.SourceText, attribute.Span), string.Empty);
+                }
+            }
+        }
     }
 
     /// <summary>

@@ -92,4 +92,10 @@ public static class XamlLoaderDiagnosticCodes
 
     /// <summary>A root-instance factory returned something the document cannot populate.</summary>
     public const string InvalidRootFactoryResult = "AXM3023";
+
+    /// <summary>A design-time attribute names no writable member of the object it is on.</summary>
+    public const string UnresolvedDesignMember = "AXM3030";
+
+    /// <summary>A design-time value was found but could not be applied to anything.</summary>
+    public const string DesignValueNotApplied = "AXM3031";
 }

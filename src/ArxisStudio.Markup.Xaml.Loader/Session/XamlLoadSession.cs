@@ -87,7 +87,7 @@ public sealed partial class XamlLoadSession : IAsyncDisposable
     public object RootObject { get; }
 
     /// <summary>Gets everything noticed while loading.</summary>
-    public ImmutableArray<MarkupDiagnostic> Diagnostics { get; }
+    public ImmutableArray<MarkupDiagnostic> Diagnostics { get; private set; }
 
     /// <summary>
     /// Loads a document, creating the objects it describes.
@@ -149,7 +149,7 @@ public sealed partial class XamlLoadSession : IAsyncDisposable
         // itself during the load and throws when it cannot. Resolving them here through the
         // environment, and handing over text with their content already in place, is what makes
         // the caller's own providers the ones that answer.
-        TextProjection projection = await XamlIncludeProjector
+        TextProjection projection = await XamlDocumentProjector
             .ProjectAsync(document, environment, diagnostics, cancellationToken).ConfigureAwait(false);
 
         // x:Class has to be resolved and instantiated before loading, because Avalonia
@@ -169,11 +169,35 @@ public sealed partial class XamlLoadSession : IAsyncDisposable
             .InvokeAsync(() => Load(document, projection, options, rootInstance, diagnostics), cancellationToken)
             .ConfigureAwait(false);
 
+        if (root is null)
+        {
+            return (null, new XamlLoadResult { RootObject = null, Diagnostics = [.. diagnostics] });
+        }
+
+        var session = new XamlLoadSession(document, environment, options, projection, root, []);
+
+        // Design-time values are applied after the objects exist, because that is the earliest
+        // there is anything to apply them to, and through the map, because an attribute belongs
+        // to the object its own element produced rather than to the root.
+        if (options.Mode == XamlLoadMode.Design)
+        {
+            await environment.Dispatcher
+                .InvokeAsync<object?>(
+                    () =>
+                    {
+                        XamlDesignValues.Apply(document, session.Objects, root, diagnostics);
+
+                        return null;
+                    },
+                    cancellationToken)
+                .ConfigureAwait(false);
+        }
+
         var result = new XamlLoadResult { RootObject = root, Diagnostics = [.. diagnostics] };
 
-        return root is null
-            ? (null, result)
-            : (new XamlLoadSession(document, environment, options, projection, root, result.Diagnostics), result);
+        session.Diagnostics = result.Diagnostics;
+
+        return (session, result);
     }
 
     /// <summary>

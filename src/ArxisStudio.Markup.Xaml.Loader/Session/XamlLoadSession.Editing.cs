@@ -318,31 +318,8 @@ public sealed partial class XamlLoadSession
     }
 
     /// <summary>Converts attribute text to the type a property holds.</summary>
-    private static object? Convert(AvaloniaProperty property, string text, List<MarkupDiagnostic> diagnostics)
-    {
-        if (property.PropertyType == typeof(string))
-        {
-            return text;
-        }
-
-        try
-        {
-            TypeConverter converter = TypeDescriptor.GetConverter(property.PropertyType);
-
-            if (converter.CanConvertFrom(typeof(string)))
-            {
-                return converter.ConvertFromInvariantString(text);
-            }
-        }
-        catch (Exception error) when (error is NotSupportedException or FormatException or ArgumentException)
-        {
-            diagnostics.Add(MarkupDiagnostic.Load(
-                XamlLoaderDiagnosticCodes.TypeConverterFailure,
-                $"'{text}' could not be converted to {property.PropertyType.Name}: {error.Message}"));
-        }
-
-        return text;
-    }
+    private static object? Convert(AvaloniaProperty property, string text, List<MarkupDiagnostic> diagnostics) =>
+        XamlValueConversion.Convert(property.PropertyType, text, diagnostics);
 
     /// <summary>Renders a value as the document would write it.</summary>
     private static string Format(object? value) => value switch
