@@ -104,8 +104,17 @@ public sealed class XamlObjectMap
     {
         ArgumentNullException.ThrowIfNull(runtimeObject);
 
-        return _origins.TryGetValue(runtimeObject, out OriginBox? origin)
-            ? origin.Value
+        if (_origins.TryGetValue(runtimeObject, out OriginBox? origin))
+        {
+            return origin.Value;
+        }
+
+        // Templates are applied lazily, so their output routinely appears after the map was
+        // built. Belonging to a template is a property of the object itself, not of when the
+        // walk happened to run, and answering "run-time generated" here would let template
+        // output be mistaken for something a caller may edit.
+        return runtimeObject is StyledElement { TemplatedParent: not null }
+            ? XamlObjectOrigin.Template
             : XamlObjectOrigin.RuntimeGenerated;
     }
 

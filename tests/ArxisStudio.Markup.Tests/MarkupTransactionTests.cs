@@ -350,8 +350,12 @@ public sealed class MarkupTransactionTests
                 // Lost the race; the winner's state stands.
             }
 
-            string observedView = workspace.GetDocument(view.Id).Text.ToString();
-            string observedTheme = workspace.GetDocument(theme.Id).Text.ToString();
+            // Both documents must come from one snapshot. Two separate reads can legitimately
+            // straddle another transaction's commit, which would look like a torn state and is
+            // not one.
+            var snapshot = workspace.Documents.ToDictionary(static d => d.Id);
+            string observedView = snapshot[view.Id].Text.ToString();
+            string observedTheme = snapshot[theme.Id].Text.ToString();
 
             if (!string.Equals(observedView, observedTheme, StringComparison.Ordinal))
             {
