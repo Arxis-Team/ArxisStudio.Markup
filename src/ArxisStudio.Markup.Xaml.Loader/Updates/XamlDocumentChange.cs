@@ -28,6 +28,19 @@ public sealed class XamlDocumentChange
     public XamlUpdateStrategy Strategy { get; }
 
     /// <summary>
+    /// Gets a value indicating whether the object itself has to be replaced rather than having
+    /// its content rebuilt inside it.
+    /// </summary>
+    /// <remarks>
+    /// The element became a different element, or something the object was constructed with
+    /// changed. When only its content differs the object survives and its children are rebuilt,
+    /// which is what lets a child be added to the root without recreating everything. Only
+    /// meaningful for a strategy that rebuilds markup: setting a property never replaces the
+    /// object it is set on.
+    /// </remarks>
+    internal bool ReplacesObject { get; init; }
+
+    /// <summary>
     /// Gets the element in the loaded document, which is the one the object map knows, or
     /// <see langword="null"/> when the change is not about a particular element.
     /// </summary>

@@ -5,6 +5,7 @@ using System.Linq;
 using System.Runtime.CompilerServices;
 using Avalonia;
 using Avalonia.Controls;
+using Avalonia.Controls.Primitives;
 using Avalonia.LogicalTree;
 using Avalonia.Markup.Xaml.Diagnostics;
 using Avalonia.Styling;
@@ -44,13 +45,25 @@ public sealed class XamlObjectMap
     private readonly List<object> _objects = [];
 
     private readonly TextProjection _projection;
+    private readonly IReadOnlyDictionary<Uri, TextProjection> _fragments;
+    private readonly HashSet<Uri> _observed = new(XamlUri.Comparer);
 
     private Uri? _documentSourceUri;
 
-    private XamlObjectMap(TextProjection projection)
+    private XamlObjectMap(TextProjection projection, IReadOnlyDictionary<Uri, TextProjection> fragments)
     {
         _projection = projection;
+        _fragments = fragments;
     }
+
+    /// <summary>
+    /// Gets the names Avalonia gave the texts the objects in this map were actually built from.
+    /// </summary>
+    /// <remarks>
+    /// A session prunes its record of separately loaded fragments to these, so the ones whose
+    /// objects have since been replaced do not accumulate for the life of the session.
+    /// </remarks>
+    internal IReadOnlyCollection<Uri> ObservedSources => _observed;
 
     /// <summary>Gets the objects the map knows about, in the order they were reached.</summary>
     public IReadOnlyList<object> Objects => _objects;
@@ -79,13 +92,34 @@ public sealed class XamlObjectMap
     /// </param>
     /// <returns>The map.</returns>
     /// <exception cref="ArgumentNullException">An argument is <see langword="null"/>.</exception>
-    public static XamlObjectMap Build(XamlDocument document, object root, TextProjection projection)
+    public static XamlObjectMap Build(XamlDocument document, object root, TextProjection projection) =>
+        Build(document, root, projection, ImmutableDictionary<Uri, TextProjection>.Empty);
+
+    /// <summary>
+    /// Builds a map for a tree that has had part of it rebuilt from a fragment.
+    /// </summary>
+    /// <remarks>
+    /// Avalonia names every text it is given, and gives a separately loaded fragment a name of
+    /// its own, so an object's recorded name says which text built it. Each name is paired with
+    /// the projection of that text, which is what lets an object rebuilt by an update still be
+    /// traced to the markup in the document that describes it.
+    /// </remarks>
+    /// <param name="document">The document the objects were created from.</param>
+    /// <param name="root">The object the document produced.</param>
+    /// <param name="projection">The text the document as a whole was built from.</param>
+    /// <param name="fragments">The projection behind each separately loaded fragment, by the name Avalonia gave it.</param>
+    /// <returns>The map.</returns>
+    internal static XamlObjectMap Build(
+        XamlDocument document,
+        object root,
+        TextProjection projection,
+        IReadOnlyDictionary<Uri, TextProjection> fragments)
     {
         ArgumentNullException.ThrowIfNull(document);
         ArgumentNullException.ThrowIfNull(root);
         ArgumentNullException.ThrowIfNull(projection);
 
-        var map = new XamlObjectMap(projection)
+        var map = new XamlObjectMap(projection, fragments)
         {
             // Avalonia names a runtime-loaded document with a synthetic URI of its own rather
             // than the base URI it was handed, so what the document "is" can only be learnt
@@ -187,11 +221,13 @@ public sealed class XamlObjectMap
             _sourceUris.AddOrUpdate(current, sourceUri);
         }
 
-        // Only a Document-origin object gets a two-way link. A template-generated child may
-        // carry source information pointing at the template's own markup, and letting that
-        // masquerade as the control's declaration is the specific mistake this map exists to
-        // avoid.
-        if (element is not null && origin == XamlObjectOrigin.Document)
+        // A template-generated child carries source information pointing at the template's own
+        // markup, and letting that masquerade as the control's declaration is the specific
+        // mistake this map exists to avoid. A resource or a style is not that case: the element
+        // that declares it is genuinely the element that declares it, and an update that
+        // rebuilds one has to be able to find what it built.
+        if (element is not null
+            && origin is XamlObjectOrigin.Document or XamlObjectOrigin.Resource or XamlObjectOrigin.Style)
         {
             _elementsByObject.AddOrUpdate(current, element);
             _objectsByElement.TryAdd(element, current);
@@ -231,18 +267,20 @@ public sealed class XamlObjectMap
             return default;
         }
 
-        // Source information from another file describes another document's markup. Mapping it
-        // into this one would put an object under an unrelated element. Included documents are
-        // not this case: they were spliced into the text Avalonia was handed, so they report
-        // the same URI as the rest of it and the projection is what tells them apart.
-        if (_documentSourceUri is not null
-            && info.SourceUri is not null
-            && !XamlUri.Comparer.Equals(info.SourceUri, _documentSourceUri))
+        if (ProjectionFor(info.SourceUri) is not { } projection)
         {
+            // Source information from a text this map knows nothing about describes somebody
+            // else's markup — a template's, or a fragment loaded before the last update.
+            // Mapping it into this document would put an object under an unrelated element.
             return default;
         }
 
-        TextProjectionPosition position = _projection.Map(
+        if (info.SourceUri is not null)
+        {
+            _observed.Add(info.SourceUri);
+        }
+
+        TextProjectionPosition position = projection.Map(
             new TextPosition(info.LineNumber - 1, Math.Max(0, info.LinePosition - 1)));
 
         if (!position.IsOriginal)
@@ -253,7 +291,7 @@ public sealed class XamlObjectMap
         // The recorded position lands inside the start tag, so the innermost node there is a
         // part of the element rather than the element itself.
         XamlElement? element = document
-            .FindNode(OffsetIn(document.SourceText, position.Offset))
+            .FindNode(OffsetIn(document.SourceText, projection, position.Offset))
             ?.AncestorsAndSelf()
             .OfType<XamlElement>()
             .FirstOrDefault();
@@ -272,15 +310,15 @@ public sealed class XamlObjectMap
     /// that lengthens an earlier line moves every later offset and leaves the lines alone —
     /// which is the tolerance the map had before it read positions through a projection at all.
     /// </remarks>
-    private int OffsetIn(SourceText current, int offsetInProjectedSource)
+    private static int OffsetIn(SourceText current, TextProjection projection, int offsetInProjectedSource)
     {
-        if (ReferenceEquals(current, _projection.Source))
+        if (ReferenceEquals(current, projection.Source))
         {
             return Math.Min(offsetInProjectedSource, Math.Max(0, current.Length - 1));
         }
 
-        TextPosition position = _projection.Source.Lines.GetPosition(
-            Math.Clamp(offsetInProjectedSource, 0, _projection.Source.Length));
+        TextPosition position = projection.Source.Lines.GetPosition(
+            Math.Clamp(offsetInProjectedSource, 0, projection.Source.Length));
 
         TextLineCollection lines = current.Lines;
         TextLine line = lines[Math.Min(position.Line, lines.Count - 1)];
@@ -288,6 +326,25 @@ public sealed class XamlObjectMap
         return Math.Min(
             line.Start + Math.Clamp(position.Column, 0, line.Span.Length),
             Math.Max(0, current.Length - 1));
+    }
+
+    /// <summary>Finds the projection of the text Avalonia built an object from.</summary>
+    /// <remarks>
+    /// The document's own text is identified by the name Avalonia gave it, which is learnt from
+    /// the root object because a runtime-loaded document gets a synthetic one rather than the
+    /// base URI it was handed. A fragment loaded by an update gets its own name and its own
+    /// projection; anything else is markup this map has no claim on.
+    /// </remarks>
+    private TextProjection? ProjectionFor(Uri? runtimeSourceUri)
+    {
+        if (runtimeSourceUri is null
+            || _documentSourceUri is null
+            || XamlUri.Comparer.Equals(runtimeSourceUri, _documentSourceUri))
+        {
+            return _projection;
+        }
+
+        return _fragments.TryGetValue(runtimeSourceUri, out TextProjection? fragment) ? fragment : null;
     }
 
     /// <summary>Gets the objects reachable from one, without leaving the logical world.</summary>
@@ -339,6 +396,13 @@ public sealed class XamlObjectMap
                     yield return value;
                 }
             }
+        }
+
+        // A control's template is a value of the control, not a child of it, so nothing in the
+        // logical world reaches it — and an update that rebuilds one has to find what it built.
+        if (current is TemplatedControl { Template: { } template })
+        {
+            yield return template;
         }
 
         if (current is IStyleHost styleHost)

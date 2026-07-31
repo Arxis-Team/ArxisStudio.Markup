@@ -50,8 +50,39 @@ internal static class XamlDocumentProjector
     /// The projection, which is an identity projection when the document includes nothing this
     /// could resolve.
     /// </returns>
+    internal static ValueTask<TextProjection> ProjectAsync(
+        XamlDocument document,
+        XamlLoadEnvironment environment,
+        List<MarkupDiagnostic> diagnostics,
+        CancellationToken cancellationToken) =>
+        ProjectAsync(document, fragment: null, environment, diagnostics, cancellationToken);
+
+    /// <summary>
+    /// Projects one element of a document as a document in its own right.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// What an update needs when a style, a theme, a template, a resource or a subtree has
+    /// changed: the smallest piece of markup that can be built on its own and put back where the
+    /// old one was. Everything outside the element goes, and the namespace declarations that were
+    /// in scope where it sat come with it, because Avalonia's parser will only take them on the
+    /// root and the element is now the root.
+    /// </para>
+    /// <para>
+    /// Still a projection of the document, so its map leads back into the real file. That is what
+    /// keeps the objects a fragment builds attributable to the markup that describes them once
+    /// they are in the tree.
+    /// </para>
+    /// </remarks>
+    /// <param name="document">The document the element belongs to.</param>
+    /// <param name="fragment">The element to project on its own.</param>
+    /// <param name="environment">The environment whose resource resolver finds the includes.</param>
+    /// <param name="diagnostics">Collects everything noticed on the way.</param>
+    /// <param name="cancellationToken">A token to observe while resolving and reading.</param>
+    /// <returns>The projection, whose text is the element and nothing else.</returns>
     internal static async ValueTask<TextProjection> ProjectAsync(
         XamlDocument document,
+        XamlElement? fragment,
         XamlLoadEnvironment environment,
         List<MarkupDiagnostic> diagnostics,
         CancellationToken cancellationToken)
@@ -74,13 +105,20 @@ internal static class XamlDocumentProjector
             }
         }
 
-        return await ProjectAsync(document, state, isIncluded: false, cancellationToken).ConfigureAwait(false);
+        return await ProjectAsync(
+                document,
+                state,
+                isIncluded: false,
+                ReferenceEquals(fragment, document.Root) ? null : fragment,
+                cancellationToken)
+            .ConfigureAwait(false);
     }
 
     private static async ValueTask<TextProjection> ProjectAsync(
         XamlDocument document,
         State state,
         bool isIncluded,
+        XamlElement? fragment,
         CancellationToken cancellationToken)
     {
         ImmutableArray<XamlResourceReference> references =
@@ -103,7 +141,8 @@ internal static class XamlDocumentProjector
             // Discovery reports every include anywhere in the document, which includes one
             // written inside another. The outer one is replaced wholesale, so the inner one is
             // already gone; asking to replace it as well describes two texts for one place.
-            if (spliced.Exists(span => span.Contains(reference.Element.Span)))
+            if (spliced.Exists(span => span.Contains(reference.Element.Span))
+                || !Covers(fragment, reference.Element.Span))
             {
                 continue;
             }
@@ -134,7 +173,7 @@ internal static class XamlDocumentProjector
 
             try
             {
-                inner = await ProjectAsync(included, state, isIncluded: true, cancellationToken)
+                inner = await ProjectAsync(included, state, isIncluded: true, null, cancellationToken)
                     .ConfigureAwait(false);
             }
             finally
@@ -149,11 +188,15 @@ internal static class XamlDocumentProjector
             spliced.Add(reference.Element.Span);
         }
 
-        Strip(document, builder, spliced);
-        Rebind(document, builder, state, isIncluded);
+        Strip(document, builder, spliced, fragment);
+        Rebind(document, builder, state, isIncluded, fragment);
 
         return builder.ToProjection();
     }
+
+    /// <summary>Reports whether a span is inside the fragment being projected, if there is one.</summary>
+    private static bool Covers(XamlElement? fragment, TextSpan span) =>
+        fragment is null || fragment.Span.Contains(span);
 
     /// <summary>
     /// Takes out the attributes Avalonia's loader would refuse the whole document over.
@@ -171,12 +214,17 @@ internal static class XamlDocumentProjector
     /// makes them survive a save and lets design mode apply them afterwards.
     /// </para>
     /// </remarks>
-    private static void Strip(XamlDocument document, TextProjectionBuilder builder, List<TextSpan> spliced)
+    private static void Strip(
+        XamlDocument document,
+        TextProjectionBuilder builder,
+        List<TextSpan> spliced,
+        XamlElement? fragment)
     {
         foreach (XamlElement element in document.DescendantElements())
         {
-            // Inside an include that has already been replaced there is no text left to edit.
-            if (spliced.Exists(span => span.Contains(element.Span)))
+            // Inside an include that has already been replaced there is no text left to edit,
+            // and outside the fragment there will be no text at all.
+            if (spliced.Exists(span => span.Contains(element.Span)) || !Covers(fragment, element.Span))
             {
                 continue;
             }
@@ -227,7 +275,8 @@ internal static class XamlDocumentProjector
         XamlDocument document,
         TextProjectionBuilder builder,
         State state,
-        bool isIncluded)
+        bool isIncluded,
+        XamlElement? fragment)
     {
         if (document.Root is not { } root)
         {
@@ -244,14 +293,52 @@ internal static class XamlDocumentProjector
             return;
         }
 
-        if (state.Hoisted.Count == 0)
+        XamlElement target = fragment ?? root;
+        Dictionary<string, string> declarations = state.Hoisted;
+
+        if (fragment is not null)
+        {
+            // Everything but the fragment goes, the declarations that were in scope where it sat
+            // included, so they have to be written onto it — minus any it makes for itself,
+            // because one element cannot bind a prefix twice.
+            builder.Replace(TextSpan.FromBounds(0, fragment.Span.Start), string.Empty);
+            builder.Replace(
+                TextSpan.FromBounds(fragment.Span.End, document.SourceText.Length), string.Empty);
+
+            // x:Key says which entry of a dictionary the element is, which is a fact about the
+            // dictionary rather than about the object. On the root of a document it is a
+            // directive Avalonia's loader has no emitter for, and the update puts the rebuilt
+            // object back under the key it already had.
+            foreach (XamlAttribute directive in fragment.Attributes.Where(static attribute =>
+                attribute.IsDirective && attribute.Name.LocalName is "Key"))
+            {
+                // The whitespace before it stays: the declarations being hoisted are written in
+                // straight after the element name, and two replacements cannot describe one
+                // position. A double space in a text nobody ever sees is the cheaper problem.
+                builder.Replace(directive.Span, string.Empty);
+            }
+
+            declarations = new Dictionary<string, string>(state.Hoisted, StringComparer.Ordinal);
+
+            foreach ((string prefix, string namespaceUri) in InScope(fragment))
+            {
+                declarations.TryAdd(prefix, namespaceUri);
+            }
+
+            foreach (XamlNamespaceDeclaration own in fragment.NamespaceDeclarations)
+            {
+                declarations.Remove(own.Prefix ?? string.Empty);
+            }
+        }
+
+        if (declarations.Count == 0)
         {
             return;
         }
 
         var text = new StringBuilder();
 
-        foreach ((string prefix, string namespaceUri) in state.Hoisted)
+        foreach ((string prefix, string namespaceUri) in declarations)
         {
             text.Append(prefix.Length == 0 ? " xmlns=\"" : $" xmlns:{prefix}=\"")
                 .Append(namespaceUri)
@@ -260,7 +347,25 @@ internal static class XamlDocumentProjector
 
         // Straight after the element name, where an author would have written them, and before
         // any attribute so that nothing already on the tag has to move relative to anything else.
-        builder.Replace(new TextSpan(root.NameSpan.End, 0), text.ToString());
+        builder.Replace(new TextSpan(target.NameSpan.End, 0), text.ToString());
+    }
+
+    /// <summary>Gets every prefix bound where an element sits, innermost binding winning.</summary>
+    private static Dictionary<string, string> InScope(XamlElement element)
+    {
+        var declarations = new Dictionary<string, string>(StringComparer.Ordinal);
+
+        for (XamlNamespaceContext? context = element.NamespaceContext;
+            context is not null;
+            context = context.Parent)
+        {
+            foreach ((string prefix, string namespaceUri) in context.Declarations)
+            {
+                declarations.TryAdd(prefix, namespaceUri);
+            }
+        }
+
+        return declarations;
     }
 
     /// <summary>

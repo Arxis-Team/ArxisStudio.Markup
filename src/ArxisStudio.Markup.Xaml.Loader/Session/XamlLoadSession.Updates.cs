@@ -4,6 +4,8 @@ using System.Collections.Immutable;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
+using Avalonia.Markup.Xaml;
+using Avalonia.Markup.Xaml.Diagnostics;
 
 namespace ArxisStudio.Markup.Xaml.Loader;
 
@@ -27,6 +29,8 @@ namespace ArxisStudio.Markup.Xaml.Loader;
 /// </remarks>
 public sealed partial class XamlLoadSession
 {
+    private readonly Dictionary<Uri, TextProjection> _fragments = new(XamlUri.Comparer);
+
     /// <summary>
     /// Gets the most recent document that was offered and not applied, if there is one.
     /// </summary>
@@ -84,18 +88,6 @@ public sealed partial class XamlLoadSession
                 "new session from the new document.");
         }
 
-        if (strategy > XamlUpdateStrategy.UpdateDesignValue)
-        {
-            return Refuse(
-                updated,
-                strategy,
-                changes,
-                diagnostics,
-                XamlLoaderDiagnosticCodes.UpdateNotApplied,
-                $"This update needs {strategy}, which this session cannot yet apply in place. " +
-                "The objects were left as they were.");
-        }
-
         return await ApplyAsync(updated, strategy, changes, diagnostics, cancellationToken).ConfigureAwait(false);
     }
 
@@ -138,17 +130,61 @@ public sealed partial class XamlLoadSession
             };
         }
 
-        // The content the document pulls in is not the document, so there is no element of it to
-        // set a property on. Everything it produced has to be built again from the new text.
-        return Refuse(
-            Document,
-            XamlUpdateStrategy.ReplaceResource,
-            [new XamlDocumentChange(XamlUpdateStrategy.ReplaceResource, null, null, null)],
-            diagnostics,
-            XamlLoaderDiagnosticCodes.UpdateNotApplied,
-            $"'{XamlUri.ToDisplayString(resourceUri)}' changed what the document includes, which needs " +
-            "ReplaceResource. This session cannot yet apply that in place, and the objects were left " +
-            "as they were.");
+        // The included content is not part of the document, so there is no element of it to set
+        // a property on. What has to be built again is whatever element of the document the
+        // include was expanded inside — every one of them, because which include's expansion
+        // changed is not a question the projected text answers.
+        ImmutableArray<XamlDocumentChange> changes =
+        [
+            .. Document.GetResourceReferences()
+                .Select(reference => Host(reference.Element))
+                .OfType<XamlElement>()
+                .Distinct()
+                .Select(static host => new XamlDocumentChange(
+                    XamlUpdateStrategy.ReplaceResource, host, host, null) { ReplacesObject = true }),
+        ];
+
+        if (changes.IsEmpty)
+        {
+            return Refuse(
+                Document,
+                XamlUpdateStrategy.RecreateSession,
+                [],
+                diagnostics,
+                XamlLoaderDiagnosticCodes.UpdateRequiresNewSession,
+                $"'{XamlUri.ToDisplayString(resourceUri)}' is included straight into the root element, " +
+                "which cannot be rebuilt in place. Create a new session from the same document.");
+        }
+
+        return await ApplyAsync(Document, XamlUpdateStrategy.ReplaceResource, changes, diagnostics, cancellationToken)
+            .ConfigureAwait(false);
+    }
+
+    /// <summary>
+    /// Finds the element an include was expanded inside, which is what has to be built again
+    /// when the file it names changes.
+    /// </summary>
+    /// <remarks>
+    /// The nearest ordinary element that produced an object of its own and is not the root: a
+    /// property element is not something that can be loaded on its own, and the root has no slot
+    /// to be put back into.
+    /// </remarks>
+    private XamlElement? Host(XamlElement include)
+    {
+        foreach (XamlElement ancestor in include.AncestorsAndSelf().OfType<XamlElement>().Skip(1))
+        {
+            if (ReferenceEquals(ancestor, Document.Root))
+            {
+                return null;
+            }
+
+            if (!ancestor.IsPropertyElementSyntax && Objects.GetObject(ancestor) is not null)
+            {
+                return ancestor;
+            }
+        }
+
+        return null;
     }
 
     /// <summary>Applies an update that can be made on the objects that already exist.</summary>
@@ -165,8 +201,32 @@ public sealed partial class XamlLoadSession
             .ProjectAsync(updated, Environment, diagnostics, cancellationToken)
             .ConfigureAwait(false);
 
+        // Every fragment is projected and parsed before any object is touched, for the same
+        // reason: a fragment that will not build is a refused update, not a half-rebuilt tree.
+        var fragments = new List<(XamlDocumentChange Change, TextProjection Projection)>();
+
+        foreach (XamlDocumentChange change in changes.Where(static change => Rebuilds(change.Strategy)))
+        {
+            if (change.NewElement is not { } element)
+            {
+                return Refuse(
+                    updated,
+                    strategy,
+                    changes,
+                    diagnostics,
+                    XamlLoaderDiagnosticCodes.UpdateNotApplied,
+                    $"{change} does not say which element to rebuild.");
+            }
+
+            fragments.Add((
+                change,
+                await XamlDocumentProjector
+                    .ProjectAsync(updated, element, Environment, diagnostics, cancellationToken)
+                    .ConfigureAwait(false)));
+        }
+
         bool applied = await _dispatcher
-            .InvokeAsync(() => Write(changes, diagnostics), cancellationToken)
+            .InvokeAsync(() => Write(changes, fragments, diagnostics), cancellationToken)
             .ConfigureAwait(false);
 
         if (!applied)
@@ -182,8 +242,15 @@ public sealed partial class XamlLoadSession
 
         Document = updated;
         Projection = projection;
-        Objects = XamlObjectMap.Build(updated, RootObject, projection);
+        Objects = XamlObjectMap.Build(updated, RootObject, projection, _fragments);
         PendingDocument = null;
+
+        // A fragment whose objects the walk never reached has been replaced by a later one, and
+        // its projection describes text that is no longer anywhere in the tree.
+        foreach (Uri stale in _fragments.Keys.Where(uri => !Objects.ObservedSources.Contains(uri)).ToArray())
+        {
+            _fragments.Remove(stale);
+        }
 
         // Design values are re-applied from the document rather than patched one at a time.
         // Nothing re-evaluates on an update, so the document is the only place that says what
@@ -218,12 +285,46 @@ public sealed partial class XamlLoadSession
     /// Each change is checked before any is made. A run that stopped halfway would leave the
     /// objects agreeing with neither document, and nothing would say where the boundary was.
     /// </remarks>
-    private bool Write(ImmutableArray<XamlDocumentChange> changes, List<MarkupDiagnostic> diagnostics)
+    private bool Write(
+        ImmutableArray<XamlDocumentChange> changes,
+        List<(XamlDocumentChange Change, TextProjection Projection)> fragments,
+        List<MarkupDiagnostic> diagnostics)
     {
         var writes = new List<(object Target, XamlMemberDescriptor Member, object? Value)>();
+        var rebuilds = new List<(XamlDocumentChange Change, object Previous, object Fresh, Uri? RuntimeUri)>();
+
+        // Building every fragment first means a fragment that will not build refuses the update
+        // rather than stopping halfway through a tree that is already part-way rebuilt.
+        foreach ((XamlDocumentChange change, TextProjection fragment) in fragments)
+        {
+            if (change.OldElement is not { } element || Objects.GetObject(element) is not { } previous)
+            {
+                diagnostics.Add(MarkupDiagnostic.Synchronization(
+                    XamlLoaderDiagnosticCodes.UpdateNotApplied,
+                    $"{change} names an element that produced no object.",
+                    MarkupDiagnosticSeverity.Error,
+                    Document.Uri));
+
+                return false;
+            }
+
+            (object? fresh, Uri? runtimeUri) = Build(fragment, diagnostics);
+
+            if (fresh is null)
+            {
+                return false;
+            }
+
+            rebuilds.Add((change, previous, fresh, runtimeUri));
+        }
 
         foreach (XamlDocumentChange change in changes)
         {
+            if (Rebuilds(change.Strategy))
+            {
+                continue;
+            }
+
             if (change.Strategy == XamlUpdateStrategy.UpdateDesignValue)
             {
                 // Design values are reapplied wholesale once the document has advanced, because
@@ -275,6 +376,23 @@ public sealed partial class XamlLoadSession
             writes.Add((target, member, XamlValueConversion.Convert(member.ValueType, text, diagnostics)));
         }
 
+        foreach ((XamlDocumentChange change, object previous, object fresh, Uri? runtimeUri) in rebuilds)
+        {
+            bool replaced = change.ReplacesObject
+                ? XamlObjectReplacement.Replace(Objects, change.OldElement!, previous, fresh, diagnostics)
+                : XamlObjectReplacement.ReplaceContent(previous, fresh, change.OldElement!, diagnostics);
+
+            if (!replaced)
+            {
+                return false;
+            }
+
+            if (runtimeUri is not null)
+            {
+                _fragments[runtimeUri] = fragments.First(entry => entry.Change == change).Projection;
+            }
+        }
+
         foreach ((object target, XamlMemberDescriptor member, object? value) in writes)
         {
             XamlDesignValues.Write(target, member, value);
@@ -282,6 +400,55 @@ public sealed partial class XamlLoadSession
 
         return true;
     }
+
+    /// <summary>Builds the objects a projected fragment describes.</summary>
+    /// <remarks>
+    /// Through Avalonia's own runtime loader, like any other load. It names the text it is given,
+    /// and that name is how the object map later tells objects built from this fragment from the
+    /// ones built from the document — which is what keeps them traceable to their markup.
+    /// </remarks>
+    private (object? Fresh, Uri? RuntimeUri) Build(TextProjection fragment, List<MarkupDiagnostic> diagnostics)
+    {
+        var configuration = new RuntimeXamlLoaderConfiguration
+        {
+            LocalAssembly = Options.LocalAssembly,
+            UseCompiledBindingsByDefault = Options.UseCompiledBindingsByDefault,
+            DesignMode = Options.Mode == XamlLoadMode.Design,
+            CreateSourceInfo = true,
+            DiagnosticHandler = diagnostic =>
+            {
+                diagnostics.Add(Translate(diagnostic, Document, fragment));
+
+                return diagnostic.Severity;
+            },
+        };
+
+        try
+        {
+            object fresh = AvaloniaRuntimeXamlLoader.Load(
+                new RuntimeXamlLoaderDocument(Document.BaseUri, fragment.Text.ToString()), configuration);
+
+            return (fresh, XamlSourceInfo.GetXamlSourceInfo(fresh)?.SourceUri);
+        }
+        catch (Exception error)
+        {
+            diagnostics.Add(MarkupDiagnostic.Synchronization(
+                XamlLoaderDiagnosticCodes.UpdateNotApplied,
+                $"Rebuilding part of the document failed: {error.Message}",
+                MarkupDiagnosticSeverity.Error,
+                Document.Uri));
+
+            return (null, null);
+        }
+    }
+
+    /// <summary>Reports whether a strategy is one that builds markup again rather than setting a value.</summary>
+    private static bool Rebuilds(XamlUpdateStrategy strategy) =>
+        strategy is XamlUpdateStrategy.ReplaceResource
+            or XamlUpdateStrategy.ReloadStyle
+            or XamlUpdateStrategy.ReloadTheme
+            or XamlUpdateStrategy.ReloadTemplate
+            or XamlUpdateStrategy.ReloadSubtree;
 
     /// <summary>Records an update that was not applied, keeping the document it was offered.</summary>
     private XamlUpdateResult Refuse(

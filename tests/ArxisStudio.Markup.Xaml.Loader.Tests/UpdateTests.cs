@@ -4,6 +4,7 @@ using System.Threading.Tasks;
 using ArxisStudio.Markup.Xaml.Loader.TestControls;
 using Avalonia.Controls;
 using Avalonia.Headless.XUnit;
+using Avalonia.VisualTree;
 using Xunit;
 
 namespace ArxisStudio.Markup.Xaml.Loader.Tests;
@@ -391,6 +392,262 @@ public sealed class UpdateTests
             ColorsUri, TestContext.Current.CancellationToken);
 
         Assert.Equal(XamlUpdateStrategy.ReplaceResource, changed.Strategy);
+    }
+
+    [AvaloniaFact]
+    public async Task AReloadedStyleRestylesTheControlItTargets()
+    {
+        string Xaml(string width) =>
+            $"<Border xmlns=\"{AvaloniaNamespace}\">\n" +
+            "  <Border.Styles>\n" +
+            $"    <Style Selector=\"Border\"><Setter Property=\"Width\" Value=\"{width}\" /></Style>\n" +
+            "  </Border.Styles>\n" +
+            "  <Border />\n" +
+            "</Border>";
+
+        await using XamlLoadSession session = await Load(Xaml("10"));
+
+        var root = session.GetRoot<Border>();
+        var inner = (Border)root.Child!;
+
+        root.Measure(new Avalonia.Size(1000, 1000));
+
+        Assert.Equal(10d, inner.Width);
+
+        XamlUpdateResult result = await Update(session, Xaml("20"));
+
+        Assert.True(result.Applied, string.Join(" | ", result.Diagnostics));
+        Assert.Equal(XamlUpdateStrategy.ReloadStyle, result.Strategy);
+
+        root.Measure(new Avalonia.Size(1000, 1000));
+
+        // The control was never rebuilt; the style it is matched by was.
+        Assert.Same(inner, root.Child);
+        Assert.Equal(20d, inner.Width);
+    }
+
+    [AvaloniaFact]
+    public async Task AReplacedResourceReachesADynamicReference()
+    {
+        string Xaml(string colour) =>
+            $"<Border xmlns=\"{AvaloniaNamespace}\" xmlns:x=\"http://schemas.microsoft.com/winfx/2006/xaml\">\n" +
+            "  <Border.Resources>\n" +
+            $"    <SolidColorBrush x:Key=\"Accent\" Color=\"{colour}\" />\n" +
+            "  </Border.Resources>\n" +
+            "  <Border Background=\"{DynamicResource Accent}\" />\n" +
+            "</Border>";
+
+        await using XamlLoadSession session = await Load(Xaml("Red"));
+
+        var inner = (Border)session.GetRoot<Border>().Child!;
+
+        Assert.Equal(Avalonia.Media.Colors.Red, ((Avalonia.Media.SolidColorBrush)inner.Background!).Color);
+
+        XamlUpdateResult result = await Update(session, Xaml("Blue"));
+
+        Assert.True(result.Applied, string.Join(" | ", result.Diagnostics));
+        Assert.Equal(XamlUpdateStrategy.ReplaceResource, result.Strategy);
+        Assert.Equal(Avalonia.Media.Colors.Blue, ((Avalonia.Media.SolidColorBrush)inner.Background!).Color);
+    }
+
+    [AvaloniaFact]
+    public async Task AStaticReferenceIsRebuiltWhenTheResourceItReadIsReplaced()
+    {
+        string Xaml(string colour) =>
+            $"<StackPanel xmlns=\"{AvaloniaNamespace}\" xmlns:x=\"http://schemas.microsoft.com/winfx/2006/xaml\">\n" +
+            "  <StackPanel.Resources>\n" +
+            $"    <SolidColorBrush x:Key=\"Accent\" Color=\"{colour}\" />\n" +
+            "  </StackPanel.Resources>\n" +
+            "  <Border Background=\"{StaticResource Accent}\" />\n" +
+            "</StackPanel>";
+
+        await using XamlLoadSession session = await Load(Xaml("Red"));
+
+        var panel = session.GetRoot<StackPanel>();
+
+        Assert.Equal(
+            Avalonia.Media.Colors.Red,
+            ((Avalonia.Media.SolidColorBrush)((Border)panel.Children[0]).Background!).Color);
+
+        XamlUpdateResult result = await Update(session, Xaml("Blue"));
+
+        // A static reference is resolved once, while the object is being built, so replacing the
+        // dictionary entry alone would leave the border holding the brush it was given.
+        Assert.True(result.Applied, string.Join(" | ", result.Diagnostics));
+        Assert.Equal(XamlUpdateStrategy.ReloadSubtree, result.Strategy);
+        Assert.Equal(
+            Avalonia.Media.Colors.Blue,
+            ((Avalonia.Media.SolidColorBrush)((Border)panel.Children[0]).Background!).Color);
+    }
+
+    [AvaloniaFact]
+    public async Task AReloadedTemplateRecreatesTheContentItProduces()
+    {
+        string Xaml(string width) =>
+            $"<Button xmlns=\"{AvaloniaNamespace}\" Width=\"200\" Height=\"50\">\n" +
+            "  <Button.Template>\n" +
+            $"    <ControlTemplate><Border Name=\"PART_Root\" Width=\"{width}\" /></ControlTemplate>\n" +
+            "  </Button.Template>\n" +
+            "</Button>";
+
+        await using XamlLoadSession session = await Load(Xaml("10"));
+
+        var button = session.GetRoot<Button>();
+
+        button.ApplyTemplate();
+
+        Assert.Equal(10d, button.GetVisualChildren().OfType<Border>().First().Width);
+
+        XamlUpdateResult result = await Update(session, Xaml("20"));
+
+        Assert.True(result.Applied, string.Join(" | ", result.Diagnostics));
+        Assert.Equal(XamlUpdateStrategy.ReloadTemplate, result.Strategy);
+
+        button.ApplyTemplate();
+
+        Assert.Equal(20d, button.GetVisualChildren().OfType<Border>().First().Width);
+    }
+
+    [AvaloniaFact]
+    public async Task AChildAddedToANestedElementIsBuiltInPlace()
+    {
+        await using XamlLoadSession session = await Load(
+            $"<Border xmlns=\"{AvaloniaNamespace}\">\n" +
+            "  <StackPanel><TextBlock Text=\"first\" /></StackPanel>\n" +
+            "</Border>");
+
+        var panel = (StackPanel)session.GetRoot<Border>().Child!;
+
+        XamlUpdateResult result = await Update(
+            session,
+            $"<Border xmlns=\"{AvaloniaNamespace}\">\n" +
+            "  <StackPanel><TextBlock Text=\"first\" /><TextBlock Text=\"second\" /></StackPanel>\n" +
+            "</Border>");
+
+        Assert.True(result.Applied, string.Join(" | ", result.Diagnostics));
+        Assert.Equal(XamlUpdateStrategy.ReloadSubtree, result.Strategy);
+
+        // The panel is the same panel: only what is inside it was built again.
+        Assert.Same(panel, session.GetRoot<Border>().Child);
+        Assert.Equal(2, panel.Children.Count);
+        Assert.Equal("second", ((TextBlock)panel.Children[1]).Text);
+    }
+
+    [AvaloniaFact]
+    public async Task AChildAddedToTheRootIsBuiltInPlace()
+    {
+        await using XamlLoadSession session = await Load(
+            $"<StackPanel xmlns=\"{AvaloniaNamespace}\"><TextBlock Text=\"first\" /></StackPanel>");
+
+        var panel = session.GetRoot<StackPanel>();
+
+        XamlUpdateResult result = await Update(
+            session,
+            $"<StackPanel xmlns=\"{AvaloniaNamespace}\">" +
+            "<TextBlock Text=\"first\" /><TextBlock Text=\"second\" /></StackPanel>");
+
+        // The root has no slot to be put back into, so its content is rebuilt inside it and the
+        // session — which is built around that object — keeps working.
+        Assert.True(result.Applied, string.Join(" | ", result.Diagnostics));
+        Assert.Same(panel, session.RootObject);
+        Assert.Equal(2, panel.Children.Count);
+    }
+
+    [AvaloniaFact]
+    public async Task ARebuiltObjectIsStillTraceableToItsMarkup()
+    {
+        await using XamlLoadSession session = await Load(
+            $"<Border xmlns=\"{AvaloniaNamespace}\">\n" +
+            "  <StackPanel><TextBlock Text=\"first\" /></StackPanel>\n" +
+            "</Border>");
+
+        Assert.True((await Update(
+            session,
+            $"<Border xmlns=\"{AvaloniaNamespace}\">\n" +
+            "  <StackPanel><TextBlock Text=\"first\" /><TextBlock Name=\"Added\" Text=\"second\" /></StackPanel>\n" +
+            "</Border>")).Applied);
+
+        var panel = (StackPanel)session.GetRoot<Border>().Child!;
+        XamlElement element = Assert.IsType<XamlElement>(session.GetElement(panel.Children[1]));
+
+        // The fragment Avalonia built it from is a text of its own, and the map has to know
+        // which document that text was a projection of.
+        Assert.Contains("Name=\"Added\"", element.GetSourceText(), StringComparison.Ordinal);
+        Assert.Equal(XamlObjectOrigin.Document, session.GetOrigin(panel.Children[1]));
+    }
+
+    [AvaloniaFact]
+    public async Task AFragmentThatWillNotBuildLeavesTheTreeAlone()
+    {
+        await using XamlLoadSession session = await Load(
+            $"<Border xmlns=\"{AvaloniaNamespace}\">\n" +
+            "  <StackPanel><TextBlock Text=\"first\" /></StackPanel>\n" +
+            "</Border>");
+
+        var panel = (StackPanel)session.GetRoot<Border>().Child!;
+
+        XamlUpdateResult result = await Update(
+            session,
+            $"<Border xmlns=\"{AvaloniaNamespace}\">\n" +
+            "  <StackPanel><TextBlock Text=\"first\" /><NoSuchControl /></StackPanel>\n" +
+            "</Border>");
+
+        Assert.False(result.Applied);
+        Assert.Single(panel.Children);
+        Assert.NotNull(session.PendingDocument);
+    }
+
+    [AvaloniaFact]
+    public async Task AChangedIncludeIsRebuiltWhereItWasExpanded()
+    {
+        var resources = new InMemoryResourceResolver();
+        XamlLoadEnvironment defaults = XamlLoadEnvironment.CreateDefault();
+
+        string Dictionary(string colour) =>
+            $"<ResourceDictionary xmlns=\"{AvaloniaNamespace}\"\n" +
+            "                    xmlns:x=\"http://schemas.microsoft.com/winfx/2006/xaml\">\n" +
+            $"  <SolidColorBrush x:Key=\"Accent\" Color=\"{colour}\" />\n" +
+            "</ResourceDictionary>";
+
+        resources.Update(ColorsUri, Dictionary("Red"));
+
+        var environment = new XamlLoadEnvironment
+        {
+            SourceProvider = defaults.SourceProvider,
+            AssemblyResolver = defaults.AssemblyResolver,
+            TypeResolver = defaults.TypeResolver,
+            ResourceResolver = new CompositeResourceResolver(resources, defaults.ResourceResolver),
+        };
+
+        await using XamlLoadSession session = await XamlLoadSession.CreateAsync(
+            Parse(
+                $"<Border xmlns=\"{AvaloniaNamespace}\" xmlns:x=\"http://schemas.microsoft.com/winfx/2006/xaml\">\n" +
+                "  <Border.Resources>\n" +
+                "    <ResourceDictionary>\n" +
+                "      <ResourceDictionary.MergedDictionaries>\n" +
+                "        <ResourceInclude Source=\"/Themes/Colors.axaml\" />\n" +
+                "      </ResourceDictionary.MergedDictionaries>\n" +
+                "    </ResourceDictionary>\n" +
+                "  </Border.Resources>\n" +
+                "  <Border Background=\"{DynamicResource Accent}\" />\n" +
+                "</Border>"),
+            environment,
+            cancellationToken: TestContext.Current.CancellationToken);
+
+        var inner = (Border)session.GetRoot<Border>().Child!;
+
+        Assert.Equal(Avalonia.Media.Colors.Red, ((Avalonia.Media.SolidColorBrush)inner.Background!).Color);
+
+        resources.Update(ColorsUri, Dictionary("Blue"));
+
+        XamlUpdateResult result = await session.ApplySourceUpdateAsync(
+            ColorsUri, TestContext.Current.CancellationToken);
+
+        // The document reads the same; what changed is a file it pulls in, so what is rebuilt is
+        // the element the include was expanded inside.
+        Assert.True(result.Applied, string.Join(" | ", result.Diagnostics));
+        Assert.Equal(XamlUpdateStrategy.ReplaceResource, result.Strategy);
+        Assert.Equal(Avalonia.Media.Colors.Blue, ((Avalonia.Media.SolidColorBrush)inner.Background!).Color);
     }
 
     [AvaloniaFact]

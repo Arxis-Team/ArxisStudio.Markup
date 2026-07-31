@@ -62,8 +62,83 @@ internal static class XamlDocumentDiff
 
         CompareElements(before, after, changes);
 
-        return changes.ToImmutable();
+        return
+        [
+            .. changes
+                .SelectMany(change => Consumers(change, loaded, updated))
+
+                // Rebuilding the root object would leave nowhere to put it: the caller holds it,
+                // and a session is built around it. That is the one case a new session is for.
+                .Select(change => change.ReplacesObject && ReferenceEquals(change.OldElement, before)
+                    ? new XamlDocumentChange(XamlUpdateStrategy.RecreateSession, before, after, null)
+                    : change)
+
+                // Smallest first, so a resource is in place before anything that reads it is
+                // rebuilt from a document that expects the new value.
+                .OrderBy(static change => change.Strategy),
+        ];
     }
+
+    /// <summary>
+    /// Adds the elements that read a changed resource with <c>StaticResource</c> to the changes.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// A static reference is resolved once, while the object is being built, so replacing the
+    /// dictionary entry does nothing for anything already holding the old value. Whoever reads it
+    /// has to be built again — which is the contract's separate row for a static resource, and
+    /// the difference between an update that visibly works and one that quietly does not.
+    /// </para>
+    /// <para>
+    /// What is rebuilt is the element that owns the dictionary, not the reader. A reader built on
+    /// its own has no dictionary to read: a static reference is resolved against the resources in
+    /// scope where the markup sits, and the smallest piece of markup that still has them is the
+    /// one that declares them.
+    /// </para>
+    /// </remarks>
+    private static IEnumerable<XamlDocumentChange> Consumers(
+        XamlDocumentChange change,
+        XamlDocument loaded,
+        XamlDocument updated)
+    {
+        yield return change;
+
+        if (change.Strategy != XamlUpdateStrategy.ReplaceResource
+            || change.OldElement is not { } keyed
+            || keyed.GetDirective("Key") is not { } key
+            || !loaded.DescendantElements().Any(element => ReadsStatically(element, key)))
+        {
+            yield break;
+        }
+
+        int depth = 0;
+
+        foreach (XamlElement ancestor in keyed.AncestorsAndSelf().OfType<XamlElement>())
+        {
+            // Past the dictionary and the Resources it hangs off, to whatever declares them.
+            if (depth > 0
+                && !ancestor.IsPropertyElementSyntax
+                && !string.Equals(ancestor.Name.LocalName, "ResourceDictionary", StringComparison.Ordinal))
+            {
+                if (Ancestor(change.NewElement ?? keyed, depth) is { } after)
+                {
+                    yield return Structural(ancestor, after, replacesObject: false);
+                }
+
+                yield break;
+            }
+
+            depth++;
+        }
+    }
+
+    /// <summary>Reports whether any of an element's attributes reads a key with <c>StaticResource</c>.</summary>
+    private static bool ReadsStatically(XamlElement element, string key) =>
+        element.Attributes.Any(attribute =>
+            attribute.GetValue() is XamlMarkupExtensionValue extension
+            && string.Equals(extension.TypeName.LocalName, "StaticResource", StringComparison.Ordinal)
+            && extension.PositionalArguments.Any(argument =>
+                string.Equals(argument.Value.ToXamlText(), key, StringComparison.Ordinal)));
 
     /// <summary>Gets the largest strategy a set of changes calls for.</summary>
     internal static XamlUpdateStrategy Largest(ImmutableArray<XamlDocumentChange> changes) =>
@@ -94,7 +169,10 @@ internal static class XamlDocumentDiff
         if (beforeChildren.Length != afterChildren.Length
             || !SignificantText(before).SequenceEqual(SignificantText(after), StringComparer.Ordinal))
         {
-            changes.Add(Structural(before, after));
+            // The element is still the same element; only what is inside it differs. Rebuilding
+            // its content leaves the object itself, and everything holding a reference to it,
+            // alone — and works at the root, where there is no slot to put a new object into.
+            changes.Add(Structural(before, after, replacesObject: false));
 
             return;
         }
@@ -163,11 +241,16 @@ internal static class XamlDocumentDiff
 
         if (Container(before) is { } container)
         {
+            // A style, a theme, a template or a resource is rebuilt whole and put back in the
+            // collection it came from; there is no "content" of one that means anything alone.
             return new XamlDocumentChange(
                 container.Strategy,
                 container.Element,
                 Ancestor(after, container.Depth),
-                null);
+                null)
+            {
+                ReplacesObject = true,
+            };
         }
 
         // An expression is resolved while objects are built — a binding needs its source, a
@@ -239,8 +322,11 @@ internal static class XamlDocumentDiff
         return node as XamlElement;
     }
 
-    private static XamlDocumentChange Structural(XamlElement before, XamlElement after) =>
-        new(XamlUpdateStrategy.ReloadSubtree, before, after, null);
+    private static XamlDocumentChange Structural(
+        XamlElement before,
+        XamlElement after,
+        bool replacesObject = true) =>
+        new(XamlUpdateStrategy.ReloadSubtree, before, after, null) { ReplacesObject = replacesObject };
 
     /// <summary>Gets the attributes that can make a difference to an object.</summary>
     private static IEnumerable<XamlAttribute> Meaningful(XamlElement element) =>
