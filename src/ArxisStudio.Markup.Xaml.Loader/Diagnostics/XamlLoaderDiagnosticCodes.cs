@@ -48,6 +48,9 @@ public static class XamlLoaderDiagnosticCodes
     /// </summary>
     public const string IncludeNamespaceConflict = "AXM2011";
 
+    /// <summary>A markup extension named a type that nothing in scope declares.</summary>
+    public const string MarkupExtensionFailure = "AXM2012";
+
     /// <summary>Avalonia reported a problem while loading the document.</summary>
     public const string RuntimeLoadFailure = "AXM3001";
 
@@ -59,6 +62,9 @@ public static class XamlLoaderDiagnosticCodes
 
     /// <summary>An Avalonia object was touched from a thread that does not own it.</summary>
     public const string InvalidThreadAccess = "AXM3004";
+
+    /// <summary>An event attribute named a handler the root instance does not declare.</summary>
+    public const string MissingEventHandler = "AXM3005";
 
     /// <summary>A member named in an edit is not a member of the target type.</summary>
     public const string UnresolvedMember = "AXM3010";

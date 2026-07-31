@@ -55,7 +55,7 @@ internal static class XamlDocumentProjector
         XamlLoadEnvironment environment,
         List<MarkupDiagnostic> diagnostics,
         CancellationToken cancellationToken) =>
-        ProjectAsync(document, fragment: null, environment, diagnostics, cancellationToken);
+        ProjectAsync(document, fragment: null, environment, diagnostics, [], cancellationToken);
 
     /// <summary>
     /// Projects one element of a document as a document in its own right.
@@ -78,6 +78,10 @@ internal static class XamlDocumentProjector
     /// <param name="fragment">The element to project on its own.</param>
     /// <param name="environment">The environment whose resource resolver finds the includes.</param>
     /// <param name="diagnostics">Collects everything noticed on the way.</param>
+    /// <param name="unloadable">
+    /// Attributes the load has already been told it cannot be given, such as an event naming a
+    /// handler nobody has written.
+    /// </param>
     /// <param name="cancellationToken">A token to observe while resolving and reading.</param>
     /// <returns>The projection, whose text is the element and nothing else.</returns>
     internal static async ValueTask<TextProjection> ProjectAsync(
@@ -85,6 +89,7 @@ internal static class XamlDocumentProjector
         XamlElement? fragment,
         XamlLoadEnvironment environment,
         List<MarkupDiagnostic> diagnostics,
+        IReadOnlyCollection<TextSpan> unloadable,
         CancellationToken cancellationToken)
     {
         var state = new State(environment, diagnostics);
@@ -110,6 +115,7 @@ internal static class XamlDocumentProjector
                 state,
                 isIncluded: false,
                 ReferenceEquals(fragment, document.Root) ? null : fragment,
+                unloadable,
                 cancellationToken)
             .ConfigureAwait(false);
     }
@@ -119,6 +125,7 @@ internal static class XamlDocumentProjector
         State state,
         bool isIncluded,
         XamlElement? fragment,
+        IReadOnlyCollection<TextSpan> unloadable,
         CancellationToken cancellationToken)
     {
         ImmutableArray<XamlResourceReference> references =
@@ -173,7 +180,7 @@ internal static class XamlDocumentProjector
 
             try
             {
-                inner = await ProjectAsync(included, state, isIncluded: true, null, cancellationToken)
+                inner = await ProjectAsync(included, state, isIncluded: true, null, [], cancellationToken)
                     .ConfigureAwait(false);
             }
             finally
@@ -188,7 +195,7 @@ internal static class XamlDocumentProjector
             spliced.Add(reference.Element.Span);
         }
 
-        Strip(document, builder, spliced, fragment);
+        Strip(document, builder, spliced, fragment, unloadable);
         Rebind(document, builder, state, isIncluded, fragment);
 
         return builder.ToProjection();
@@ -218,7 +225,8 @@ internal static class XamlDocumentProjector
         XamlDocument document,
         TextProjectionBuilder builder,
         List<TextSpan> spliced,
-        XamlElement? fragment)
+        XamlElement? fragment,
+        IReadOnlyCollection<TextSpan> unloadable)
     {
         foreach (XamlElement element in document.DescendantElements())
         {
@@ -231,7 +239,7 @@ internal static class XamlDocumentProjector
 
             foreach (XamlAttribute attribute in element.Attributes)
             {
-                if (XamlDesignValues.IsHiddenFromLoader(attribute, element))
+                if (XamlDesignValues.IsHiddenFromLoader(attribute, element) || unloadable.Contains(attribute.Span))
                 {
                     builder.Replace(WithLeadingSpace(document.SourceText, attribute.Span), string.Empty);
                 }

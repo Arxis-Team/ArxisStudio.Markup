@@ -47,6 +47,79 @@ public sealed class RootClassTests
         $"</{rootElement}>";
 
     [AvaloniaFact]
+    public async Task AHandlerNobodyHasWrittenIsReportedAndTheRestStillLoads()
+    {
+        await using XamlLoadSession session = await XamlLoadSession.CreateAsync(
+            Parse(ViewXaml(content: "  <Button Content=\"Save\" Click=\"NotWrittenYet\" />\n")),
+            Environment(),
+            cancellationToken: TestContext.Current.CancellationToken);
+
+        // Avalonia fails the whole document over this, and a handler nobody has written yet is
+        // the ordinary state of a file being worked on.
+        MarkupDiagnostic reported = Assert.Single(
+            session.Diagnostics,
+            static d => d.Code == XamlLoaderDiagnosticCodes.MissingEventHandler);
+
+        Assert.Equal(MarkupDiagnosticSeverity.Warning, reported.Severity);
+        Assert.NotNull(reported.Span);
+
+        var view = session.GetRoot<CustomerView>();
+
+        Assert.IsType<Button>(view.Content);
+        Assert.DoesNotContain(session.Diagnostics, static d => d.IsError);
+
+        // The document itself still says what its author wrote.
+        Assert.Contains("Click=\"NotWrittenYet\"", session.Document.GetText(), StringComparison.Ordinal);
+    }
+
+    [AvaloniaFact]
+    public async Task AHandlerThatExistsIsNotReported()
+    {
+        await using XamlLoadSession session = await XamlLoadSession.CreateAsync(
+            Parse(ViewXaml(content: "  <Button Content=\"Save\" Click=\"SaveClicked\" />\n")),
+            Environment(),
+            cancellationToken: TestContext.Current.CancellationToken);
+
+        Assert.DoesNotContain(
+            session.Diagnostics,
+            static d => d.Code == XamlLoaderDiagnosticCodes.MissingEventHandler);
+    }
+
+    [AvaloniaFact]
+    public async Task AMistypedMarkupExtensionIsReportedAgainstItsValue()
+    {
+        (XamlLoadSession? session, XamlLoadResult result) = await XamlLoadSession.TryCreateAsync(
+            Parse(ViewXaml(content: "  <Button Content=\"{StaticResourse Missing}\" />\n")),
+            Environment(),
+            cancellationToken: TestContext.Current.CancellationToken);
+
+        await using (session)
+        {
+            // Avalonia's own report for this is about an emitter, at a position in a text the
+            // caller never wrote. This one names the extension and points at the value.
+            MarkupDiagnostic reported = Assert.Single(
+                result.Diagnostics,
+                static d => d.Code == XamlLoaderDiagnosticCodes.MarkupExtensionFailure);
+
+            Assert.Contains("StaticResourse", reported.Message, StringComparison.Ordinal);
+            Assert.NotNull(reported.Span);
+        }
+    }
+
+    [AvaloniaFact]
+    public async Task TheExtensionsXamlItselfDefinesAreNotReported()
+    {
+        await using XamlLoadSession session = await XamlLoadSession.CreateAsync(
+            Parse(ViewXaml(content: "  <Button Content=\"{Binding Name}\" Tag=\"{x:Null}\" />\n")),
+            Environment(),
+            cancellationToken: TestContext.Current.CancellationToken);
+
+        Assert.DoesNotContain(
+            session.Diagnostics,
+            static d => d.Code == XamlLoaderDiagnosticCodes.MarkupExtensionFailure);
+    }
+
+    [AvaloniaFact]
     public async Task ACompatibleRootClassIsInstantiatedAndPopulated()
     {
         await using XamlLoadSession session = await XamlLoadSession.CreateAsync(

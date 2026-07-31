@@ -145,16 +145,10 @@ public sealed partial class XamlLoadSession : IAsyncDisposable
             diagnostics.Add(diagnostic);
         }
 
-        // Includes are resolved before anything is created, because Avalonia resolves them
-        // itself during the load and throws when it cannot. Resolving them here through the
-        // environment, and handing over text with their content already in place, is what makes
-        // the caller's own providers the ones that answer.
-        TextProjection projection = await XamlDocumentProjector
-            .ProjectAsync(document, environment, diagnostics, cancellationToken).ConfigureAwait(false);
-
         // x:Class has to be resolved and instantiated before loading, because Avalonia
         // populates an instance the caller supplies rather than creating one for it. This also
-        // gives Avalonia the object whose methods the document's event handlers name.
+        // gives Avalonia the object whose methods the document's event handlers name — and it
+        // is what the attributes are checked against, so it comes first.
         object? rootInstance = await environment.Dispatcher
             .InvokeAsync(
                 () => XamlRootClass
@@ -163,6 +157,18 @@ public sealed partial class XamlLoadSession : IAsyncDisposable
                     .GetAwaiter()
                     .GetResult(),
                 cancellationToken)
+            .ConfigureAwait(false);
+
+        ImmutableArray<TextSpan> unloadable = await XamlAttributeChecks
+            .RunAsync(document, rootInstance?.GetType(), environment, diagnostics, cancellationToken)
+            .ConfigureAwait(false);
+
+        // Includes are resolved before anything is created, because Avalonia resolves them
+        // itself during the load and throws when it cannot. Resolving them here through the
+        // environment, and handing over text with their content already in place, is what makes
+        // the caller's own providers the ones that answer.
+        TextProjection projection = await XamlDocumentProjector
+            .ProjectAsync(document, null, environment, diagnostics, unloadable, cancellationToken)
             .ConfigureAwait(false);
 
         object? root = await environment.Dispatcher

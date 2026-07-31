@@ -221,7 +221,7 @@ public sealed partial class XamlLoadSession
             fragments.Add((
                 change,
                 await XamlDocumentProjector
-                    .ProjectAsync(updated, element, Environment, diagnostics, cancellationToken)
+                    .ProjectAsync(updated, element, Environment, diagnostics, [], cancellationToken)
                     .ConfigureAwait(false)));
         }
 

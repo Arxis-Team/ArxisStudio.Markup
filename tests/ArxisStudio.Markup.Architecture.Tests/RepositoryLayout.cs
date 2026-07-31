@@ -29,9 +29,23 @@ internal static class RepositoryLayout
         ReadReferences(package, "ProjectReference", static value =>
             Path.GetFileNameWithoutExtension(value.Replace('\\', '/')));
 
-    /// <summary>NuGet package ids each package declares a <c>PackageReference</c> to.</summary>
+    /// <summary>
+    /// NuGet package ids each package ends up referencing, its own project file and the shared
+    /// <c>src/Directory.Build.props</c> together.
+    /// </summary>
+    /// <remarks>
+    /// A reference declared once for all three is still a reference each of them has. Reading
+    /// only the project file would miss both what they share and what could be smuggled in
+    /// through it.
+    /// </remarks>
     public static IReadOnlySet<string> PackageReferencesOf(string package) =>
-        ReadReferences(package, "PackageReference", static value => value);
+        new HashSet<string>(
+            ReadReferences(package, "PackageReference", static value => value)
+                .Concat(ReadFrom(
+                    Path.Combine(RepositoryRoot, "src", "Directory.Build.props"),
+                    "PackageReference",
+                    static value => value)),
+            StringComparer.Ordinal);
 
     /// <summary>Loads a shipping assembly from the test output directory.</summary>
     public static Assembly LoadAssembly(string package) => Assembly.Load(new AssemblyName(package));
@@ -50,13 +64,18 @@ internal static class RepositoryLayout
                 projectPath);
         }
 
-        return XDocument.Load(projectPath)
-            .Descendants(itemName)
-            .Select(element => element.Attribute("Include")?.Value)
-            .Where(static value => !string.IsNullOrWhiteSpace(value))
-            .Select(value => select(value!))
-            .ToHashSet(StringComparer.Ordinal);
+        return ReadFrom(projectPath, itemName, select);
     }
+
+    private static IReadOnlySet<string> ReadFrom(string path, string itemName, Func<string, string> select) =>
+        !File.Exists(path)
+            ? new HashSet<string>(StringComparer.Ordinal)
+            : XDocument.Load(path)
+                .Descendants(itemName)
+                .Select(element => element.Attribute("Include")?.Value)
+                .Where(static value => !string.IsNullOrWhiteSpace(value))
+                .Select(value => select(value!))
+                .ToHashSet(StringComparer.Ordinal);
 
     private static string ResolveRepositoryRoot()
     {
