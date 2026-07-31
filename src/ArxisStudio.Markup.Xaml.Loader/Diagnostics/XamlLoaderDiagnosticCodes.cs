@@ -60,4 +60,16 @@ public static class XamlLoaderDiagnosticCodes
 
     /// <summary>An edit targeted an object nothing in this document declares.</summary>
     public const string NoSourceDeclaration = "AXM3016";
+
+    /// <summary>The type named by <c>x:Class</c> could not be resolved.</summary>
+    public const string UnresolvedRootType = "AXM3020";
+
+    /// <summary>The type named by <c>x:Class</c> is not compatible with the root element.</summary>
+    public const string IncompatibleRootType = "AXM3021";
+
+    /// <summary>Creating the root instance threw.</summary>
+    public const string RootInstanceCreationFailure = "AXM3022";
+
+    /// <summary>A root-instance factory returned something the document cannot populate.</summary>
+    public const string InvalidRootFactoryResult = "AXM3023";
 }

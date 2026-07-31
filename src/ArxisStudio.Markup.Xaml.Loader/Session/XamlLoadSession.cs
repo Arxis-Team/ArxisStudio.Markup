@@ -130,8 +130,21 @@ public sealed partial class XamlLoadSession : IAsyncDisposable
             diagnostics.Add(diagnostic);
         }
 
+        // x:Class has to be resolved and instantiated before loading, because Avalonia
+        // populates an instance the caller supplies rather than creating one for it. This also
+        // gives Avalonia the object whose methods the document's event handlers name.
+        object? rootInstance = await environment.Dispatcher
+            .InvokeAsync(
+                () => XamlRootClass
+                    .CreateInstanceAsync(document, environment, options, diagnostics, cancellationToken)
+                    .AsTask()
+                    .GetAwaiter()
+                    .GetResult(),
+                cancellationToken)
+            .ConfigureAwait(false);
+
         object? root = await environment.Dispatcher
-            .InvokeAsync(() => Load(document, options, diagnostics), cancellationToken)
+            .InvokeAsync(() => Load(document, options, rootInstance, diagnostics), cancellationToken)
             .ConfigureAwait(false);
 
         var result = new XamlLoadResult { RootObject = root, Diagnostics = [.. diagnostics] };
@@ -190,7 +203,11 @@ public sealed partial class XamlLoadSession : IAsyncDisposable
     }
 
     /// <summary>Hands the document's text to Avalonia's runtime loader.</summary>
-    private static object? Load(XamlDocument document, XamlLoadOptions options, List<MarkupDiagnostic> diagnostics)
+    private static object? Load(
+        XamlDocument document,
+        XamlLoadOptions options,
+        object? rootInstance,
+        List<MarkupDiagnostic> diagnostics)
     {
         var configuration = new RuntimeXamlLoaderConfiguration
         {
@@ -210,10 +227,9 @@ public sealed partial class XamlLoadSession : IAsyncDisposable
             },
         };
 
-        var loaderDocument = new RuntimeXamlLoaderDocument(document.BaseUri, document.GetText())
-        {
-            ServiceProvider = null,
-        };
+        // The root-instance constructor is what makes event handlers resolvable: Avalonia looks
+        // for the named methods on the object it is populating.
+        var loaderDocument = new RuntimeXamlLoaderDocument(document.BaseUri, rootInstance, document.GetText());
 
         try
         {

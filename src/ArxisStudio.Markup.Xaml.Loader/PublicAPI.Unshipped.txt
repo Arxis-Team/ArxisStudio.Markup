@@ -16,6 +16,9 @@ ArxisStudio.Markup.Xaml.Loader.CompositeResourceResolver.CompositeResourceResolv
 ArxisStudio.Markup.Xaml.Loader.CompositeResourceResolver.CompositeResourceResolver(params ArxisStudio.Markup.Xaml.Loader.IXamlResourceResolver![]! resolvers) -> void
 ArxisStudio.Markup.Xaml.Loader.CompositeResourceResolver.ResolveAsync(System.Uri! resourceUri, System.Uri? baseUri, System.Threading.CancellationToken cancellationToken) -> System.Threading.Tasks.ValueTask<ArxisStudio.Markup.Xaml.Loader.XamlResource?>
 ArxisStudio.Markup.Xaml.Loader.CompositeResourceResolver.Resolvers.get -> System.Collections.Generic.IReadOnlyList<ArxisStudio.Markup.Xaml.Loader.IXamlResourceResolver!>!
+ArxisStudio.Markup.Xaml.Loader.DefaultXamlRootInstanceFactory
+ArxisStudio.Markup.Xaml.Loader.DefaultXamlRootInstanceFactory.CreateAsync(System.Type! rootType, ArxisStudio.Markup.Xaml.Loader.XamlRootInstanceContext context, System.Threading.CancellationToken cancellationToken) -> System.Threading.Tasks.ValueTask<object!>
+ArxisStudio.Markup.Xaml.Loader.DefaultXamlRootInstanceFactory.DefaultXamlRootInstanceFactory() -> void
 ArxisStudio.Markup.Xaml.Loader.DirectoryAssemblyResolver
 ArxisStudio.Markup.Xaml.Loader.DirectoryAssemblyResolver.Directories.get -> System.Collections.Generic.IReadOnlyList<string!>!
 ArxisStudio.Markup.Xaml.Loader.DirectoryAssemblyResolver.DirectoryAssemblyResolver(System.Collections.Generic.IEnumerable<string!>! directories) -> void
@@ -204,12 +207,15 @@ ArxisStudio.Markup.Xaml.Loader.XamlValueSource.Template = 5 -> ArxisStudio.Marku
 ArxisStudio.Markup.Xaml.Loader.XamlValueSource.Unset = 0 -> ArxisStudio.Markup.Xaml.Loader.XamlValueSource
 const ArxisStudio.Markup.Xaml.Loader.XamlLoaderDiagnosticCodes.ExpressionNotApplied = "AXM3015" -> string!
 const ArxisStudio.Markup.Xaml.Loader.XamlLoaderDiagnosticCodes.ExpressionReplaced = "AXM3014" -> string!
+const ArxisStudio.Markup.Xaml.Loader.XamlLoaderDiagnosticCodes.IncompatibleRootType = "AXM3021" -> string!
 const ArxisStudio.Markup.Xaml.Loader.XamlLoaderDiagnosticCodes.IncompatibleValue = "AXM3012" -> string!
+const ArxisStudio.Markup.Xaml.Loader.XamlLoaderDiagnosticCodes.InvalidRootFactoryResult = "AXM3023" -> string!
 const ArxisStudio.Markup.Xaml.Loader.XamlLoaderDiagnosticCodes.InvalidThreadAccess = "AXM3004" -> string!
 const ArxisStudio.Markup.Xaml.Loader.XamlLoaderDiagnosticCodes.NoRootObject = "AXM3003" -> string!
 const ArxisStudio.Markup.Xaml.Loader.XamlLoaderDiagnosticCodes.NoSourceDeclaration = "AXM3016" -> string!
 const ArxisStudio.Markup.Xaml.Loader.XamlLoaderDiagnosticCodes.ObjectCreationFailure = "AXM3002" -> string!
 const ArxisStudio.Markup.Xaml.Loader.XamlLoaderDiagnosticCodes.ReadOnlyMember = "AXM3011" -> string!
+const ArxisStudio.Markup.Xaml.Loader.XamlLoaderDiagnosticCodes.RootInstanceCreationFailure = "AXM3022" -> string!
 const ArxisStudio.Markup.Xaml.Loader.XamlLoaderDiagnosticCodes.RuntimeLoadFailure = "AXM3001" -> string!
 const ArxisStudio.Markup.Xaml.Loader.XamlLoaderDiagnosticCodes.TypeConverterFailure = "AXM3013" -> string!
 const ArxisStudio.Markup.Xaml.Loader.XamlLoaderDiagnosticCodes.UndeclaredPrefix = "AXM2003" -> string!
@@ -217,6 +223,7 @@ const ArxisStudio.Markup.Xaml.Loader.XamlLoaderDiagnosticCodes.UnknownNamespace 
 const ArxisStudio.Markup.Xaml.Loader.XamlLoaderDiagnosticCodes.UnresolvedAssembly = "AXM2001" -> string!
 const ArxisStudio.Markup.Xaml.Loader.XamlLoaderDiagnosticCodes.UnresolvedMember = "AXM3010" -> string!
 const ArxisStudio.Markup.Xaml.Loader.XamlLoaderDiagnosticCodes.UnresolvedResource = "AXM2005" -> string!
+const ArxisStudio.Markup.Xaml.Loader.XamlLoaderDiagnosticCodes.UnresolvedRootType = "AXM3020" -> string!
 const ArxisStudio.Markup.Xaml.Loader.XamlLoaderDiagnosticCodes.UnresolvedType = "AXM2002" -> string!
 const ArxisStudio.Markup.Xaml.Loader.XamlLoaderDiagnosticCodes.UnsupportedGenericType = "AXM2006" -> string!
 override ArxisStudio.Markup.Xaml.Loader.XamlEditResult.ToString() -> string!
@@ -230,6 +237,7 @@ override ArxisStudio.Markup.Xaml.Loader.XamlTypeResolution.GetHashCode() -> int
 override ArxisStudio.Markup.Xaml.Loader.XamlTypeResolution.ToString() -> string!
 override ArxisStudio.Markup.Xaml.Loader.XamlValueInfo.ToString() -> string!
 static ArxisStudio.Markup.Xaml.Loader.AvaloniaXamlDispatcher.Instance.get -> ArxisStudio.Markup.Xaml.Loader.AvaloniaXamlDispatcher!
+static ArxisStudio.Markup.Xaml.Loader.DefaultXamlRootInstanceFactory.Instance.get -> ArxisStudio.Markup.Xaml.Loader.DefaultXamlRootInstanceFactory!
 static ArxisStudio.Markup.Xaml.Loader.FileResourceResolver.Instance.get -> ArxisStudio.Markup.Xaml.Loader.FileResourceResolver!
 static ArxisStudio.Markup.Xaml.Loader.LoadedAssemblyResolver.Instance.get -> ArxisStudio.Markup.Xaml.Loader.LoadedAssemblyResolver!
 static ArxisStudio.Markup.Xaml.Loader.XamlLoadEnvironment.CreateDefault(System.Collections.Generic.IEnumerable<System.Reflection.Assembly!>? assemblies = null, ArxisStudio.Markup.IMarkupSourceProvider? sourceProvider = null) -> ArxisStudio.Markup.Xaml.Loader.XamlLoadEnvironment!
