@@ -1,0 +1,75 @@
+# Known limitations
+
+What these packages do not do, or do only partly, as of the first preview. Everything here is
+deliberate and tested; nothing here is a bug report. Where a limitation exists because of
+something outside this repository, that is said plainly.
+
+The three rules in `README.md` are never traded away for any of it: the document stays the source
+of truth, an unchanged document round-trips byte for byte, and unknown content survives.
+
+## Includes
+
+`ResourceInclude` and `StyleInclude` are resolved through `IXamlResourceResolver` by projecting
+the document — see `docs/adr/0005-resource-includes.md` for why. That leaves four cases.
+
+- **A prefix the host already binds elsewhere.** Avalonia's parser accepts `xmlns` only on a root
+  element, so an included file's declarations are moved onto the root of the projected text. If
+  the included file binds a prefix that the host binds to a different URI, the two cannot both be
+  right once merged, and renaming one would mean rewriting every name and markup extension that
+  uses it. The include is left as written and `AXM2011` says so.
+- **`xmlns` on a non-root element of an included file.** Avalonia rejects it wherever it appears,
+  so such a file does not load standalone either. It is spliced as written and Avalonia's own
+  error is reported — against the included file, because the projection maps it there.
+- **Relative URIs outside an include's `Source`.** A relative `Source` on an include that is
+  being left as written is rewritten to the URI it already resolved to. A relative URI in any
+  other attribute — an image source, say — cannot be found without CLR metadata about what that
+  attribute means, and is not rebased. A fragment spliced from another folder can therefore carry
+  a relative asset reference that resolves against the host's folder.
+- **An include straight inside the root element.** `ApplySourceUpdateAsync` rebuilds the element
+  the include was expanded inside. When that element is the document root there is no slot to put
+  a rebuilt object into, and `AXM3040` asks for a new session instead.
+
+## Design mode
+
+- **Avalonia understands four names in the design namespace** — `d:DesignWidth`,
+  `d:DesignHeight`, `d:DataContext` and `d:PreviewWith` — and has no emitter for any other, so a
+  single `d:Text` fails the whole document in both modes. Every other design attribute is
+  therefore removed from the projected text and applied afterwards, which means it is applied as
+  an ordinary property set: it cannot do anything a property set cannot.
+- **A design value written as a markup extension** is evaluated by the load, so changing one is
+  not something re-applying design values can do. Such a change is treated as a rebuild.
+- **Elements in the design namespace** — `<d:Something>` — are not removed. They are unusual, the
+  contract asks only about attributes, and Avalonia reports them clearly enough.
+- **`mc:Ignorable`** is honoured for attributes, by namespace rather than by prefix. Ignorable
+  elements are not removed, for the same reason.
+
+## Updates
+
+- **Reordering reads as a structural change.** Elements are paired by position among their
+  siblings and nothing is matched across a move. Being cleverer risks giving a control the value
+  of whatever used to sit in its place, which is the one outcome worth being slow to avoid.
+- **A static resource rebuilds the element that declares the resources**, not the element that
+  reads them. A reader built on its own has no dictionary to read, because a static reference is
+  resolved against the resources in scope where the markup sits.
+- **A structural change at the root rebuilds the root's content in place.** The root object
+  itself survives, because a session is built around it and the caller holds it. A change to the
+  root element's own type or `x:Class` needs a new session.
+- **Positions after an edit are resolved by line and column.** Editing reparses, and the object
+  map is rebuilt from positions Avalonia recorded before it did. An edit that lengthens an
+  earlier line moves every later offset and leaves the lines alone, so lines are what survive;
+  an edit that adds or removes lines before a mapped element loses that element's mapping until
+  the next load.
+
+## Everything else
+
+- **No sandbox.** Loading a document runs constructors, setters, type converters, markup
+  extensions and any custom control code the document reaches. A caller loading XAML it did not
+  write is running code it did not write, and this library makes no attempt to prevent that.
+- **No project system.** Assemblies, resources and source arrive through the environment's
+  resolver interfaces and nowhere else. Nothing here reads a `.sln`, a `.csproj`,
+  `project.assets.json` or a package cache, and nothing here will.
+- **Avalonia thread affinity.** Parsing and text editing are free of it; creating and mutating
+  objects is not, and calling from the wrong thread fails with `AXM3004` rather than corrupting
+  state that would surface later and somewhere else.
+- **`ArxisStudio.Markup.Xaml` grants its internals to the benchmarks assembly** so that lexing
+  can be measured separately from parsing, as the contract asks. Nothing else has access.
