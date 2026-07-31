@@ -83,4 +83,16 @@ public static class XamlDiagnosticCodes
 
     /// <summary>Two edits in one operation would change overlapping regions of the document.</summary>
     public const string ConflictingEdits = "AXM1041";
+
+    /// <summary>An include element has no <c>Source</c> attribute.</summary>
+    public const string MissingIncludeSource = "AXM1050";
+
+    /// <summary>An include's <c>Source</c> could not be resolved to a URI.</summary>
+    public const string UnresolvedIncludeUri = "AXM1051";
+
+    /// <summary>A chain of includes leads back to a document already in the chain.</summary>
+    public const string ResourceIncludeCycle = "AXM1052";
+
+    /// <summary>An include points at a URI no source provider knows.</summary>
+    public const string UnresolvedIncludeDocument = "AXM1053";
 }

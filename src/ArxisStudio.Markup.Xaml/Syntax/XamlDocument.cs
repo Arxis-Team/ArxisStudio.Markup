@@ -47,6 +47,12 @@ public sealed class XamlDocument : XamlSyntaxNode
     public Uri? Uri { get; }
 
     /// <summary>
+    /// Gets the URI relative includes are resolved against, which is the document's own
+    /// location unless the parse options said otherwise.
+    /// </summary>
+    public Uri? BaseUri { get; private init; }
+
+    /// <summary>
     /// Gets the root element, or <see langword="null"/> when the document has none.
     /// </summary>
     /// <remarks>
@@ -90,7 +96,10 @@ public sealed class XamlDocument : XamlSyntaxNode
         ImmutableArray<MarkupDiagnostic> diagnostics =
             [.. lexical, .. syntactic, .. Validate(nodes, options.DocumentUri)];
 
-        return new XamlDocument(text, options.DocumentUri, tokens, nodes, diagnostics);
+        return new XamlDocument(text, options.DocumentUri, tokens, nodes, diagnostics)
+        {
+            BaseUri = options.BaseUri ?? options.DocumentUri,
+        };
     }
 
     /// <summary>Parses a string.</summary>
@@ -176,6 +185,11 @@ public sealed class XamlDocument : XamlSyntaxNode
         mode == XamlWriteMode.Format
             ? XamlFormatter.Format(this, options ?? XamlFormattingOptions.Default)
             : GetText();
+
+    /// <summary>Finds the resource and style includes this document declares, in source order.</summary>
+    /// <returns>The references, with their sources resolved against <see cref="BaseUri"/>.</returns>
+    public ImmutableArray<XamlResourceReference> GetResourceReferences() =>
+        XamlResourceAnalyzer.Discover(this);
 
     /// <summary>Gets every diagnostic the parse produced, in source order.</summary>
     /// <returns>The document's diagnostics.</returns>
