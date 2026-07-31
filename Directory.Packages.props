@@ -1,0 +1,38 @@
+<Project>
+
+  <PropertyGroup>
+    <ManagePackageVersionsCentrally>true</ManagePackageVersionsCentrally>
+    <CentralPackageTransitivePinningEnabled>true</CentralPackageTransitivePinningEnabled>
+  </PropertyGroup>
+
+  <!--
+    Avalonia. See docs/adr/0002-avalonia-version.md.
+    Referenced only by ArxisStudio.Markup.Xaml.Loader and its test project;
+    PackageBoundaryTests enforces that the two lower packages stay Avalonia-free.
+  -->
+  <ItemGroup>
+    <PackageVersion Include="Avalonia" Version="12.1.1" />
+    <PackageVersion Include="Avalonia.Markup.Xaml.Loader" Version="12.1.1" />
+    <PackageVersion Include="Avalonia.Headless" Version="12.1.1" />
+    <PackageVersion Include="Avalonia.Headless.XUnit" Version="12.1.1" />
+  </ItemGroup>
+
+  <!-- Test stack. Avalonia.Headless.XUnit 12.1.1 depends on xunit.v3 3.2.2. -->
+  <ItemGroup>
+    <PackageVersion Include="Microsoft.NET.Test.Sdk" Version="18.8.1" />
+    <PackageVersion Include="xunit.v3" Version="3.2.2" />
+    <PackageVersion Include="xunit.runner.visualstudio" Version="3.1.5" />
+    <!--
+      Golden round-trip assertions are byte-exact and hand-rolled on purpose.
+      Verify is pinned here for syntax-tree and diagnostic snapshots from milestone 3;
+      it is deliberately not referenced yet.
+    -->
+    <PackageVersion Include="Verify.XUnit" Version="31.12.5" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageVersion Include="BenchmarkDotNet" Version="0.15.8" />
+    <PackageVersion Include="Microsoft.CodeAnalysis.PublicApiAnalyzers" Version="5.6.0" />
+  </ItemGroup>
+
+</Project>

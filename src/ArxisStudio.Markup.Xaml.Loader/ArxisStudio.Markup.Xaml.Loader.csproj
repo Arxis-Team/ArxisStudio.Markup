@@ -1,0 +1,17 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <RootNamespace>ArxisStudio.Markup.Xaml.Loader</RootNamespace>
+    <Description>Connects lossless XAML documents to live Avalonia objects: load environment and resolvers, load sessions, node-to-object mapping, member classification and controlled round-trip synchronization.</Description>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="../ArxisStudio.Markup.Xaml/ArxisStudio.Markup.Xaml.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Avalonia" />
+    <PackageReference Include="Avalonia.Markup.Xaml.Loader" />
+  </ItemGroup>
+
+</Project>

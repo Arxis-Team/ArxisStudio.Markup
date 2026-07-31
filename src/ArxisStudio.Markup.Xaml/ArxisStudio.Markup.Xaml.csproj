@@ -1,0 +1,12 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <RootNamespace>ArxisStudio.Markup.Xaml</RootNamespace>
+    <Description>Lossless XAML syntax model: trivia-preserving lexer and parser, namespaces and directives, markup-extension parsing, structured editing and round-trip serialization. Requires no Avalonia runtime assemblies.</Description>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="../ArxisStudio.Markup/ArxisStudio.Markup.csproj" />
+  </ItemGroup>
+
+</Project>

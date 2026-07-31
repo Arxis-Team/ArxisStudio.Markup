@@ -1,0 +1,24 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <RootNamespace>ArxisStudio.Markup.Architecture.Tests</RootNamespace>
+  </PropertyGroup>
+
+  <!--
+    Cross-cutting guard tests. This project deliberately references all three
+    packages so it can inspect their compiled metadata; see docs/adr/0003-architecture-tests.md.
+    Keeping these tests out of the per-package suites stops the base package's
+    test project from having to reference the top of the stack.
+  -->
+  <ItemGroup>
+    <ProjectReference Include="../../src/ArxisStudio.Markup/ArxisStudio.Markup.csproj" />
+    <ProjectReference Include="../../src/ArxisStudio.Markup.Xaml/ArxisStudio.Markup.Xaml.csproj" />
+    <ProjectReference Include="../../src/ArxisStudio.Markup.Xaml.Loader/ArxisStudio.Markup.Xaml.Loader.csproj" />
+  </ItemGroup>
+
+  <!-- The declarative project graph is checked from source, so the tests need the repo root. -->
+  <ItemGroup>
+    <AssemblyMetadata Include="RepositoryRoot" Value="$([System.IO.Path]::GetFullPath('$(MSBuildThisFileDirectory)../../'))" />
+  </ItemGroup>
+
+</Project>

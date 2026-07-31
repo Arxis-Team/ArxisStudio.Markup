@@ -1,0 +1,11 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <RootNamespace>ArxisStudio.Markup.Xaml.Loader.Sample</RootNamespace>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="../../src/ArxisStudio.Markup.Xaml.Loader/ArxisStudio.Markup.Xaml.Loader.csproj" />
+  </ItemGroup>
+
+</Project>

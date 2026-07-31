@@ -1,0 +1,8 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <RootNamespace>ArxisStudio.Markup</RootNamespace>
+    <Description>Format-independent document infrastructure: source text, spans, document identity and versions, source providers, diagnostics, workspace, transactions and a dependency graph. Contains no XML, XAML or UI framework knowledge.</Description>
+  </PropertyGroup>
+
+</Project>

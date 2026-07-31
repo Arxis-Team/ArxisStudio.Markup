@@ -1,0 +1,28 @@
+## Build output
+[Bb]in/
+[Oo]bj/
+artifacts/
+*.binlog
+
+## Test output
+[Tt]est[Rr]esult*/
+*.trx
+*.coverage
+coverage*.json
+coverage*.xml
+*.received.*
+
+## BenchmarkDotNet
+BenchmarkDotNet.Artifacts/
+
+## IDE
+.idea/
+.vs/
+.vscode/
+*.user
+*.suo
+*.userprefs
+
+## OS
+.DS_Store
+Thumbs.db
