@@ -39,4 +39,25 @@ public static class XamlLoaderDiagnosticCodes
 
     /// <summary>An Avalonia object was touched from a thread that does not own it.</summary>
     public const string InvalidThreadAccess = "AXM3004";
+
+    /// <summary>A member named in an edit is not a member of the target type.</summary>
+    public const string UnresolvedMember = "AXM3010";
+
+    /// <summary>An edit targeted a member that cannot be written.</summary>
+    public const string ReadOnlyMember = "AXM3011";
+
+    /// <summary>A value could not be assigned to the member it was meant for.</summary>
+    public const string IncompatibleValue = "AXM3012";
+
+    /// <summary>A type converter refused a value.</summary>
+    public const string TypeConverterFailure = "AXM3013";
+
+    /// <summary>An edit replaced a binding or resource reference with a literal.</summary>
+    public const string ExpressionReplaced = "AXM3014";
+
+    /// <summary>An expression was written to the document but not evaluated onto the object.</summary>
+    public const string ExpressionNotApplied = "AXM3015";
+
+    /// <summary>An edit targeted an object nothing in this document declares.</summary>
+    public const string NoSourceDeclaration = "AXM3016";
 }

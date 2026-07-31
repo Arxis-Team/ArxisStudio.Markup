@@ -28,7 +28,7 @@ namespace ArxisStudio.Markup.Xaml.Loader;
 /// forks its compiler.
 /// </para>
 /// </remarks>
-public sealed class XamlLoadSession : IAsyncDisposable
+public sealed partial class XamlLoadSession : IAsyncDisposable
 {
     private readonly IXamlDispatcher _dispatcher;
 
@@ -43,14 +43,24 @@ public sealed class XamlLoadSession : IAsyncDisposable
     {
         Document = document;
         Environment = environment;
+        Objects = XamlObjectMap.Build(document, rootObject);
         Options = options;
         RootObject = rootObject;
         Diagnostics = diagnostics;
         _dispatcher = environment.Dispatcher;
     }
 
-    /// <summary>Gets the document the objects were created from.</summary>
-    public XamlDocument Document { get; }
+    /// <summary>
+    /// Gets the document the objects were created from.
+    /// </summary>
+    /// <remarks>
+    /// Advances as edits are applied, because editing reparses. Elements taken from an earlier
+    /// value describe text that has moved and are rejected if used.
+    /// </remarks>
+    public XamlDocument Document { get; private set; }
+
+    /// <summary>Gets which element of the document each loaded object came from.</summary>
+    public XamlObjectMap Objects { get; private set; }
 
     /// <summary>Gets the environment the document was loaded through.</summary>
     public XamlLoadEnvironment Environment { get; }
@@ -187,6 +197,9 @@ public sealed class XamlLoadSession : IAsyncDisposable
             LocalAssembly = options.LocalAssembly,
             UseCompiledBindingsByDefault = options.UseCompiledBindingsByDefault,
             DesignMode = options.Mode == XamlLoadMode.Design,
+
+            // The object map is built from the source information Avalonia records here.
+            CreateSourceInfo = true,
             DiagnosticHandler = diagnostic =>
             {
                 diagnostics.Add(Translate(diagnostic, document));
