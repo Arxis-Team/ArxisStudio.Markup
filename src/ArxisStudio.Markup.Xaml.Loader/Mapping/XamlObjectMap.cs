@@ -252,11 +252,42 @@ public sealed class XamlObjectMap
 
         // The recorded position lands inside the start tag, so the innermost node there is a
         // part of the element rather than the element itself.
-        int offset = Math.Min(position.Offset, Math.Max(0, document.SourceText.Length - 1));
-        XamlElement? element =
-            document.FindNode(offset)?.AncestorsAndSelf().OfType<XamlElement>().FirstOrDefault();
+        XamlElement? element = document
+            .FindNode(OffsetIn(document.SourceText, position.Offset))
+            ?.AncestorsAndSelf()
+            .OfType<XamlElement>()
+            .FirstOrDefault();
 
         return new Declaration(element, document.Uri, IsFromIncludedDocument: false);
+    }
+
+    /// <summary>
+    /// Turns an offset into the text the objects were built from into one in the document as it
+    /// stands now.
+    /// </summary>
+    /// <remarks>
+    /// The two are the same text until an edit is applied, and editing reparses: the map is then
+    /// rebuilt against a document whose text has moved on, from positions Avalonia recorded
+    /// before it did. Going back through the line and column is what survives that — an edit
+    /// that lengthens an earlier line moves every later offset and leaves the lines alone —
+    /// which is the tolerance the map had before it read positions through a projection at all.
+    /// </remarks>
+    private int OffsetIn(SourceText current, int offsetInProjectedSource)
+    {
+        if (ReferenceEquals(current, _projection.Source))
+        {
+            return Math.Min(offsetInProjectedSource, Math.Max(0, current.Length - 1));
+        }
+
+        TextPosition position = _projection.Source.Lines.GetPosition(
+            Math.Clamp(offsetInProjectedSource, 0, _projection.Source.Length));
+
+        TextLineCollection lines = current.Lines;
+        TextLine line = lines[Math.Min(position.Line, lines.Count - 1)];
+
+        return Math.Min(
+            line.Start + Math.Clamp(position.Column, 0, line.Span.Length),
+            Math.Max(0, current.Length - 1));
     }
 
     /// <summary>Gets the objects reachable from one, without leaving the logical world.</summary>

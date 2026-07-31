@@ -1,7 +1,6 @@
 using System;
 using System.Collections.Generic;
 using System.Collections.Immutable;
-using System.IO;
 using System.Linq;
 using System.Text;
 using System.Threading;
@@ -80,7 +79,12 @@ internal static class XamlIncludeProjector
         ImmutableArray<XamlResourceReference> references =
             XamlResourceAnalyzer.Discover(document, out ImmutableArray<MarkupDiagnostic> discovery);
 
-        state.Diagnostics.AddRange(discovery);
+        // A document two includes both reach is walked once per route, and what is wrong with
+        // it is wrong with it once however many routes lead there.
+        if (state.Described(document.Uri))
+        {
+            state.Diagnostics.AddRange(discovery);
+        }
 
         if (references.IsEmpty && !isIncluded)
         {
@@ -88,24 +92,37 @@ internal static class XamlIncludeProjector
         }
 
         var builder = new TextProjectionBuilder(document.SourceText, document.Uri);
+        var spliced = new List<TextSpan>();
 
         foreach (XamlResourceReference reference in references)
         {
             cancellationToken.ThrowIfCancellationRequested();
+
+            // Discovery reports every include anywhere in the document, which includes one
+            // written inside another. The outer one is replaced wholesale, so the inner one is
+            // already gone; asking to replace it as well describes two texts for one place.
+            if (spliced.Exists(span => span.Contains(reference.Element.Span)))
+            {
+                continue;
+            }
 
             // A Source written as a markup extension, or a relative one with no base URI to
             // resolve it against. Discovery has already said so where there was anything to
             // say; either way the include goes to Avalonia as written.
             if (reference.ResolvedUri is not { } uri)
             {
+                Rebase(reference, builder, isIncluded);
+
                 continue;
             }
 
             XamlDocument? included =
                 await OpenAsync(reference, uri, document, state, cancellationToken).ConfigureAwait(false);
 
-            if (included?.Root is not { } root || !Hoist(reference, root, document, state))
+            if (included?.Root is not { } root || !Hoist(reference, root, included.Uri, document, state))
             {
+                Rebase(reference, builder, isIncluded);
+
                 continue;
             }
 
@@ -127,11 +144,35 @@ internal static class XamlIncludeProjector
             // it — an XML declaration, leading comments, the trailing newline — belongs to that
             // file rather than to this position in this one.
             builder.Replace(reference.Element.Span, inner, inner.GetProjectedSpan(root.Span));
+            spliced.Add(reference.Element.Span);
         }
 
         Rebind(document, builder, state, isIncluded);
 
         return builder.ToProjection();
+    }
+
+    /// <summary>
+    /// Makes an include that is being left as written say where it points from its new home.
+    /// </summary>
+    /// <remarks>
+    /// A relative <c>Source</c> means "beside the file it is written in". Once the file it is
+    /// written in has been spliced into another one, Avalonia resolves it against the host's
+    /// base URI instead, which is a different folder. Writing the URI it already resolved to
+    /// into the projection keeps it pointing where the author meant, and the document itself
+    /// still says what the author wrote.
+    /// </remarks>
+    private static void Rebase(XamlResourceReference reference, TextProjectionBuilder builder, bool isIncluded)
+    {
+        if (!isIncluded
+            || reference.ResolvedUri is not { } uri
+            || reference.Element.GetAttribute("Source")?.ValueSpan is not { } written
+            || Uri.TryCreate(reference.SourceText, UriKind.Absolute, out _))
+        {
+            return;
+        }
+
+        builder.Replace(written, XamlUri.ToDisplayString(uri));
     }
 
     /// <summary>
@@ -190,10 +231,12 @@ internal static class XamlIncludeProjector
     private static bool Hoist(
         XamlResourceReference reference,
         XamlElement root,
+        Uri? includedUri,
         XamlDocument document,
         State state)
     {
-        Dictionary<string, string> declarations = DeclarationsOf(root);
+        Dictionary<string, string> declarations =
+            DeclarationsOf(root, includedUri is null ? null : XamlUri.GetAssemblyName(includedUri));
 
         foreach ((string prefix, string namespaceUri) in declarations)
         {
@@ -261,8 +304,11 @@ internal static class XamlIncludeProjector
             resource = await state.Environment.ResourceResolver
                 .ResolveAsync(uri, document.BaseUri, cancellationToken).ConfigureAwait(false);
         }
-        catch (Exception error) when (error is IOException or UnauthorizedAccessException)
+        catch (Exception error) when (error is not OperationCanceledException)
         {
+            // A resolver is the caller's own code and may fail in any way its source of
+            // resources can. That is a resource this load could not have, which is a diagnostic,
+            // not a reason to abandon a load that would otherwise have produced a tree.
             state.Diagnostics.Add(Unreadable(reference, document, error));
 
             return null;
@@ -289,8 +335,11 @@ internal static class XamlIncludeProjector
         {
             included = await ReadAsync(resource, state, cancellationToken).ConfigureAwait(false);
         }
-        catch (Exception error) when (error is IOException or UnauthorizedAccessException)
+        catch (Exception error) when (error is not OperationCanceledException)
         {
+            // A resolver is the caller's own code and may fail in any way its source of
+            // resources can. That is a resource this load could not have, which is a diagnostic,
+            // not a reason to abandon a load that would otherwise have produced a tree.
             state.Diagnostics.Add(Unreadable(reference, document, error));
 
             return null;
@@ -307,7 +356,11 @@ internal static class XamlIncludeProjector
 
             // The included document's own errors say what is actually wrong with it, and they
             // carry its URI, so a caller can put them on the right file.
-            state.Diagnostics.AddRange(included.GetDiagnostics().Where(static diagnostic => diagnostic.IsError));
+            if (state.Described(included.Uri))
+            {
+                state.Diagnostics.AddRange(
+                    included.GetDiagnostics().Where(static diagnostic => diagnostic.IsError));
+            }
 
             return null;
         }
@@ -340,16 +393,52 @@ internal static class XamlIncludeProjector
     }
 
     /// <summary>Reads an element's namespace declarations, the default one keyed by an empty prefix.</summary>
-    private static Dictionary<string, string> DeclarationsOf(XamlElement element)
+    /// <param name="element">The element whose declarations to read.</param>
+    /// <param name="assembly">
+    /// The assembly the element's document lives in, when it is known, so that declarations
+    /// which mean "this document's own assembly" keep meaning that once moved.
+    /// </param>
+    private static Dictionary<string, string> DeclarationsOf(XamlElement element, string? assembly = null)
     {
         var declarations = new Dictionary<string, string>(StringComparer.Ordinal);
 
         foreach (XamlNamespaceDeclaration declaration in element.NamespaceDeclarations)
         {
-            declarations[declaration.Prefix ?? string.Empty] = declaration.GetNamespaceUri();
+            declarations[declaration.Prefix ?? string.Empty] = Qualify(declaration.GetNamespaceUri(), assembly);
         }
 
         return declarations;
+    }
+
+    /// <summary>
+    /// Names the assembly a declaration only implied, when moving it would change which assembly
+    /// that is.
+    /// </summary>
+    /// <remarks>
+    /// <c>using:Some.Namespace</c> and <c>clr-namespace:Some.Namespace</c> both mean "in the
+    /// assembly of the document this is written in". Hoisting such a declaration onto another
+    /// document's root would silently repoint it at that document's assembly instead, so the
+    /// assembly it meant is written out. Anything already absolute is left alone.
+    /// </remarks>
+    private static string Qualify(string namespaceUri, string? assembly)
+    {
+        const string Using = "using:";
+        const string ClrNamespace = "clr-namespace:";
+
+        if (assembly is null)
+        {
+            return namespaceUri;
+        }
+
+        if (namespaceUri.StartsWith(Using, StringComparison.Ordinal))
+        {
+            return $"{ClrNamespace}{namespaceUri[Using.Length..]};assembly={assembly}";
+        }
+
+        return namespaceUri.StartsWith(ClrNamespace, StringComparison.Ordinal)
+            && !namespaceUri.Contains(";assembly=", StringComparison.Ordinal)
+                ? $"{namespaceUri};assembly={assembly}"
+                : namespaceUri;
     }
 
     /// <summary>
@@ -397,5 +486,15 @@ internal static class XamlIncludeProjector
 
         /// <summary>The declarations that have to be added to the loaded document's root.</summary>
         public Dictionary<string, string> Hoisted { get; } = new(StringComparer.Ordinal);
+
+        private HashSet<string> Reported { get; } = new(StringComparer.Ordinal);
+
+        /// <summary>
+        /// Reports whether a document still has to have its own diagnostics collected, and
+        /// records that it now has.
+        /// </summary>
+        /// <param name="uri">The document's URI, or <see langword="null"/> when it has none.</param>
+        /// <returns><see langword="true"/> the first time a document is asked about.</returns>
+        public bool Described(Uri? uri) => uri is null || Reported.Add(XamlUri.ToKey(uri));
     }
 }

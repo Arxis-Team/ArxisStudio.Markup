@@ -335,6 +335,32 @@ public sealed class PropertyMatrixTests
     }
 
     [AvaloniaFact]
+    public async Task AnEditThatChangesTheLengthOfALineDoesNotMoveLaterElements()
+    {
+        // Rebuilding the map after an edit reads positions recorded against the text as it was
+        // when the objects were built. Resolving those against the document as it is now has to
+        // survive an edit that lengthened an earlier line, or the next edit writes itself into
+        // whatever element the stale offset happens to land in.
+        await using XamlLoadSession session = await Load(
+            $"<StackPanel xmlns=\"{AvaloniaNamespace}\">\n" +
+            "  <TextBlock Text=\"a\" />\n" +
+            "  <Button Content=\"go\" />\n" +
+            "</StackPanel>");
+
+        var panel = session.GetRoot<StackPanel>();
+        var text = (TextBlock)panel.Children[0];
+        var button = (Button)panel.Children[1];
+
+        Assert.True(session.SetValue(text, TextBlock.TextProperty, "a much longer value").Applied);
+        Assert.True(session.SetValue(button, ContentControl.ContentProperty, "stop").Applied);
+
+        string saved = session.Document.GetText();
+
+        Assert.Contains("<TextBlock Text=\"a much longer value\" />", saved, StringComparison.Ordinal);
+        Assert.Contains("<Button Content=\"stop\" />", saved, StringComparison.Ordinal);
+    }
+
+    [AvaloniaFact]
     public async Task TwoEditsInSequenceBothLand()
     {
         // The map is rebuilt after each edit, so the second edit's element is not stale.

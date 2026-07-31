@@ -369,6 +369,7 @@ static ArxisStudio.Markup.Xaml.XamlToken.operator ==(ArxisStudio.Markup.Xaml.Xam
 static ArxisStudio.Markup.Xaml.XamlUnsetValue.operator !=(ArxisStudio.Markup.Xaml.XamlUnsetValue? left, ArxisStudio.Markup.Xaml.XamlUnsetValue? right) -> bool
 static ArxisStudio.Markup.Xaml.XamlUnsetValue.operator ==(ArxisStudio.Markup.Xaml.XamlUnsetValue? left, ArxisStudio.Markup.Xaml.XamlUnsetValue? right) -> bool
 static ArxisStudio.Markup.Xaml.XamlUri.Comparer.get -> System.Collections.Generic.IEqualityComparer<System.Uri!>!
+static ArxisStudio.Markup.Xaml.XamlUri.GetAssemblyName(System.Uri! uri) -> string?
 static ArxisStudio.Markup.Xaml.XamlUri.IsAvaloniaResource(System.Uri! uri) -> bool
 static ArxisStudio.Markup.Xaml.XamlUri.ToDisplayString(System.Uri! uri) -> string!
 static ArxisStudio.Markup.Xaml.XamlUri.ToKey(System.Uri! uri) -> string!

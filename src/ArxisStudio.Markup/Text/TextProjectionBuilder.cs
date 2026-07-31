@@ -138,7 +138,14 @@ public sealed class TextProjectionBuilder
 
         foreach (Splice existing in _splices)
         {
-            if (existing.Span.OverlapsWith(span) || (span.IsEmpty && existing.Span.Contains(span.Start)))
+            // An empty span overlaps nothing by the usual definition, so an insertion point
+            // inside a replaced range — or a replacement swallowing an insertion point — has to
+            // be caught on its own. Left through, it produces a splice order the build cannot
+            // walk, and the failure surfaces at ToProjection with nothing to say about which
+            // call was wrong.
+            if (existing.Span.OverlapsWith(span)
+                || (span.IsEmpty && existing.Span.Contains(span.Start))
+                || (existing.Span.IsEmpty && span.Contains(existing.Span.Start)))
             {
                 throw new ArgumentException(
                     $"The replacement at {span} overlaps the one already made at {existing.Span}.",
@@ -201,13 +208,20 @@ public sealed class TextProjectionBuilder
 
             segments.Add(new TextProjectionSegment(
                 new TextSpan(start + (taken.Start - splice.ReplacementSpan.Start), taken.Length),
-                segment.SourceSpan.Start + (taken.Start - segment.ProjectedSpan.Start),
+
+                // A run the inner projection wrote for itself still stands for the point it
+                // stood for; clipping it does not give it a stretch of source it never had.
+                segment.IsSynthesized
+                    ? segment.SourceSpan
+                    : new TextSpan(
+                        segment.SourceSpan.Start + (taken.Start - segment.ProjectedSpan.Start), taken.Length),
                 segment.SourceUri,
 
                 // Original to the replacement is still spliced-in here. Only the document being
                 // projected is the original one, or a position in an include would come back as
                 // an offset into a file it is not in.
-                isOriginal: false));
+                isOriginal: false,
+                segment.IsSynthesized));
         }
 
         text.Append(splice.Replacement.Text.GetText(splice.ReplacementSpan));

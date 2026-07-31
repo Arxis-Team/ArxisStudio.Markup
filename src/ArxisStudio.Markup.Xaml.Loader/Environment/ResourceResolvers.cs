@@ -163,7 +163,7 @@ public sealed class AvaloniaResourceResolver : IXamlResourceResolver
         }
 
         // The host of the original string, not of the parsed Uri, because Uri lower-cases it.
-        string assemblyName = AssemblyNameOf(target);
+        string assemblyName = XamlUri.GetAssemblyName(target) ?? target.Host;
 
         Assembly? assembly = await _assemblyResolver
             .ResolveAsync(new AssemblyName(assemblyName), cancellationToken).ConfigureAwait(false);
@@ -189,23 +189,6 @@ public sealed class AvaloniaResourceResolver : IXamlResourceResolver
                 ?? throw new InvalidOperationException($"Resource '{name}' disappeared from '{assemblyName}'.")));
     }
 
-    /// <summary>Reads the assembly name from an avares URI without letting Uri lower-case it.</summary>
-    private static string AssemblyNameOf(Uri uri)
-    {
-        const string SchemePrefix = XamlUri.AvaloniaResourceScheme + "://";
-
-        string original = uri.OriginalString;
-
-        if (!original.StartsWith(SchemePrefix, StringComparison.OrdinalIgnoreCase))
-        {
-            return uri.Host;
-        }
-
-        string rest = original[SchemePrefix.Length..];
-        int slash = rest.IndexOf('/', StringComparison.Ordinal);
-
-        return slash < 0 ? rest : rest[..slash];
-    }
 }
 
 /// <summary>

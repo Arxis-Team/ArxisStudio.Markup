@@ -95,6 +95,41 @@ public static class XamlUri
     }
 
     /// <summary>
+    /// Reads the assembly name out of an <c>avares://</c> URI.
+    /// </summary>
+    /// <remarks>
+    /// From the original text rather than <see cref="Uri.Host"/>, which lower-cases it. Assembly
+    /// names are case-sensitive, so the parsed host names a different assembly.
+    /// </remarks>
+    /// <param name="uri">The URI to read.</param>
+    /// <returns>The assembly name, or <see langword="null"/> when the URI names no assembly.</returns>
+    /// <exception cref="ArgumentNullException"><paramref name="uri"/> is <see langword="null"/>.</exception>
+    public static string? GetAssemblyName(Uri uri)
+    {
+        ArgumentNullException.ThrowIfNull(uri);
+
+        if (!IsAvaloniaResource(uri))
+        {
+            return null;
+        }
+
+        const string SchemePrefix = AvaloniaResourceScheme + "://";
+
+        string original = uri.OriginalString;
+
+        if (!original.StartsWith(SchemePrefix, StringComparison.OrdinalIgnoreCase))
+        {
+            return string.IsNullOrEmpty(uri.Host) ? null : uri.Host;
+        }
+
+        string rest = original[SchemePrefix.Length..];
+        int slash = rest.IndexOf('/', StringComparison.Ordinal);
+        string name = slash < 0 ? rest : rest[..slash];
+
+        return name.Length == 0 ? null : name;
+    }
+
+    /// <summary>
     /// Resolves an include's source against the document that declared it.
     /// </summary>
     /// <remarks>

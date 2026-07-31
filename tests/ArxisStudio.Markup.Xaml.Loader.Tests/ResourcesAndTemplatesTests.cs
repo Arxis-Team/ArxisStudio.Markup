@@ -225,6 +225,39 @@ public sealed class ResourcesAndTemplatesTests
     }
 
     [AvaloniaFact]
+    public async Task AnIncludedFilesOwnAssemblyIsNamedWhenItsPrefixOnlyImpliedIt()
+    {
+        (XamlLoadEnvironment environment, InMemoryResourceResolver resources) = Setup();
+
+        string assembly = typeof(CustomBadge).Assembly.GetName().Name!;
+        var themeUri = new Uri($"avares://{assembly}/Themes/Colors.axaml");
+
+        // 'using:' means "in the assembly this file lives in". That file is in the control
+        // library; the view is not, so hoisting the prefix as written would repoint it at the
+        // view's assembly and CustomBadge would resolve to nothing.
+        resources.Update(
+            themeUri,
+            $"<ResourceDictionary xmlns=\"{AvaloniaNamespace}\"\n" +
+            "                    xmlns:x=\"http://schemas.microsoft.com/winfx/2006/xaml\"\n" +
+            $"                    xmlns:owned=\"using:{typeof(CustomBadge).Namespace}\">\n" +
+            "  <SolidColorBrush x:Key=\"Accent\" Color=\"Red\" />\n" +
+            "  <owned:CustomBadge x:Key=\"Badge\" />\n" +
+            "</ResourceDictionary>");
+
+        await using XamlLoadSession session = await Load(ViewIncluding(themeUri.OriginalString), environment);
+
+        var border = session.GetRoot<Border>();
+
+        Assert.True(border.Resources.TryGetResource("Badge", null, out object? badge));
+        Assert.IsType<CustomBadge>(badge);
+
+        Assert.Contains(
+            $"clr-namespace:{typeof(CustomBadge).Namespace};assembly={assembly}",
+            session.Projection.Text.Lines[0].ToString(),
+            StringComparison.Ordinal);
+    }
+
+    [AvaloniaFact]
     public async Task AnIncludeThatRebindsAPrefixIsLeftAsWritten()
     {
         (XamlLoadEnvironment environment, InMemoryResourceResolver resources) = Setup();
@@ -343,6 +376,76 @@ public sealed class ResourcesAndTemplatesTests
             Assert.Contains(
                 result.Diagnostics,
                 diagnostic => diagnostic.Code == XamlLoaderDiagnosticCodes.IncludeCycle);
+        }
+    }
+
+    [AvaloniaFact]
+    public async Task AnIncludeWrittenInsideAnotherIsNotSplicedTwice()
+    {
+        (XamlLoadEnvironment environment, InMemoryResourceResolver resources) = Setup();
+
+        resources.Update(ColorsUri, Dictionary("Accent", "Red"));
+        resources.Update(PaletteUri, Dictionary("Accent", "Lime"));
+
+        // Odd markup, but a document is entitled to contain it, and discovery reports every
+        // include anywhere. The outer one takes the inner one with it; describing two texts for
+        // one place is a mistake this must not make on the caller's behalf.
+        (XamlLoadSession? session, XamlLoadResult result) = await XamlLoadSession.TryCreateAsync(
+            XamlDocument.Parse(
+                $"<Border xmlns=\"{AvaloniaNamespace}\" xmlns:x=\"http://schemas.microsoft.com/winfx/2006/xaml\">\n" +
+                "  <Border.Resources>\n" +
+                "    <ResourceDictionary>\n" +
+                "      <ResourceDictionary.MergedDictionaries>\n" +
+                "        <ResourceInclude Source=\"/Themes/Colors.axaml\">\n" +
+                "          <ResourceInclude Source=\"/Themes/Palette.axaml\" />\n" +
+                "        </ResourceInclude>\n" +
+                "      </ResourceDictionary.MergedDictionaries>\n" +
+                "    </ResourceDictionary>\n" +
+                "  </Border.Resources>\n" +
+                "  <Border Background=\"{StaticResource Accent}\" />\n" +
+                "</Border>",
+                new XamlParseOptions { DocumentUri = ViewUri }),
+            environment,
+            cancellationToken: TestContext.Current.CancellationToken);
+
+        await using (session)
+        {
+            Assert.NotNull(session);
+            Assert.Equal(
+                Colors.Red,
+                Assert.IsType<SolidColorBrush>(Inner(session.GetRoot<Border>()).Background).Color);
+            Assert.DoesNotContain(result.Diagnostics, static diagnostic => diagnostic.IsError);
+        }
+    }
+
+    [AvaloniaFact]
+    public async Task ARelativeIncludeLeftAsWrittenStillPointsWhereItWasWritten()
+    {
+        (XamlLoadEnvironment environment, InMemoryResourceResolver resources) = Setup();
+
+        // Colors.axaml is spliced into a view in another folder, and the include it carries is
+        // one no resolver knows. Left verbatim it would be resolved against the view's folder,
+        // which is not where the author wrote it.
+        resources.Update(ColorsUri, MergingDictionary("Palette.axaml"));
+
+        (XamlLoadSession? session, XamlLoadResult result) = await XamlLoadSession.TryCreateAsync(
+            XamlDocument.Parse(ViewIncluding("/Themes/Colors.axaml"), new XamlParseOptions { DocumentUri = ViewUri }),
+            environment,
+            cancellationToken: TestContext.Current.CancellationToken);
+
+        await using (session)
+        {
+            // Avalonia's own asset loader cannot open a file: URI at all, so this particular
+            // load still fails. What matters is which document it went looking for.
+            Assert.Contains(
+                result.Diagnostics,
+                static diagnostic => diagnostic.Message.Contains(
+                    "file:///Themes/Palette.axaml", StringComparison.Ordinal));
+
+            Assert.DoesNotContain(
+                result.Diagnostics,
+                static diagnostic => diagnostic.Message.Contains(
+                    "file:///Views/Palette.axaml", StringComparison.Ordinal));
         }
     }
 

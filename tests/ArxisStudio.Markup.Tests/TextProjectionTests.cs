@@ -267,6 +267,32 @@ public sealed class TextProjectionTests
     }
 
     [Fact]
+    public void Replace_CarriesANestedProjectionsWrittenTextAcrossAsWritten()
+    {
+        var inner = new TextProjectionBuilder(SourceText.From(Inner), InnerUri);
+
+        inner.Replace(new TextSpan(7, 0), " a=\"b\"");
+
+        TextProjection middle = inner.ToProjection();
+        var outer = new TextProjectionBuilder(SourceText.From(Outer), OuterUri);
+
+        outer.Replace(IncludeSpan, middle, middle.GetProjectedSpan(ColorsSpan));
+
+        TextProjection projection = outer.ToProjection();
+        string text = projection.Text.ToString();
+        int written = text.IndexOf("a=\"b\"", StringComparison.Ordinal);
+
+        // Nesting must not turn a run that stood for a point into one claiming a stretch of the
+        // included file it never covered.
+        Assert.All(
+            new[] { written, written + 1, written + 4 },
+            offset => Assert.Equal(7, projection.Map(offset).Offset));
+
+        Assert.Equal(InnerUri, projection.Map(written).SourceUri);
+        Assert.False(projection.Map(written).IsOriginal);
+    }
+
+    [Fact]
     public void Replace_RejectsOverlappingReplacements()
     {
         var builder = new TextProjectionBuilder(SourceText.From(Outer), OuterUri);
@@ -276,6 +302,19 @@ public sealed class TextProjectionTests
 
         Assert.Throws<ArgumentException>(
             () => builder.Replace(new TextSpan(IncludeSpan.Start + 2, 4), inner, ColorsSpan));
+    }
+
+    [Fact]
+    public void Replace_RejectsAReplacementEitherWayRoundAnEmptyOne()
+    {
+        var builder = new TextProjectionBuilder(SourceText.From(Outer), OuterUri);
+
+        builder.Replace(new TextSpan(IncludeSpan.Start + 2, 0), "XX");
+
+        // An empty span overlaps nothing by the usual definition, so a replacement swallowing an
+        // insertion point has to be caught deliberately. Left through, the build walks the
+        // splices in an order it cannot make sense of.
+        Assert.Throws<ArgumentException>(() => builder.Replace(IncludeSpan, "YY"));
     }
 
     [Fact]

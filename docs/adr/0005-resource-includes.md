@@ -60,13 +60,22 @@ includes across several files becomes one text with one flat map.
   include produced is not the document being edited.
 - Avalonia's XAML parser accepts `xmlns` declarations only on the root element. A spliced-in
   fragment therefore cannot keep its own: they are stripped from it and added to the root of the
-  projected text, which leaves every name in the fragment resolving to what it resolved to
-  before. This is why `TextProjection` allows a synthesized run at all.
+  projected text. This is why `TextProjection` allows a synthesized run at all.
+- Moving a declaration is only meaning-preserving if it says which assembly it means.
+  `using:Some.Namespace` and an unqualified `clr-namespace:Some.Namespace` mean "the assembly of
+  the file this is written in", so hoisting them verbatim would repoint them at the host's
+  assembly. They are rewritten to `clr-namespace:…;assembly=…` naming the assembly of the
+  `avares://` URI the fragment came from, which is the only place that assembly is recorded.
 - An include whose target no resolver knows is left exactly as written, and Avalonia's own asset
   loader still gets its chance at it — `avares://` URIs from assemblies this library was never
   handed keep working. The same is true of a cycle, a malformed included file, and the one case
   the projection cannot express: an included file that binds a prefix the host already binds to
   something else. Each is reported (`AXM2007`–`AXM2011`) rather than guessed at.
+- A relative `Source` on an include that is being left as written is rewritten in the projection
+  to the URI it already resolved to. Relative means "beside the file it is written in", and the
+  file it is written in is no longer where Avalonia thinks it is once the fragment has moved.
+  Relative URIs in any other attribute cannot be found without CLR metadata and are not
+  rebased — a limitation, not a decision.
 - If a future Avalonia makes `AvaloniaLocator` public, the bridging asset loader becomes a
   simpler answer for the loading half — it needs no namespace hoisting — though the projection's
   map would still be the thing that keeps included markup attributable. This decision should be
