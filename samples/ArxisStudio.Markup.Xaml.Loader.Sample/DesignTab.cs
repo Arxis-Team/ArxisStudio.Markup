@@ -65,7 +65,16 @@ internal static class DesignTab
             return Ui.Stack(Ui.Caption(mode.ToString()), Ui.Diagnostics(result.Diagnostics));
         }
 
+        // Only the run-mode pane is given data. A design-time value is applied as a local
+        // value, and a binding on the same property overwrites it the moment a data context
+        // arrives — which is the whole reason a design value exists: so that a document can be
+        // shown without one.
         var view = (Control)session.RootObject;
+
+        if (mode == XamlLoadMode.Runtime)
+        {
+            SampleData.Attach(view);
+        }
 
         return Ui.Stack(
             Ui.Caption(mode.ToString()),

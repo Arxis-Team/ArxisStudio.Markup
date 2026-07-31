@@ -38,6 +38,10 @@ the document — see `docs/adr/0005-resource-includes.md` for why. That leaves f
   an ordinary property set: it cannot do anything a property set cannot.
 - **A design value written as a markup extension** is evaluated by the load, so changing one is
   not something re-applying design values can do. Such a change is treated as a rebuild.
+- **A design value is applied as a local value**, so a binding on the same property overwrites
+  it as soon as the property's data context arrives. A host that supplies a data context in
+  design mode gets the binding's value, not the design one — which is consistent with what a
+  design value is for, since its purpose is to show a document that has no data context yet.
 - **Elements in the design namespace** — `<d:Something>` — are not removed. They are unusual, the
   contract asks only about attributes, and Avalonia reports them clearly enough.
 - **`mc:Ignorable`** is honoured for attributes, by namespace rather than by prefix. Ignorable
@@ -54,11 +58,12 @@ the document — see `docs/adr/0005-resource-includes.md` for why. That leaves f
 - **A structural change at the root rebuilds the root's content in place.** The root object
   itself survives, because a session is built around it and the caller holds it. A change to the
   root element's own type or `x:Class` needs a new session.
-- **Positions after an edit are resolved by line and column.** Editing reparses, and the object
-  map is rebuilt from positions Avalonia recorded before it did. An edit that lengthens an
-  earlier line moves every later offset and leaves the lines alone, so lines are what survive;
-  an edit that adds or removes lines before a mapped element loses that element's mapping until
-  the next load.
+- **An object rebuilt below a structural change is mapped from the fragment it was built from,
+  and everything that survived the change carries its element across by position.** Avalonia
+  records where it built an object once, and nothing re-records it, so a document that has moved
+  on cannot be re-read for it. What that leaves unmapped is an object under a subtree the pairing
+  stopped descending into and which no fragment rebuilt — a case an update does not produce, but
+  one a caller reaching past `ApplyDocumentUpdateAsync` could.
 
 ## Everything else
 

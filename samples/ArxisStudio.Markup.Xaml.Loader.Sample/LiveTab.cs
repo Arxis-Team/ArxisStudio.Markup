@@ -28,9 +28,8 @@ namespace ArxisStudio.Markup.Xaml.Loader.Sample;
 internal sealed class LiveTab
 {
     private readonly TextBox _editor;
-    private readonly Border _preview;
+    private readonly PreviewHost _preview;
     private readonly StackPanel _report;
-    private readonly InMemoryResourceResolver _resources;
     private readonly XamlLoadEnvironment _environment;
 
     private XamlLoadSession? _session;
@@ -40,7 +39,7 @@ internal sealed class LiveTab
 
     internal LiveTab()
     {
-        (_environment, _resources) = ShowcaseEnvironment.Create();
+        (_environment, _) = ShowcaseEnvironment.Create();
 
         _editor = Ui.Code(Fixtures.View, editable: true);
         _preview = Ui.Frame();
@@ -76,25 +75,19 @@ internal sealed class LiveTab
         Grid.SetColumnSpan(header, 3);
         grid.Children.Add(header);
 
-        var editor = new DockPanel();
-
-        DockPanel.SetDock(_editor, Dock.Top);
-
-        var editorPane = new Grid { RowDefinitions = new RowDefinitions("2*,Auto,1*") };
+        var editorPane = new Grid { RowDefinitions = new RowDefinitions("2*,1*") };
 
         Grid.SetRow(_editor, 0);
         editorPane.Children.Add(_editor);
 
         var reportScroll = new ScrollViewer { Content = _report, Margin = new Avalonia.Thickness(0, 8, 0, 0) };
 
-        Grid.SetRow(reportScroll, 2);
+        Grid.SetRow(reportScroll, 1);
         editorPane.Children.Add(reportScroll);
 
-        editor.Children.Add(editorPane);
-
-        Grid.SetRow(editor, 1);
-        Grid.SetColumn(editor, 0);
-        grid.Children.Add(editor);
+        Grid.SetRow(editorPane, 1);
+        Grid.SetColumn(editorPane, 0);
+        grid.Children.Add(editorPane);
 
         var previewPane = Ui.Stack(Ui.Caption("the objects the document describes"));
 
@@ -173,9 +166,7 @@ internal sealed class LiveTab
 
         _session = session;
 
-        // Detached from the frame before the next root goes in: a control belongs to one parent.
-        _preview.Child = null;
-        _preview.Child = session.RootObject as Control;
+        _preview.Preview = SampleData.Attach(session.RootObject);
 
         Show("loaded", true, result.Diagnostics, document.SourceText, []);
     }

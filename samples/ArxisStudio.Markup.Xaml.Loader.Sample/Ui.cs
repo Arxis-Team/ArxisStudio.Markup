@@ -54,15 +54,8 @@ internal static class Ui
         VerticalContentAlignment = VerticalAlignment.Top,
     };
 
-    /// <summary>A framed area, used for the one place a loaded control is put on screen.</summary>
-    internal static Border Frame(Control? content = null) => new()
-    {
-        BorderBrush = Brushes.Gray,
-        BorderThickness = new Thickness(1),
-        CornerRadius = new CornerRadius(4),
-        Padding = new Thickness(8),
-        Child = content,
-    };
+    /// <summary>The framed surface a loaded control is shown on.</summary>
+    internal static PreviewHost Frame(Control? content = null) => new() { Preview = content };
 
     /// <summary>A verdict line: what was claimed, and whether it held.</summary>
     internal static Control Verdict(string claim, bool held) => new StackPanel

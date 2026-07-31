@@ -15,7 +15,7 @@ namespace ArxisStudio.Markup.Xaml.Loader.Sample;
 internal sealed class ResourcesTab
 {
     private readonly StackPanel _report = new() { Spacing = 4 };
-    private readonly Border _preview = Ui.Frame();
+    private readonly PreviewHost _preview = Ui.Frame();
     private readonly ComboBox _accent;
 
     private readonly XamlLoadEnvironment _environment;
@@ -71,7 +71,7 @@ internal sealed class ResourcesTab
         }
 
         _session = session;
-        _preview.Child = session.RootObject as Control;
+        _preview.Preview = SampleData.Attach(session.RootObject);
 
         await ShowGraphAsync();
     }
