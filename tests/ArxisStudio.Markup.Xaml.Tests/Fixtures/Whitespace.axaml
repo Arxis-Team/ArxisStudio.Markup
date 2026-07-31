@@ -1,0 +1,8 @@
+<Grid>
+	<Border		Margin="4" />
+  
+      <Panel />   
+
+
+        <Canvas />	
+</Grid>

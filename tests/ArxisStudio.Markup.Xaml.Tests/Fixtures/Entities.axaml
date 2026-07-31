@@ -1,0 +1,4 @@
+<Grid>
+  <TextBlock Text="a &amp; b &lt; c &gt; d &quot;e&quot; &#65; &#x42;" />
+  <TextBlock>text &amp; more &#169; here</TextBlock>
+</Grid>

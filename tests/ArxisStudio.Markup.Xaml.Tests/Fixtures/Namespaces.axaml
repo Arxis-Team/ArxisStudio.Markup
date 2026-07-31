@@ -1,0 +1,8 @@
+<root xmlns="urn:outer" xmlns:p="urn:p-outer" xmlns:q="urn:q">
+  <p:child>
+    <inner xmlns="urn:inner" xmlns:p="urn:p-inner">
+      <p:shadowed q:attr="value" />
+    </inner>
+  </p:child>
+  <undeclared:element />
+</root>

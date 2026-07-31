@@ -1,1 +1,169 @@
 #nullable enable
+ArxisStudio.Markup.Xaml.XamlAttribute
+ArxisStudio.Markup.Xaml.XamlAttribute.GetValueText() -> string!
+ArxisStudio.Markup.Xaml.XamlAttribute.HasValue.get -> bool
+ArxisStudio.Markup.Xaml.XamlAttribute.Name.get -> ArxisStudio.Markup.Xaml.XamlQualifiedName
+ArxisStudio.Markup.Xaml.XamlAttribute.NameSpan.get -> ArxisStudio.Markup.TextSpan
+ArxisStudio.Markup.Xaml.XamlAttribute.Quote.get -> char?
+ArxisStudio.Markup.Xaml.XamlAttribute.ValueSpan.get -> ArxisStudio.Markup.TextSpan?
+ArxisStudio.Markup.Xaml.XamlCData
+ArxisStudio.Markup.Xaml.XamlCData.ContentSpan.get -> ArxisStudio.Markup.TextSpan
+ArxisStudio.Markup.Xaml.XamlCData.GetContent() -> string!
+ArxisStudio.Markup.Xaml.XamlComment
+ArxisStudio.Markup.Xaml.XamlComment.ContentSpan.get -> ArxisStudio.Markup.TextSpan
+ArxisStudio.Markup.Xaml.XamlComment.GetContent() -> string!
+ArxisStudio.Markup.Xaml.XamlDiagnosticCodes
+ArxisStudio.Markup.Xaml.XamlDocument
+ArxisStudio.Markup.Xaml.XamlDocument.GetDiagnostics() -> System.Collections.Generic.IEnumerable<ArxisStudio.Markup.MarkupDiagnostic!>!
+ArxisStudio.Markup.Xaml.XamlDocument.IsWellFormed.get -> bool
+ArxisStudio.Markup.Xaml.XamlDocument.Root.get -> ArxisStudio.Markup.Xaml.XamlElement?
+ArxisStudio.Markup.Xaml.XamlDocument.SourceText.get -> ArxisStudio.Markup.SourceText!
+ArxisStudio.Markup.Xaml.XamlDocument.Tokens.get -> System.Collections.Immutable.ImmutableArray<ArxisStudio.Markup.Xaml.XamlToken>
+ArxisStudio.Markup.Xaml.XamlDocument.Uri.get -> System.Uri?
+ArxisStudio.Markup.Xaml.XamlElement
+ArxisStudio.Markup.Xaml.XamlElement.Attributes.get -> System.Collections.Immutable.ImmutableArray<ArxisStudio.Markup.Xaml.XamlAttribute!>
+ArxisStudio.Markup.Xaml.XamlElement.Content.get -> System.Collections.Immutable.ImmutableArray<ArxisStudio.Markup.Xaml.XamlSyntaxNode!>
+ArxisStudio.Markup.Xaml.XamlElement.Elements.get -> System.Collections.Generic.IEnumerable<ArxisStudio.Markup.Xaml.XamlElement!>!
+ArxisStudio.Markup.Xaml.XamlElement.EndTagName.get -> ArxisStudio.Markup.Xaml.XamlQualifiedName?
+ArxisStudio.Markup.Xaml.XamlElement.EndTagSpan.get -> ArxisStudio.Markup.TextSpan?
+ArxisStudio.Markup.Xaml.XamlElement.GetAttribute(ArxisStudio.Markup.Xaml.XamlQualifiedName name) -> ArxisStudio.Markup.Xaml.XamlAttribute?
+ArxisStudio.Markup.Xaml.XamlElement.GetAttribute(string! localName) -> ArxisStudio.Markup.Xaml.XamlAttribute?
+ArxisStudio.Markup.Xaml.XamlElement.IsEmpty.get -> bool
+ArxisStudio.Markup.Xaml.XamlElement.IsUnclosed.get -> bool
+ArxisStudio.Markup.Xaml.XamlElement.Name.get -> ArxisStudio.Markup.Xaml.XamlQualifiedName
+ArxisStudio.Markup.Xaml.XamlElement.NameSpan.get -> ArxisStudio.Markup.TextSpan
+ArxisStudio.Markup.Xaml.XamlElement.NamespaceContext.get -> ArxisStudio.Markup.Xaml.XamlNamespaceContext!
+ArxisStudio.Markup.Xaml.XamlElement.NamespaceDeclarations.get -> System.Collections.Generic.IEnumerable<ArxisStudio.Markup.Xaml.XamlNamespaceDeclaration!>!
+ArxisStudio.Markup.Xaml.XamlElement.NamespaceUri.get -> string?
+ArxisStudio.Markup.Xaml.XamlElement.StartTagSpan.get -> ArxisStudio.Markup.TextSpan
+ArxisStudio.Markup.Xaml.XamlNamespaceContext
+ArxisStudio.Markup.Xaml.XamlNamespaceContext.Declarations.get -> System.Collections.Generic.IReadOnlyDictionary<string!, string!>!
+ArxisStudio.Markup.Xaml.XamlNamespaceContext.GetInScopeDeclarations() -> System.Collections.Generic.IReadOnlyDictionary<string!, string!>!
+ArxisStudio.Markup.Xaml.XamlNamespaceContext.IsEmpty.get -> bool
+ArxisStudio.Markup.Xaml.XamlNamespaceContext.LookupNamespace(string? prefix) -> string?
+ArxisStudio.Markup.Xaml.XamlNamespaceContext.LookupPrefix(string! namespaceUri) -> string?
+ArxisStudio.Markup.Xaml.XamlNamespaceContext.Parent.get -> ArxisStudio.Markup.Xaml.XamlNamespaceContext?
+ArxisStudio.Markup.Xaml.XamlNamespaceContext.Push(System.Collections.Generic.IReadOnlyCollection<System.Collections.Generic.KeyValuePair<string?, string!>>! declarations) -> ArxisStudio.Markup.Xaml.XamlNamespaceContext!
+ArxisStudio.Markup.Xaml.XamlNamespaceContext.TryResolveAttributeName(ArxisStudio.Markup.Xaml.XamlQualifiedName name, out string? namespaceUri) -> bool
+ArxisStudio.Markup.Xaml.XamlNamespaceContext.TryResolveElementName(ArxisStudio.Markup.Xaml.XamlQualifiedName name, out string? namespaceUri) -> bool
+ArxisStudio.Markup.Xaml.XamlNamespaceDeclaration
+ArxisStudio.Markup.Xaml.XamlNamespaceDeclaration.GetNamespaceUri() -> string!
+ArxisStudio.Markup.Xaml.XamlNamespaceDeclaration.IsDefault.get -> bool
+ArxisStudio.Markup.Xaml.XamlNamespaceDeclaration.Prefix.get -> string?
+ArxisStudio.Markup.Xaml.XamlNamespaces
+ArxisStudio.Markup.Xaml.XamlParseOptions
+ArxisStudio.Markup.Xaml.XamlParseOptions.DocumentUri.get -> System.Uri?
+ArxisStudio.Markup.Xaml.XamlParseOptions.DocumentUri.init -> void
+ArxisStudio.Markup.Xaml.XamlParseOptions.XamlParseOptions() -> void
+ArxisStudio.Markup.Xaml.XamlProcessingInstruction
+ArxisStudio.Markup.Xaml.XamlProcessingInstruction.IsXmlDeclaration.get -> bool
+ArxisStudio.Markup.Xaml.XamlProcessingInstruction.Kind.get -> ArxisStudio.Markup.Xaml.XamlProcessingInstructionKind
+ArxisStudio.Markup.Xaml.XamlProcessingInstructionKind
+ArxisStudio.Markup.Xaml.XamlProcessingInstructionKind.DocumentType = 2 -> ArxisStudio.Markup.Xaml.XamlProcessingInstructionKind
+ArxisStudio.Markup.Xaml.XamlProcessingInstructionKind.ProcessingInstruction = 0 -> ArxisStudio.Markup.Xaml.XamlProcessingInstructionKind
+ArxisStudio.Markup.Xaml.XamlProcessingInstructionKind.XmlDeclaration = 1 -> ArxisStudio.Markup.Xaml.XamlProcessingInstructionKind
+ArxisStudio.Markup.Xaml.XamlQualifiedName
+ArxisStudio.Markup.Xaml.XamlQualifiedName.Deconstruct(out string? Prefix, out string! LocalName) -> void
+ArxisStudio.Markup.Xaml.XamlQualifiedName.Equals(ArxisStudio.Markup.Xaml.XamlQualifiedName other) -> bool
+ArxisStudio.Markup.Xaml.XamlQualifiedName.HasPrefix.get -> bool
+ArxisStudio.Markup.Xaml.XamlQualifiedName.IsUnprefixed(string! localName) -> bool
+ArxisStudio.Markup.Xaml.XamlQualifiedName.LocalName.get -> string!
+ArxisStudio.Markup.Xaml.XamlQualifiedName.Prefix.get -> string?
+ArxisStudio.Markup.Xaml.XamlQualifiedName.XamlQualifiedName() -> void
+ArxisStudio.Markup.Xaml.XamlQualifiedName.XamlQualifiedName(string? Prefix, string! LocalName) -> void
+ArxisStudio.Markup.Xaml.XamlSyntaxNode
+ArxisStudio.Markup.Xaml.XamlSyntaxNode.AncestorsAndSelf() -> System.Collections.Generic.IEnumerable<ArxisStudio.Markup.Xaml.XamlSyntaxNode!>!
+ArxisStudio.Markup.Xaml.XamlSyntaxNode.Children.get -> System.Collections.Immutable.ImmutableArray<ArxisStudio.Markup.Xaml.XamlSyntaxNode!>
+ArxisStudio.Markup.Xaml.XamlSyntaxNode.DescendantElements() -> System.Collections.Generic.IEnumerable<ArxisStudio.Markup.Xaml.XamlElement!>!
+ArxisStudio.Markup.Xaml.XamlSyntaxNode.Descendants() -> System.Collections.Generic.IEnumerable<ArxisStudio.Markup.Xaml.XamlSyntaxNode!>!
+ArxisStudio.Markup.Xaml.XamlSyntaxNode.Diagnostics.get -> System.Collections.Immutable.ImmutableArray<ArxisStudio.Markup.MarkupDiagnostic!>
+ArxisStudio.Markup.Xaml.XamlSyntaxNode.Document.get -> ArxisStudio.Markup.Xaml.XamlDocument!
+ArxisStudio.Markup.Xaml.XamlSyntaxNode.FindNode(int position) -> ArxisStudio.Markup.Xaml.XamlSyntaxNode?
+ArxisStudio.Markup.Xaml.XamlSyntaxNode.GetAllDiagnostics() -> System.Collections.Generic.IEnumerable<ArxisStudio.Markup.MarkupDiagnostic!>!
+ArxisStudio.Markup.Xaml.XamlSyntaxNode.GetSourceText() -> string!
+ArxisStudio.Markup.Xaml.XamlSyntaxNode.GetText() -> string!
+ArxisStudio.Markup.Xaml.XamlSyntaxNode.Parent.get -> ArxisStudio.Markup.Xaml.XamlSyntaxNode?
+ArxisStudio.Markup.Xaml.XamlSyntaxNode.Span.get -> ArxisStudio.Markup.TextSpan
+ArxisStudio.Markup.Xaml.XamlText
+ArxisStudio.Markup.Xaml.XamlToken
+ArxisStudio.Markup.Xaml.XamlToken.Deconstruct(out ArxisStudio.Markup.Xaml.XamlTokenKind Kind, out ArxisStudio.Markup.TextSpan Span) -> void
+ArxisStudio.Markup.Xaml.XamlToken.Equals(ArxisStudio.Markup.Xaml.XamlToken other) -> bool
+ArxisStudio.Markup.Xaml.XamlToken.IsWhitespace.get -> bool
+ArxisStudio.Markup.Xaml.XamlToken.Kind.get -> ArxisStudio.Markup.Xaml.XamlTokenKind
+ArxisStudio.Markup.Xaml.XamlToken.Kind.init -> void
+ArxisStudio.Markup.Xaml.XamlToken.Span.get -> ArxisStudio.Markup.TextSpan
+ArxisStudio.Markup.Xaml.XamlToken.Span.init -> void
+ArxisStudio.Markup.Xaml.XamlToken.XamlToken() -> void
+ArxisStudio.Markup.Xaml.XamlToken.XamlToken(ArxisStudio.Markup.Xaml.XamlTokenKind Kind, ArxisStudio.Markup.TextSpan Span) -> void
+ArxisStudio.Markup.Xaml.XamlTokenKind
+ArxisStudio.Markup.Xaml.XamlTokenKind.AttributeValueText = 9 -> ArxisStudio.Markup.Xaml.XamlTokenKind
+ArxisStudio.Markup.Xaml.XamlTokenKind.CData = 13 -> ArxisStudio.Markup.Xaml.XamlTokenKind
+ArxisStudio.Markup.Xaml.XamlTokenKind.Colon = 6 -> ArxisStudio.Markup.Xaml.XamlTokenKind
+ArxisStudio.Markup.Xaml.XamlTokenKind.Comment = 12 -> ArxisStudio.Markup.Xaml.XamlTokenKind
+ArxisStudio.Markup.Xaml.XamlTokenKind.DocumentType = 16 -> ArxisStudio.Markup.Xaml.XamlTokenKind
+ArxisStudio.Markup.Xaml.XamlTokenKind.EndOfFile = 20 -> ArxisStudio.Markup.Xaml.XamlTokenKind
+ArxisStudio.Markup.Xaml.XamlTokenKind.EntityReference = 17 -> ArxisStudio.Markup.Xaml.XamlTokenKind
+ArxisStudio.Markup.Xaml.XamlTokenKind.Equals = 7 -> ArxisStudio.Markup.Xaml.XamlTokenKind
+ArxisStudio.Markup.Xaml.XamlTokenKind.GreaterThan = 3 -> ArxisStudio.Markup.Xaml.XamlTokenKind
+ArxisStudio.Markup.Xaml.XamlTokenKind.LessThan = 1 -> ArxisStudio.Markup.Xaml.XamlTokenKind
+ArxisStudio.Markup.Xaml.XamlTokenKind.LessThanSlash = 2 -> ArxisStudio.Markup.Xaml.XamlTokenKind
+ArxisStudio.Markup.Xaml.XamlTokenKind.Name = 5 -> ArxisStudio.Markup.Xaml.XamlTokenKind
+ArxisStudio.Markup.Xaml.XamlTokenKind.NewLine = 11 -> ArxisStudio.Markup.Xaml.XamlTokenKind
+ArxisStudio.Markup.Xaml.XamlTokenKind.None = 0 -> ArxisStudio.Markup.Xaml.XamlTokenKind
+ArxisStudio.Markup.Xaml.XamlTokenKind.ProcessingInstruction = 14 -> ArxisStudio.Markup.Xaml.XamlTokenKind
+ArxisStudio.Markup.Xaml.XamlTokenKind.Quote = 8 -> ArxisStudio.Markup.Xaml.XamlTokenKind
+ArxisStudio.Markup.Xaml.XamlTokenKind.Skipped = 19 -> ArxisStudio.Markup.Xaml.XamlTokenKind
+ArxisStudio.Markup.Xaml.XamlTokenKind.SlashGreaterThan = 4 -> ArxisStudio.Markup.Xaml.XamlTokenKind
+ArxisStudio.Markup.Xaml.XamlTokenKind.Text = 18 -> ArxisStudio.Markup.Xaml.XamlTokenKind
+ArxisStudio.Markup.Xaml.XamlTokenKind.Whitespace = 10 -> ArxisStudio.Markup.Xaml.XamlTokenKind
+ArxisStudio.Markup.Xaml.XamlTokenKind.XmlDeclaration = 15 -> ArxisStudio.Markup.Xaml.XamlTokenKind
+ArxisStudio.Markup.Xaml.XamlTrivia
+ArxisStudio.Markup.Xaml.XamlTrivia.Kind.get -> ArxisStudio.Markup.Xaml.XamlTriviaKind
+ArxisStudio.Markup.Xaml.XamlTriviaKind
+ArxisStudio.Markup.Xaml.XamlTriviaKind.NewLine = 1 -> ArxisStudio.Markup.Xaml.XamlTriviaKind
+ArxisStudio.Markup.Xaml.XamlTriviaKind.Skipped = 2 -> ArxisStudio.Markup.Xaml.XamlTriviaKind
+ArxisStudio.Markup.Xaml.XamlTriviaKind.Whitespace = 0 -> ArxisStudio.Markup.Xaml.XamlTriviaKind
+const ArxisStudio.Markup.Xaml.XamlDiagnosticCodes.DuplicateAttribute = "AXM1016" -> string!
+const ArxisStudio.Markup.Xaml.XamlDiagnosticCodes.DuplicateNamespacePrefix = "AXM1017" -> string!
+const ArxisStudio.Markup.Xaml.XamlDiagnosticCodes.ExpectedElementName = "AXM1010" -> string!
+const ArxisStudio.Markup.Xaml.XamlDiagnosticCodes.InvalidEntityReference = "AXM1006" -> string!
+const ArxisStudio.Markup.Xaml.XamlDiagnosticCodes.MismatchedEndTag = "AXM1014" -> string!
+const ArxisStudio.Markup.Xaml.XamlDiagnosticCodes.MissingAttributeValue = "AXM1015" -> string!
+const ArxisStudio.Markup.Xaml.XamlDiagnosticCodes.MissingRootElement = "AXM1019" -> string!
+const ArxisStudio.Markup.Xaml.XamlDiagnosticCodes.MultipleRootElements = "AXM1018" -> string!
+const ArxisStudio.Markup.Xaml.XamlDiagnosticCodes.UnclosedElement = "AXM1012" -> string!
+const ArxisStudio.Markup.Xaml.XamlDiagnosticCodes.UnexpectedCharacter = "AXM1005" -> string!
+const ArxisStudio.Markup.Xaml.XamlDiagnosticCodes.UnexpectedEndTag = "AXM1013" -> string!
+const ArxisStudio.Markup.Xaml.XamlDiagnosticCodes.UnterminatedAttributeValue = "AXM1004" -> string!
+const ArxisStudio.Markup.Xaml.XamlDiagnosticCodes.UnterminatedCData = "AXM1002" -> string!
+const ArxisStudio.Markup.Xaml.XamlDiagnosticCodes.UnterminatedComment = "AXM1001" -> string!
+const ArxisStudio.Markup.Xaml.XamlDiagnosticCodes.UnterminatedDocumentType = "AXM1007" -> string!
+const ArxisStudio.Markup.Xaml.XamlDiagnosticCodes.UnterminatedProcessingInstruction = "AXM1003" -> string!
+const ArxisStudio.Markup.Xaml.XamlDiagnosticCodes.UnterminatedTag = "AXM1011" -> string!
+const ArxisStudio.Markup.Xaml.XamlNamespaces.Design = "http://schemas.microsoft.com/expression/blend/2008" -> string!
+const ArxisStudio.Markup.Xaml.XamlNamespaces.MarkupCompatibility = "http://schemas.openxmlformats.org/markup-compatibility/2006" -> string!
+const ArxisStudio.Markup.Xaml.XamlNamespaces.Xaml = "http://schemas.microsoft.com/winfx/2006/xaml" -> string!
+const ArxisStudio.Markup.Xaml.XamlNamespaces.Xml = "http://www.w3.org/XML/1998/namespace" -> string!
+const ArxisStudio.Markup.Xaml.XamlNamespaces.Xmlns = "http://www.w3.org/2000/xmlns/" -> string!
+override ArxisStudio.Markup.Xaml.XamlAttribute.ToString() -> string!
+override ArxisStudio.Markup.Xaml.XamlElement.ToString() -> string!
+override ArxisStudio.Markup.Xaml.XamlQualifiedName.GetHashCode() -> int
+override ArxisStudio.Markup.Xaml.XamlQualifiedName.ToString() -> string!
+override ArxisStudio.Markup.Xaml.XamlSyntaxNode.ToString() -> string!
+override ArxisStudio.Markup.Xaml.XamlToken.GetHashCode() -> int
+override ArxisStudio.Markup.Xaml.XamlToken.ToString() -> string!
+static ArxisStudio.Markup.Xaml.XamlDocument.Parse(ArxisStudio.Markup.SourceText! text) -> ArxisStudio.Markup.Xaml.XamlDocument!
+static ArxisStudio.Markup.Xaml.XamlDocument.Parse(ArxisStudio.Markup.SourceText! text, ArxisStudio.Markup.Xaml.XamlParseOptions? options) -> ArxisStudio.Markup.Xaml.XamlDocument!
+static ArxisStudio.Markup.Xaml.XamlDocument.Parse(string! text) -> ArxisStudio.Markup.Xaml.XamlDocument!
+static ArxisStudio.Markup.Xaml.XamlDocument.Parse(string! text, ArxisStudio.Markup.Xaml.XamlParseOptions? options) -> ArxisStudio.Markup.Xaml.XamlDocument!
+static ArxisStudio.Markup.Xaml.XamlNamespaceContext.Empty.get -> ArxisStudio.Markup.Xaml.XamlNamespaceContext!
+static ArxisStudio.Markup.Xaml.XamlParseOptions.Default.get -> ArxisStudio.Markup.Xaml.XamlParseOptions!
+static ArxisStudio.Markup.Xaml.XamlQualifiedName.Parse(string! text) -> ArxisStudio.Markup.Xaml.XamlQualifiedName
+static ArxisStudio.Markup.Xaml.XamlQualifiedName.Unprefixed(string! localName) -> ArxisStudio.Markup.Xaml.XamlQualifiedName
+static ArxisStudio.Markup.Xaml.XamlQualifiedName.operator !=(ArxisStudio.Markup.Xaml.XamlQualifiedName left, ArxisStudio.Markup.Xaml.XamlQualifiedName right) -> bool
+static ArxisStudio.Markup.Xaml.XamlQualifiedName.operator ==(ArxisStudio.Markup.Xaml.XamlQualifiedName left, ArxisStudio.Markup.Xaml.XamlQualifiedName right) -> bool
+static ArxisStudio.Markup.Xaml.XamlToken.operator !=(ArxisStudio.Markup.Xaml.XamlToken left, ArxisStudio.Markup.Xaml.XamlToken right) -> bool
+static ArxisStudio.Markup.Xaml.XamlToken.operator ==(ArxisStudio.Markup.Xaml.XamlToken left, ArxisStudio.Markup.Xaml.XamlToken right) -> bool
+virtual ArxisStudio.Markup.Xaml.XamlSyntaxNode.IsSynthesized.get -> bool
+~override ArxisStudio.Markup.Xaml.XamlQualifiedName.Equals(object obj) -> bool
+~override ArxisStudio.Markup.Xaml.XamlToken.Equals(object obj) -> bool

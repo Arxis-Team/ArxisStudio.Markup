@@ -1,0 +1,17 @@
+# The last matching line wins, so the general rules come first and the exemption last.
+
+* text=auto
+*.cs text diff=csharp
+*.axaml text
+*.csproj text
+*.props text
+*.targets text
+*.md text
+*.json text
+*.yml text
+
+# Golden fixtures are compared byte for byte. End-of-line conversion would rewrite exactly
+# the property they exist to test -- a CRLF fixture checked out with line feeds still passes
+# every round-trip test while proving nothing -- so it is switched off for them entirely.
+# FixtureIntegrityTests fails if this ever stops working.
+tests/**/Fixtures/** -text

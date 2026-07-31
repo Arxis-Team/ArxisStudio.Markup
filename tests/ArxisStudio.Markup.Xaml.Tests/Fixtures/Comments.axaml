@@ -1,0 +1,11 @@
+<!-- leading comment -->
+<Grid>
+
+  <!-- a comment with <angle> brackets and "quotes" -->
+  <Button />
+  <!--
+     multi-line
+     comment
+  -->
+</Grid>
+<!-- trailing comment -->

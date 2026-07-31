@@ -1,0 +1,6 @@
+<root xmlns="urn:known" xmlns:future="urn:not-invented-yet">
+  <future:Element future:Directive="value" unknownAttribute="kept">
+    <future:Nested />
+  </future:Element>
+  <Known future:Annotation="also kept" />
+</root>

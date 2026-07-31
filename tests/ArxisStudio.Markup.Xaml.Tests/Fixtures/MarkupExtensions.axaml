@@ -1,0 +1,7 @@
+<UserControl xmlns="https://github.com/avaloniaui">
+  <TextBox Text="{Binding Customer.Name}"
+           Background="{DynamicResource SurfaceBrush}"
+           Theme="{StaticResource PrimaryButtonTheme}"
+           Tag="{Binding Value, Converter={StaticResource PriceConverter}}"
+           Watermark="{}{not an extension}" />
+</UserControl>
