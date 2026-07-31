@@ -103,9 +103,11 @@ ArxisStudio.Markup.Xaml.Loader.XamlLoadSession.GetMember(object! target, string!
 ArxisStudio.Markup.Xaml.Loader.XamlLoadSession.GetObject(ArxisStudio.Markup.Xaml.XamlElement! element) -> object?
 ArxisStudio.Markup.Xaml.Loader.XamlLoadSession.GetOrigin(object! runtimeObject) -> ArxisStudio.Markup.Xaml.Loader.XamlObjectOrigin
 ArxisStudio.Markup.Xaml.Loader.XamlLoadSession.GetRoot<T>() -> T!
+ArxisStudio.Markup.Xaml.Loader.XamlLoadSession.GetSourceUri(object! runtimeObject) -> System.Uri?
 ArxisStudio.Markup.Xaml.Loader.XamlLoadSession.GetValueInfo(Avalonia.AvaloniaObject! target, Avalonia.AvaloniaProperty! property) -> ArxisStudio.Markup.Xaml.Loader.XamlValueInfo!
 ArxisStudio.Markup.Xaml.Loader.XamlLoadSession.Objects.get -> ArxisStudio.Markup.Xaml.Loader.XamlObjectMap!
 ArxisStudio.Markup.Xaml.Loader.XamlLoadSession.Options.get -> ArxisStudio.Markup.Xaml.Loader.XamlLoadOptions!
+ArxisStudio.Markup.Xaml.Loader.XamlLoadSession.Projection.get -> ArxisStudio.Markup.TextProjection!
 ArxisStudio.Markup.Xaml.Loader.XamlLoadSession.RootObject.get -> object!
 ArxisStudio.Markup.Xaml.Loader.XamlLoadSession.SetValue(Avalonia.AvaloniaObject! target, Avalonia.AvaloniaProperty! property, object? value) -> ArxisStudio.Markup.Xaml.Loader.XamlEditResult!
 ArxisStudio.Markup.Xaml.Loader.XamlLoadSession.SetXamlValue(Avalonia.AvaloniaObject! target, Avalonia.AvaloniaProperty! property, ArxisStudio.Markup.Xaml.XamlValue! value) -> ArxisStudio.Markup.Xaml.Loader.XamlEditResult!
@@ -147,6 +149,7 @@ ArxisStudio.Markup.Xaml.Loader.XamlObjectMap
 ArxisStudio.Markup.Xaml.Loader.XamlObjectMap.GetElement(object! runtimeObject) -> ArxisStudio.Markup.Xaml.XamlElement?
 ArxisStudio.Markup.Xaml.Loader.XamlObjectMap.GetObject(ArxisStudio.Markup.Xaml.XamlElement! element) -> object?
 ArxisStudio.Markup.Xaml.Loader.XamlObjectMap.GetOrigin(object! runtimeObject) -> ArxisStudio.Markup.Xaml.Loader.XamlObjectOrigin
+ArxisStudio.Markup.Xaml.Loader.XamlObjectMap.GetSourceUri(object! runtimeObject) -> System.Uri?
 ArxisStudio.Markup.Xaml.Loader.XamlObjectMap.MappedElements.get -> System.Collections.Generic.IReadOnlyCollection<ArxisStudio.Markup.Xaml.XamlElement!>!
 ArxisStudio.Markup.Xaml.Loader.XamlObjectMap.Objects.get -> System.Collections.Generic.IReadOnlyList<object!>!
 ArxisStudio.Markup.Xaml.Loader.XamlObjectOrigin
@@ -207,10 +210,14 @@ ArxisStudio.Markup.Xaml.Loader.XamlValueSource.Template = 5 -> ArxisStudio.Marku
 ArxisStudio.Markup.Xaml.Loader.XamlValueSource.Unset = 0 -> ArxisStudio.Markup.Xaml.Loader.XamlValueSource
 const ArxisStudio.Markup.Xaml.Loader.XamlLoaderDiagnosticCodes.ExpressionNotApplied = "AXM3015" -> string!
 const ArxisStudio.Markup.Xaml.Loader.XamlLoaderDiagnosticCodes.ExpressionReplaced = "AXM3014" -> string!
+const ArxisStudio.Markup.Xaml.Loader.XamlLoaderDiagnosticCodes.IncludeCycle = "AXM2007" -> string!
+const ArxisStudio.Markup.Xaml.Loader.XamlLoaderDiagnosticCodes.IncludeNamespaceConflict = "AXM2011" -> string!
+const ArxisStudio.Markup.Xaml.Loader.XamlLoaderDiagnosticCodes.IncludeNotProjected = "AXM2008" -> string!
 const ArxisStudio.Markup.Xaml.Loader.XamlLoaderDiagnosticCodes.IncompatibleRootType = "AXM3021" -> string!
 const ArxisStudio.Markup.Xaml.Loader.XamlLoaderDiagnosticCodes.IncompatibleValue = "AXM3012" -> string!
 const ArxisStudio.Markup.Xaml.Loader.XamlLoaderDiagnosticCodes.InvalidRootFactoryResult = "AXM3023" -> string!
 const ArxisStudio.Markup.Xaml.Loader.XamlLoaderDiagnosticCodes.InvalidThreadAccess = "AXM3004" -> string!
+const ArxisStudio.Markup.Xaml.Loader.XamlLoaderDiagnosticCodes.MalformedInclude = "AXM2009" -> string!
 const ArxisStudio.Markup.Xaml.Loader.XamlLoaderDiagnosticCodes.NoRootObject = "AXM3003" -> string!
 const ArxisStudio.Markup.Xaml.Loader.XamlLoaderDiagnosticCodes.NoSourceDeclaration = "AXM3016" -> string!
 const ArxisStudio.Markup.Xaml.Loader.XamlLoaderDiagnosticCodes.ObjectCreationFailure = "AXM3002" -> string!
@@ -220,6 +227,7 @@ const ArxisStudio.Markup.Xaml.Loader.XamlLoaderDiagnosticCodes.RuntimeLoadFailur
 const ArxisStudio.Markup.Xaml.Loader.XamlLoaderDiagnosticCodes.TypeConverterFailure = "AXM3013" -> string!
 const ArxisStudio.Markup.Xaml.Loader.XamlLoaderDiagnosticCodes.UndeclaredPrefix = "AXM2003" -> string!
 const ArxisStudio.Markup.Xaml.Loader.XamlLoaderDiagnosticCodes.UnknownNamespace = "AXM2004" -> string!
+const ArxisStudio.Markup.Xaml.Loader.XamlLoaderDiagnosticCodes.UnreadableInclude = "AXM2010" -> string!
 const ArxisStudio.Markup.Xaml.Loader.XamlLoaderDiagnosticCodes.UnresolvedAssembly = "AXM2001" -> string!
 const ArxisStudio.Markup.Xaml.Loader.XamlLoaderDiagnosticCodes.UnresolvedMember = "AXM3010" -> string!
 const ArxisStudio.Markup.Xaml.Loader.XamlLoaderDiagnosticCodes.UnresolvedResource = "AXM2005" -> string!
@@ -246,6 +254,7 @@ static ArxisStudio.Markup.Xaml.Loader.XamlLoadSession.CreateAsync(ArxisStudio.Ma
 static ArxisStudio.Markup.Xaml.Loader.XamlLoadSession.TryCreateAsync(ArxisStudio.Markup.Xaml.XamlDocument! document, ArxisStudio.Markup.Xaml.Loader.XamlLoadEnvironment! environment, ArxisStudio.Markup.Xaml.Loader.XamlLoadOptions? options = null, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.ValueTask<(ArxisStudio.Markup.Xaml.Loader.XamlLoadSession? Session, ArxisStudio.Markup.Xaml.Loader.XamlLoadResult! Result)>
 static ArxisStudio.Markup.Xaml.Loader.XamlMemberResolver.Instance.get -> ArxisStudio.Markup.Xaml.Loader.XamlMemberResolver!
 static ArxisStudio.Markup.Xaml.Loader.XamlObjectMap.Build(ArxisStudio.Markup.Xaml.XamlDocument! document, object! root) -> ArxisStudio.Markup.Xaml.Loader.XamlObjectMap!
+static ArxisStudio.Markup.Xaml.Loader.XamlObjectMap.Build(ArxisStudio.Markup.Xaml.XamlDocument! document, object! root, ArxisStudio.Markup.TextProjection! projection) -> ArxisStudio.Markup.Xaml.Loader.XamlObjectMap!
 static ArxisStudio.Markup.Xaml.Loader.XamlRootInstanceContext.operator !=(ArxisStudio.Markup.Xaml.Loader.XamlRootInstanceContext left, ArxisStudio.Markup.Xaml.Loader.XamlRootInstanceContext right) -> bool
 static ArxisStudio.Markup.Xaml.Loader.XamlRootInstanceContext.operator ==(ArxisStudio.Markup.Xaml.Loader.XamlRootInstanceContext left, ArxisStudio.Markup.Xaml.Loader.XamlRootInstanceContext right) -> bool
 static ArxisStudio.Markup.Xaml.Loader.XamlTypeName.operator !=(ArxisStudio.Markup.Xaml.Loader.XamlTypeName left, ArxisStudio.Markup.Xaml.Loader.XamlTypeName right) -> bool

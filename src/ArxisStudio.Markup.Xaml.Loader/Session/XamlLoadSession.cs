@@ -38,12 +38,14 @@ public sealed partial class XamlLoadSession : IAsyncDisposable
         XamlDocument document,
         XamlLoadEnvironment environment,
         XamlLoadOptions options,
+        TextProjection projection,
         object rootObject,
         ImmutableArray<MarkupDiagnostic> diagnostics)
     {
         Document = document;
         Environment = environment;
-        Objects = XamlObjectMap.Build(document, rootObject);
+        Projection = projection;
+        Objects = XamlObjectMap.Build(document, rootObject, projection);
         Options = options;
         RootObject = rootObject;
         Diagnostics = diagnostics;
@@ -61,6 +63,19 @@ public sealed partial class XamlLoadSession : IAsyncDisposable
 
     /// <summary>Gets which element of the document each loaded object came from.</summary>
     public XamlObjectMap Objects { get; private set; }
+
+    /// <summary>
+    /// Gets the text the objects were actually built from: the document with its resource and
+    /// style includes resolved through the environment and spliced in.
+    /// </summary>
+    /// <remarks>
+    /// Derived, never saved, and not a second version of the document. It exists because
+    /// Avalonia resolves includes through its own asset loader during the load and offers no
+    /// seam for the environment's resolvers; expanding them into the text handed over is how
+    /// they get one. <see cref="TextProjection"/> carries the map back, which is what keeps
+    /// positions Avalonia reports attributable to the file they are really in.
+    /// </remarks>
+    public TextProjection Projection { get; }
 
     /// <summary>Gets the environment the document was loaded through.</summary>
     public XamlLoadEnvironment Environment { get; }
@@ -130,6 +145,13 @@ public sealed partial class XamlLoadSession : IAsyncDisposable
             diagnostics.Add(diagnostic);
         }
 
+        // Includes are resolved before anything is created, because Avalonia resolves them
+        // itself during the load and throws when it cannot. Resolving them here through the
+        // environment, and handing over text with their content already in place, is what makes
+        // the caller's own providers the ones that answer.
+        TextProjection projection = await XamlIncludeProjector
+            .ProjectAsync(document, environment, diagnostics, cancellationToken).ConfigureAwait(false);
+
         // x:Class has to be resolved and instantiated before loading, because Avalonia
         // populates an instance the caller supplies rather than creating one for it. This also
         // gives Avalonia the object whose methods the document's event handlers name.
@@ -144,14 +166,14 @@ public sealed partial class XamlLoadSession : IAsyncDisposable
             .ConfigureAwait(false);
 
         object? root = await environment.Dispatcher
-            .InvokeAsync(() => Load(document, options, rootInstance, diagnostics), cancellationToken)
+            .InvokeAsync(() => Load(document, projection, options, rootInstance, diagnostics), cancellationToken)
             .ConfigureAwait(false);
 
         var result = new XamlLoadResult { RootObject = root, Diagnostics = [.. diagnostics] };
 
         return root is null
             ? (null, result)
-            : (new XamlLoadSession(document, environment, options, root, result.Diagnostics), result);
+            : (new XamlLoadSession(document, environment, options, projection, root, result.Diagnostics), result);
     }
 
     /// <summary>
@@ -202,9 +224,10 @@ public sealed partial class XamlLoadSession : IAsyncDisposable
         return ValueTask.CompletedTask;
     }
 
-    /// <summary>Hands the document's text to Avalonia's runtime loader.</summary>
+    /// <summary>Hands the projected text to Avalonia's runtime loader.</summary>
     private static object? Load(
         XamlDocument document,
+        TextProjection projection,
         XamlLoadOptions options,
         object? rootInstance,
         List<MarkupDiagnostic> diagnostics)
@@ -219,7 +242,7 @@ public sealed partial class XamlLoadSession : IAsyncDisposable
             CreateSourceInfo = true,
             DiagnosticHandler = diagnostic =>
             {
-                diagnostics.Add(Translate(diagnostic, document));
+                diagnostics.Add(Translate(diagnostic, document, projection));
 
                 // The handler's return value is the severity Avalonia goes on to use. Echoing
                 // what it decided keeps this a report rather than an intervention.
@@ -229,7 +252,8 @@ public sealed partial class XamlLoadSession : IAsyncDisposable
 
         // The root-instance constructor is what makes event handlers resolvable: Avalonia looks
         // for the named methods on the object it is populating.
-        var loaderDocument = new RuntimeXamlLoaderDocument(document.BaseUri, rootInstance, document.GetText());
+        var loaderDocument = new RuntimeXamlLoaderDocument(
+            document.BaseUri, rootInstance, projection.Text.ToString());
 
         try
         {
@@ -254,22 +278,33 @@ public sealed partial class XamlLoadSession : IAsyncDisposable
     /// Turns one of Avalonia's diagnostics into one of this library's.
     /// </summary>
     /// <remarks>
+    /// <para>
     /// Avalonia reports a line and column; this library reports spans. Mapping them here means
     /// a caller can highlight the offending text without knowing where the diagnostic came
     /// from.
+    /// </para>
+    /// <para>
+    /// The line and column are in the projected text, where an include has been replaced by the
+    /// file it names. Sending them through the projection is what stops a fault in an included
+    /// dictionary being reported against whichever line of this document happens to sit at the
+    /// same number.
+    /// </para>
     /// </remarks>
-    private static MarkupDiagnostic Translate(RuntimeXamlDiagnostic diagnostic, XamlDocument document)
+    private static MarkupDiagnostic Translate(
+        RuntimeXamlDiagnostic diagnostic,
+        XamlDocument document,
+        TextProjection projection)
     {
+        Uri? documentUri = document.Uri;
         TextSpan? span = null;
 
         if (diagnostic.LineNumber is { } line && line > 0)
         {
-            int zeroBasedLine = Math.Min(line - 1, document.SourceText.Lines.Count - 1);
-            TextLine textLine = document.SourceText.Lines[zeroBasedLine];
+            TextProjectionPosition position = projection.Map(
+                new TextPosition(line - 1, Math.Max(0, (diagnostic.LinePosition ?? 1) - 1)));
 
-            int column = Math.Clamp((diagnostic.LinePosition ?? 1) - 1, 0, textLine.Span.Length);
-
-            span = new TextSpan(textLine.Start + column, 0);
+            documentUri = position.IsOriginal ? document.Uri : position.SourceUri;
+            span = new TextSpan(position.Offset, 0);
         }
 
         return MarkupDiagnostic.Load(
@@ -281,7 +316,7 @@ public sealed partial class XamlLoadSession : IAsyncDisposable
                 RuntimeXamlDiagnosticSeverity.Warning => MarkupDiagnosticSeverity.Warning,
                 _ => MarkupDiagnosticSeverity.Error,
             },
-            document.Uri,
+            documentUri,
             span);
     }
 

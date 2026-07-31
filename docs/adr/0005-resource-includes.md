@@ -1,7 +1,7 @@
 # 5. Resource includes cannot go through the asset loader
 
 Date: 2026-07-31
-Status: Accepted — with work outstanding
+Status: Accepted
 
 ## Context
 
@@ -35,21 +35,39 @@ and which would break on any Avalonia update.
 
 ## Decision
 
-Neither approach is taken. The capability is deferred, and the route chosen for it is **text
-projection**: resolve includes through the resolver and hand Avalonia a projection of the
-document with their content in place, keeping the document itself untouched.
+Neither approach is taken. The route is **text projection**: includes are resolved through the
+resolver and Avalonia is handed a projection of the document with their content in place, while
+the document itself is untouched.
+
+`TextProjection` in `ArxisStudio.Markup` is the general form of this — a text assembled from one
+document plus runs spliced in from others, carrying the segments that map any position in the
+result back to the file and offset it really came from. It knows nothing about XAML.
+`XamlIncludeProjector` in the loader is what drives it: it discovers includes with the syntax
+package's analyser, resolves each through `IXamlResourceResolver`, and recurses, so a chain of
+includes across several files becomes one text with one flat map.
 
 ## Consequences
 
 - The document stays the source of truth. Only the text handed to Avalonia is transformed, and
-  it is never written anywhere.
-- Line numbers in the projection do not match the document, and the object map built in
-  milestone 7 is keyed on exactly those line numbers. The projection must therefore carry an
-  offset map from projected position back to original position, and `XamlObjectMap` must consult
-  it. This is the real work outstanding, and the reason the approach was not attempted in the
-  same sitting as the two above.
-- Until it is done, includes resolve the way Avalonia resolves them: `avares://` and files its
-  own asset loader can find. The resource graph from milestone 5 still analyses the dependencies
-  for invalidation; only loading bypasses the resolver.
-- If a future Avalonia makes `AvaloniaLocator` public, the bridging asset loader becomes the
-  better answer — it needs no offset map at all — and this decision should be revisited.
+  it is never written anywhere. `XamlLoadSession.Document` still round-trips byte for byte.
+- `XamlLoadSession.Projection` exposes the projection, and `XamlObjectMap` consults it. Line
+  numbers in the projection do not match the document, and the object map from milestone 7 is
+  keyed on exactly those line numbers; without the map back, an object declared in an included
+  dictionary would be attributed to whichever element of the host document happens to sit at the
+  same line. Runtime diagnostics are mapped the same way, so a fault in an included file is
+  reported against that file's URI.
+- `XamlObjectMap.GetSourceUri` reports the file an object's markup is in, which for anything an
+  include produced is not the document being edited.
+- Avalonia's XAML parser accepts `xmlns` declarations only on the root element. A spliced-in
+  fragment therefore cannot keep its own: they are stripped from it and added to the root of the
+  projected text, which leaves every name in the fragment resolving to what it resolved to
+  before. This is why `TextProjection` allows a synthesized run at all.
+- An include whose target no resolver knows is left exactly as written, and Avalonia's own asset
+  loader still gets its chance at it — `avares://` URIs from assemblies this library was never
+  handed keep working. The same is true of a cycle, a malformed included file, and the one case
+  the projection cannot express: an included file that binds a prefix the host already binds to
+  something else. Each is reported (`AXM2007`–`AXM2011`) rather than guessed at.
+- If a future Avalonia makes `AvaloniaLocator` public, the bridging asset loader becomes a
+  simpler answer for the loading half — it needs no namespace hoisting — though the projection's
+  map would still be the thing that keeps included markup attributable. This decision should be
+  revisited then.

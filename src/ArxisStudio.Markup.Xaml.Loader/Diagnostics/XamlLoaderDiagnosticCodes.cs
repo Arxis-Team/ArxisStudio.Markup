@@ -28,6 +28,26 @@ public static class XamlLoaderDiagnosticCodes
     /// <summary>A generic type was named without the arguments it needs.</summary>
     public const string UnsupportedGenericType = "AXM2006";
 
+    /// <summary>An include names a document already being included further up the chain.</summary>
+    public const string IncludeCycle = "AXM2007";
+
+    /// <summary>
+    /// No resolver knew an include's target, so it was left for Avalonia's own asset loader.
+    /// </summary>
+    public const string IncludeNotProjected = "AXM2008";
+
+    /// <summary>An included document did not parse cleanly enough to be used.</summary>
+    public const string MalformedInclude = "AXM2009";
+
+    /// <summary>An included document was found but could not be read.</summary>
+    public const string UnreadableInclude = "AXM2010";
+
+    /// <summary>
+    /// An included document binds a namespace prefix that already means something else where
+    /// the include sits.
+    /// </summary>
+    public const string IncludeNamespaceConflict = "AXM2011";
+
     /// <summary>Avalonia reported a problem while loading the document.</summary>
     public const string RuntimeLoadFailure = "AXM3001";
 

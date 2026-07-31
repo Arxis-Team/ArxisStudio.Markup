@@ -7,6 +7,7 @@ using Avalonia.Controls;
 using Avalonia.Headless.XUnit;
 using Avalonia.Layout;
 using Avalonia.Media;
+using Avalonia.Styling;
 using Avalonia.VisualTree;
 using Xunit;
 
@@ -55,10 +56,34 @@ public sealed class ResourcesAndTemplatesTests
     private static Border Inner(Border outer) => (Border)outer.Child!;
 
     private static string Dictionary(string key, string colour) =>
-        $"<ResourceDictionary xmlns=\"{AvaloniaNamespace}\">\n" +
-        $"  <SolidColorBrush x:Key=\"{key}\" Color=\"{colour}\"\n" +
-        $"                   xmlns:x=\"http://schemas.microsoft.com/winfx/2006/xaml\" />\n" +
+        $"<ResourceDictionary xmlns=\"{AvaloniaNamespace}\"\n" +
+        "                    xmlns:x=\"http://schemas.microsoft.com/winfx/2006/xaml\">\n" +
+        $"  <SolidColorBrush x:Key=\"{key}\" Color=\"{colour}\" />\n" +
         "</ResourceDictionary>";
+
+    /// <summary>A dictionary whose whole content is an include of another one.</summary>
+    private static string MergingDictionary(string source) =>
+        $"<ResourceDictionary xmlns=\"{AvaloniaNamespace}\">\n" +
+        "  <ResourceDictionary.MergedDictionaries>\n" +
+        $"    <ResourceInclude Source=\"{source}\" />\n" +
+        "  </ResourceDictionary.MergedDictionaries>\n" +
+        "</ResourceDictionary>";
+
+    /// <summary>
+    /// A view that gets its <c>Accent</c> brush from an include and nothing else, with the
+    /// element that uses it written after the include so a splice moves it.
+    /// </summary>
+    private static string ViewIncluding(string source) =>
+        $"<Border xmlns=\"{AvaloniaNamespace}\" xmlns:x=\"http://schemas.microsoft.com/winfx/2006/xaml\">\n" +
+        "  <Border.Resources>\n" +
+        "    <ResourceDictionary>\n" +
+        "      <ResourceDictionary.MergedDictionaries>\n" +
+        $"        <ResourceInclude Source=\"{source}\" />\n" +
+        "      </ResourceDictionary.MergedDictionaries>\n" +
+        "    </ResourceDictionary>\n" +
+        "  </Border.Resources>\n" +
+        "  <Border Name=\"Uses\" Background=\"{StaticResource Accent}\" />\n" +
+        "</Border>";
 
     [AvaloniaFact]
     public async Task AnInlineResourceReachesTheControlThatUsesIt()
@@ -79,8 +104,297 @@ public sealed class ResourcesAndTemplatesTests
         Assert.Equal(Colors.Red, Assert.IsType<SolidColorBrush>(Inner(border).Background).Color);
     }
 
+    [AvaloniaFact]
+    public async Task AResourceIncludeIsResolvedThroughTheEnvironmentsResolver()
+    {
+        (XamlLoadEnvironment environment, InMemoryResourceResolver resources) = Setup();
 
+        // Nothing on disk and nothing embedded in an assembly: only the caller's resolver knows
+        // this file exists, which is the whole point of the include going through it.
+        resources.Update(ColorsUri, Dictionary("Accent", "Red"));
 
+        await using XamlLoadSession session = await Load(ViewIncluding("/Themes/Colors.axaml"), environment);
+
+        var border = session.GetRoot<Border>();
+
+        Assert.Equal(Colors.Red, Assert.IsType<SolidColorBrush>(Inner(border).Background).Color);
+    }
+
+    [AvaloniaFact]
+    public async Task ANestedIncludeResolvesFromInMemoryProvidersAlone()
+    {
+        (XamlLoadEnvironment environment, InMemoryResourceResolver resources) = Setup();
+
+        // Colors.axaml includes Palette.axaml by a relative source, which only resolves if the
+        // included document is resolved from where it lives rather than from the view.
+        resources.Update(ColorsUri, MergingDictionary("Palette.axaml"));
+        resources.Update(PaletteUri, Dictionary("Accent", "Lime"));
+
+        await using XamlLoadSession session = await Load(ViewIncluding("/Themes/Colors.axaml"), environment);
+
+        var border = session.GetRoot<Border>();
+
+        Assert.Equal(Colors.Lime, Assert.IsType<SolidColorBrush>(Inner(border).Background).Color);
+    }
+
+    [AvaloniaFact]
+    public async Task AnEditedIncludeIsWhatTheDocumentSees()
+    {
+        (XamlLoadEnvironment environment, InMemoryResourceResolver resources) = Setup();
+
+        resources.Update(ColorsUri, Dictionary("Accent", "Red"));
+
+        await using (XamlLoadSession first = await Load(ViewIncluding("/Themes/Colors.axaml"), environment))
+        {
+            Assert.Equal(Colors.Red, Assert.IsType<SolidColorBrush>(Inner(first.GetRoot<Border>()).Background).Color);
+        }
+
+        // An unsaved edit to the included file, held in memory. Loading again has to see it.
+        resources.Update(ColorsUri, Dictionary("Accent", "Blue"));
+
+        await using XamlLoadSession second = await Load(ViewIncluding("/Themes/Colors.axaml"), environment);
+
+        Assert.Equal(Colors.Blue, Assert.IsType<SolidColorBrush>(Inner(second.GetRoot<Border>()).Background).Color);
+    }
+
+    [AvaloniaFact]
+    public async Task AStyleIncludeIsResolvedThroughTheEnvironmentsResolver()
+    {
+        (XamlLoadEnvironment environment, InMemoryResourceResolver resources) = Setup();
+
+        resources.Update(
+            StylesUri,
+            $"<Styles xmlns=\"{AvaloniaNamespace}\">\n" +
+            "  <Style Selector=\"Border.wide\">\n" +
+            "    <Setter Property=\"Width\" Value=\"321\" />\n" +
+            "  </Style>\n" +
+            "</Styles>");
+
+        await using XamlLoadSession session = await Load(
+            $"<Border xmlns=\"{AvaloniaNamespace}\">\n" +
+            "  <Border.Styles>\n" +
+            "    <StyleInclude Source=\"/Themes/Styles.axaml\" />\n" +
+            "  </Border.Styles>\n" +
+            "  <Border Classes=\"wide\" />\n" +
+            "</Border>",
+            environment);
+
+        var border = session.GetRoot<Border>();
+        IStyle included = Assert.Single(border.Styles);
+
+        // The include is gone: what sits in the collection is the styles the file declares,
+        // built by Avalonia from text the environment's resolver supplied.
+        var style = Assert.IsType<Style>(Assert.Single(Assert.IsType<Styles>(included)));
+
+        Assert.Equal(XamlObjectOrigin.Style, session.GetOrigin(style));
+        Assert.Equal(StylesUri, session.GetSourceUri(style));
+        Assert.Null(session.GetElement(style));
+    }
+
+    [AvaloniaFact]
+    public async Task AnIncludedFilesOwnPrefixesReachTheRootOfWhatIsLoaded()
+    {
+        (XamlLoadEnvironment environment, InMemoryResourceResolver resources) = Setup();
+
+        // The view knows nothing of this prefix. Avalonia accepts xmlns only on the root
+        // element, so splicing the dictionary in as written would be rejected outright, and
+        // dropping its declarations would leave local:CustomBadge naming nothing.
+        resources.Update(
+            ColorsUri,
+            $"<ResourceDictionary xmlns=\"{AvaloniaNamespace}\"\n" +
+            "                    xmlns:x=\"http://schemas.microsoft.com/winfx/2006/xaml\"\n" +
+            $"                    xmlns:local=\"{TestControlsNamespace}\">\n" +
+            "  <SolidColorBrush x:Key=\"Accent\" Color=\"Red\" />\n" +
+            "  <local:CustomBadge x:Key=\"Badge\" />\n" +
+            "</ResourceDictionary>");
+
+        await using XamlLoadSession session = await Load(ViewIncluding("/Themes/Colors.axaml"), environment);
+
+        var border = session.GetRoot<Border>();
+
+        Assert.Equal(Colors.Red, Assert.IsType<SolidColorBrush>(Inner(border).Background).Color);
+        Assert.True(border.Resources.TryGetResource("Badge", null, out object? badge));
+        Assert.IsType<CustomBadge>(badge);
+
+        // The prefix was moved to the root of the text Avalonia was given, which is the only
+        // place it is allowed to be.
+        Assert.Contains(
+            $"xmlns:local=\"{TestControlsNamespace}\"",
+            session.Projection.Text.Lines[0].ToString(),
+            StringComparison.Ordinal);
+    }
+
+    [AvaloniaFact]
+    public async Task AnIncludeThatRebindsAPrefixIsLeftAsWritten()
+    {
+        (XamlLoadEnvironment environment, InMemoryResourceResolver resources) = Setup();
+
+        resources.Update(
+            ColorsUri,
+            $"<ResourceDictionary xmlns=\"{AvaloniaNamespace}\"\n" +
+            "                    xmlns:x=\"http://schemas.microsoft.com/winfx/2006/xaml\"\n" +
+            "                    xmlns:local=\"https://example.invalid/somewhere-else\">\n" +
+            "  <SolidColorBrush x:Key=\"Accent\" Color=\"Red\" />\n" +
+            "</ResourceDictionary>");
+
+        (XamlLoadSession? session, XamlLoadResult result) = await XamlLoadSession.TryCreateAsync(
+            XamlDocument.Parse(
+                $"<Border xmlns=\"{AvaloniaNamespace}\" xmlns:local=\"{TestControlsNamespace}\">\n" +
+                "  <Border.Resources>\n" +
+                "    <ResourceDictionary>\n" +
+                "      <ResourceDictionary.MergedDictionaries>\n" +
+                "        <ResourceInclude Source=\"/Themes/Colors.axaml\" />\n" +
+                "      </ResourceDictionary.MergedDictionaries>\n" +
+                "    </ResourceDictionary>\n" +
+                "  </Border.Resources>\n" +
+                "</Border>",
+                new XamlParseOptions { DocumentUri = ViewUri }),
+            environment,
+            cancellationToken: TestContext.Current.CancellationToken);
+
+        await using (session)
+        {
+            // Two files that are each correct alone and cannot both keep 'local' once merged.
+            // Guessing which one to rename would be worse than saying so.
+            Assert.Contains(
+                result.Diagnostics,
+                diagnostic => diagnostic.Code == XamlLoaderDiagnosticCodes.IncludeNamespaceConflict);
+        }
+    }
+
+    [AvaloniaFact]
+    public async Task AnIncludedObjectIsAttributedToTheFileItIsWrittenIn()
+    {
+        (XamlLoadEnvironment environment, InMemoryResourceResolver resources) = Setup();
+
+        resources.Update(ColorsUri, Dictionary("Accent", "Red"));
+
+        await using XamlLoadSession session = await Load(ViewIncluding("/Themes/Colors.axaml"), environment);
+
+        var border = session.GetRoot<Border>();
+        IResourceProvider merged = Assert.Single(border.Resources.MergedDictionaries);
+
+        // The dictionary was declared in Colors.axaml. Handing back an element of this document
+        // for it would offer the caller an edit that writes into the wrong file.
+        Assert.Equal(ColorsUri, session.GetSourceUri(merged));
+        Assert.Equal(XamlObjectOrigin.Resource, session.GetOrigin(merged));
+        Assert.Null(session.GetElement(merged));
+    }
+
+    [AvaloniaFact]
+    public async Task TheLinesAnIncludeAddsDoNotMoveTheDocumentsOwnElements()
+    {
+        (XamlLoadEnvironment environment, InMemoryResourceResolver resources) = Setup();
+
+        // Three lines of dictionary replacing one line of include, so every element written
+        // after it sits two lines further down in the text Avalonia is given than in the file.
+        resources.Update(ColorsUri, Dictionary("Accent", "Red"));
+
+        string xaml = ViewIncluding("/Themes/Colors.axaml");
+
+        await using XamlLoadSession session = await Load(xaml, environment);
+
+        Assert.False(session.Projection.IsIdentity);
+
+        XamlElement element = Assert.IsType<XamlElement>(session.GetElement(Inner(session.GetRoot<Border>())));
+
+        Assert.Contains(
+            "Name=\"Uses\"",
+            session.Document.SourceText.GetText(element.Span),
+            StringComparison.Ordinal);
+        Assert.Equal(ViewUri, session.GetSourceUri(Inner(session.GetRoot<Border>())));
+    }
+
+    [AvaloniaFact]
+    public async Task ProjectingAnIncludeLeavesTheDocumentItself()
+    {
+        (XamlLoadEnvironment environment, InMemoryResourceResolver resources) = Setup();
+
+        resources.Update(ColorsUri, Dictionary("Accent", "Red"));
+
+        string xaml = ViewIncluding("/Themes/Colors.axaml");
+
+        await using XamlLoadSession session = await Load(xaml, environment);
+
+        // Rule 1 and rule 2 of the contract. The projection is what Avalonia was handed; the
+        // document is what a save would write, and it still says what the author wrote.
+        Assert.Equal(xaml, session.Document.GetText());
+        Assert.Equal(xaml, session.Projection.Source.ToString());
+        Assert.Contains("<ResourceInclude", session.Document.GetText(), StringComparison.Ordinal);
+        Assert.DoesNotContain("<ResourceInclude", session.Projection.Text.ToString(), StringComparison.Ordinal);
+        Assert.Contains("SolidColorBrush", session.Projection.Text.ToString(), StringComparison.Ordinal);
+    }
+
+    [AvaloniaFact]
+    public async Task AnIncludeCycleIsReportedRatherThanExpandedForEver()
+    {
+        (XamlLoadEnvironment environment, InMemoryResourceResolver resources) = Setup();
+
+        resources.Update(ColorsUri, MergingDictionary("Palette.axaml"));
+        resources.Update(PaletteUri, MergingDictionary("Colors.axaml"));
+
+        (XamlLoadSession? session, XamlLoadResult result) = await XamlLoadSession.TryCreateAsync(
+            XamlDocument.Parse(ViewIncluding("/Themes/Colors.axaml"), new XamlParseOptions { DocumentUri = ViewUri }),
+            environment,
+            cancellationToken: TestContext.Current.CancellationToken);
+
+        await using (session)
+        {
+            Assert.Contains(
+                result.Diagnostics,
+                diagnostic => diagnostic.Code == XamlLoaderDiagnosticCodes.IncludeCycle);
+        }
+    }
+
+    [AvaloniaFact]
+    public async Task AnIncludeNoResolverKnowsIsLeftForAvalonia()
+    {
+        (XamlLoadEnvironment environment, _) = Setup();
+
+        (XamlLoadSession? session, XamlLoadResult result) = await XamlLoadSession.TryCreateAsync(
+            XamlDocument.Parse(
+                ViewIncluding("avares://NoSuchAssembly/Themes/Colors.axaml"),
+                new XamlParseOptions { DocumentUri = ViewUri }),
+            environment,
+            cancellationToken: TestContext.Current.CancellationToken);
+
+        await using (session)
+        {
+            // Not an error here: Avalonia's own asset loader reaches resources this library was
+            // never told about, and it is the one that gets to say the URI is wrong.
+            MarkupDiagnostic left = Assert.Single(
+                result.Diagnostics,
+                diagnostic => diagnostic.Code == XamlLoaderDiagnosticCodes.IncludeNotProjected);
+
+            Assert.Equal(MarkupDiagnosticSeverity.Info, left.Severity);
+        }
+    }
+
+    [AvaloniaFact]
+    public async Task AMalformedIncludeIsReportedAgainstTheFileItIsIn()
+    {
+        (XamlLoadEnvironment environment, InMemoryResourceResolver resources) = Setup();
+
+        resources.Update(ColorsUri, $"<ResourceDictionary xmlns=\"{AvaloniaNamespace}\">");
+
+        (XamlLoadSession? session, XamlLoadResult result) = await XamlLoadSession.TryCreateAsync(
+            XamlDocument.Parse(ViewIncluding("/Themes/Colors.axaml"), new XamlParseOptions { DocumentUri = ViewUri }),
+            environment,
+            cancellationToken: TestContext.Current.CancellationToken);
+
+        await using (session)
+        {
+            Assert.Contains(
+                result.Diagnostics,
+                diagnostic => diagnostic.Code == XamlLoaderDiagnosticCodes.MalformedInclude);
+
+            // The errors that say what is actually wrong belong to the included file, not to
+            // the document that named it.
+            Assert.Contains(
+                result.Diagnostics,
+                diagnostic => diagnostic.IsError && ColorsUri.Equals(diagnostic.DocumentUri));
+        }
+    }
 
 
 

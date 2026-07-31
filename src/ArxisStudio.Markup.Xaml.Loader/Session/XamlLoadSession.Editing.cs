@@ -53,6 +53,23 @@ public sealed partial class XamlLoadSession
         return Objects.GetOrigin(runtimeObject);
     }
 
+    /// <summary>Gets the document an object was declared in.</summary>
+    /// <remarks>
+    /// Not always this document. An object created by a <c>ResourceInclude</c> or a
+    /// <c>StyleInclude</c> is declared in the file the include names, and a caller offering to
+    /// navigate to a declaration needs to open that file rather than this one.
+    /// </remarks>
+    /// <param name="runtimeObject">The object to look up.</param>
+    /// <returns>The URI of the file its markup is in, or <see langword="null"/> when it has none.</returns>
+    /// <exception cref="ArgumentNullException"><paramref name="runtimeObject"/> is <see langword="null"/>.</exception>
+    /// <exception cref="InvalidOperationException">The calling thread does not own the objects.</exception>
+    public Uri? GetSourceUri(object runtimeObject)
+    {
+        VerifyAccess();
+
+        return Objects.GetSourceUri(runtimeObject);
+    }
+
     /// <summary>Works out what a member name means on an object.</summary>
     /// <param name="target">The object the member is written on.</param>
     /// <param name="name">The member name, which may have the <c>Owner.Member</c> shape.</param>
@@ -287,7 +304,9 @@ public sealed partial class XamlLoadSession
         Document = Document.SetAttribute(element, XamlQualifiedName.Parse(memberName), value);
 
         // Editing reparses, so every element the caller holds now describes text that has moved.
-        Objects = XamlObjectMap.Build(Document, RootObject);
+        // The projection is the one the objects were built from, because the positions being
+        // read back are the ones Avalonia recorded against it.
+        Objects = XamlObjectMap.Build(Document, RootObject, Projection);
     }
 
     /// <summary>Reads what the document says a property is.</summary>

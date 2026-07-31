@@ -27,18 +27,29 @@ namespace ArxisStudio.Markup.Xaml.Loader;
 /// that it belongs to a template, not handed the control's own declaration as though editing
 /// it were the same thing.
 /// </para>
+/// <para>
+/// The positions Avalonia records are positions in the projected text, in which every include
+/// has been replaced by the document it names. They are therefore read through the projection
+/// rather than used directly, which is both what keeps the document's own elements at the right
+/// offsets once a splice has moved everything after it, and what makes an object declared in an
+/// included file identifiable as belonging to that file.
+/// </para>
 /// </remarks>
 public sealed class XamlObjectMap
 {
     private readonly Dictionary<XamlElement, object> _objectsByElement = [];
     private readonly ConditionalWeakTable<object, XamlElement> _elementsByObject = [];
     private readonly ConditionalWeakTable<object, OriginBox> _origins = [];
+    private readonly ConditionalWeakTable<object, Uri> _sourceUris = [];
     private readonly List<object> _objects = [];
+
+    private readonly TextProjection _projection;
 
     private Uri? _documentSourceUri;
 
-    private XamlObjectMap()
+    private XamlObjectMap(TextProjection projection)
     {
+        _projection = projection;
     }
 
     /// <summary>Gets the objects the map knows about, in the order they were reached.</summary>
@@ -47,7 +58,7 @@ public sealed class XamlObjectMap
     /// <summary>Gets the elements that were matched to an object.</summary>
     public IReadOnlyCollection<XamlElement> MappedElements => _objectsByElement.Keys;
 
-    /// <summary>Builds a map for a freshly loaded tree.</summary>
+    /// <summary>Builds a map for a tree loaded from a document with nothing spliced into it.</summary>
     /// <param name="document">The document the objects were created from.</param>
     /// <param name="root">The object the document produced.</param>
     /// <returns>The map.</returns>
@@ -55,9 +66,26 @@ public sealed class XamlObjectMap
     public static XamlObjectMap Build(XamlDocument document, object root)
     {
         ArgumentNullException.ThrowIfNull(document);
-        ArgumentNullException.ThrowIfNull(root);
 
-        var map = new XamlObjectMap
+        return Build(document, root, TextProjection.Identity(document.SourceText, document.Uri));
+    }
+
+    /// <summary>Builds a map for a freshly loaded tree.</summary>
+    /// <param name="document">The document the objects were created from.</param>
+    /// <param name="root">The object the document produced.</param>
+    /// <param name="projection">
+    /// The text the objects were actually built from, which is the document with its includes
+    /// resolved and spliced in.
+    /// </param>
+    /// <returns>The map.</returns>
+    /// <exception cref="ArgumentNullException">An argument is <see langword="null"/>.</exception>
+    public static XamlObjectMap Build(XamlDocument document, object root, TextProjection projection)
+    {
+        ArgumentNullException.ThrowIfNull(document);
+        ArgumentNullException.ThrowIfNull(root);
+        ArgumentNullException.ThrowIfNull(projection);
+
+        var map = new XamlObjectMap(projection)
         {
             // Avalonia names a runtime-loaded document with a synthetic URI of its own rather
             // than the base URI it was handed, so what the document "is" can only be learnt
@@ -118,6 +146,20 @@ public sealed class XamlObjectMap
             : XamlObjectOrigin.RuntimeGenerated;
     }
 
+    /// <summary>Gets the document an object was declared in.</summary>
+    /// <param name="runtimeObject">The object to look up.</param>
+    /// <returns>
+    /// The URI of the file the object's markup lives in — this document, or an included one —
+    /// or <see langword="null"/> when nothing declared it or the file has no URI.
+    /// </returns>
+    /// <exception cref="ArgumentNullException"><paramref name="runtimeObject"/> is <see langword="null"/>.</exception>
+    public Uri? GetSourceUri(object runtimeObject)
+    {
+        ArgumentNullException.ThrowIfNull(runtimeObject);
+
+        return _sourceUris.TryGetValue(runtimeObject, out Uri? uri) ? uri : null;
+    }
+
     /// <summary>Walks a tree, recording what each object came from.</summary>
     private void Walk(XamlDocument document, object current, XamlObjectOrigin inherited, HashSet<object> seen)
     {
@@ -126,11 +168,24 @@ public sealed class XamlObjectMap
             return;
         }
 
-        XamlObjectOrigin origin = DetermineOrigin(current, inherited);
-        XamlElement? element = FindDeclaration(document, current);
+        Declaration declaration = Locate(document, current);
+
+        // An object whose markup is in an included file is not part of this document however
+        // deep in it the include sits, so it cannot inherit this document's origin: a style
+        // pulled in by a StyleInclude has to read as a style, not as one written here.
+        XamlObjectOrigin origin = DetermineOrigin(
+            current,
+            declaration.IsFromIncludedDocument ? XamlObjectOrigin.Resource : inherited);
+
+        XamlElement? element = declaration.Element;
 
         _objects.Add(current);
         _origins.AddOrUpdate(current, new OriginBox(origin));
+
+        if (declaration.SourceUri is { } sourceUri)
+        {
+            _sourceUris.AddOrUpdate(current, sourceUri);
+        }
 
         // Only a Document-origin object gets a two-way link. A template-generated child may
         // carry source information pointing at the template's own markup, and letting that
@@ -166,40 +221,42 @@ public sealed class XamlObjectMap
         };
     }
 
-    /// <summary>Finds the element an object was created from, using Avalonia's source information.</summary>
-    private XamlElement? FindDeclaration(XamlDocument document, object current)
+    /// <summary>Finds where an object was declared, using Avalonia's source information.</summary>
+    private Declaration Locate(XamlDocument document, object current)
     {
         XamlSourceInfo? info = XamlSourceInfo.GetXamlSourceInfo(current);
 
         if (info is null || info.LineNumber <= 0)
         {
-            return null;
+            return default;
         }
 
         // Source information from another file describes another document's markup. Mapping it
-        // into this one would put an object under an unrelated element.
+        // into this one would put an object under an unrelated element. Included documents are
+        // not this case: they were spliced into the text Avalonia was handed, so they report
+        // the same URI as the rest of it and the projection is what tells them apart.
         if (_documentSourceUri is not null
             && info.SourceUri is not null
             && !XamlUri.Comparer.Equals(info.SourceUri, _documentSourceUri))
         {
-            return null;
+            return default;
         }
 
-        TextLineCollection lines = document.SourceText.Lines;
-        int line = Math.Min(info.LineNumber - 1, lines.Count - 1);
+        TextProjectionPosition position = _projection.Map(
+            new TextPosition(info.LineNumber - 1, Math.Max(0, info.LinePosition - 1)));
 
-        if (line < 0)
+        if (!position.IsOriginal)
         {
-            return null;
+            return new Declaration(null, position.SourceUri, IsFromIncludedDocument: true);
         }
-
-        TextLine textLine = lines[line];
-        int column = Math.Clamp(info.LinePosition - 1, 0, Math.Max(0, textLine.Span.Length));
-        int offset = Math.Min(textLine.Start + column, Math.Max(0, document.SourceText.Length - 1));
 
         // The recorded position lands inside the start tag, so the innermost node there is a
         // part of the element rather than the element itself.
-        return document.FindNode(offset)?.AncestorsAndSelf().OfType<XamlElement>().FirstOrDefault();
+        int offset = Math.Min(position.Offset, Math.Max(0, document.SourceText.Length - 1));
+        XamlElement? element =
+            document.FindNode(offset)?.AncestorsAndSelf().OfType<XamlElement>().FirstOrDefault();
+
+        return new Declaration(element, document.Uri, IsFromIncludedDocument: false);
     }
 
     /// <summary>Gets the objects reachable from one, without leaving the logical world.</summary>
@@ -237,6 +294,13 @@ public sealed class XamlObjectMap
 
         if (current is IResourceDictionary dictionary)
         {
+            // Merged dictionaries are where an include's content ends up, so a walk that
+            // skipped them would have nothing to say about the objects an include produced.
+            foreach (IResourceProvider merged in dictionary.MergedDictionaries)
+            {
+                yield return merged;
+            }
+
             foreach (object? value in dictionary.Values)
             {
                 if (value is not null)
@@ -253,7 +317,28 @@ public sealed class XamlObjectMap
                 yield return style;
             }
         }
+
+        // A style include brings in a whole Styles collection, which sits inside the host's own
+        // one rather than being flattened into it.
+        if (current is Styles nested)
+        {
+            foreach (IStyle style in nested)
+            {
+                yield return style;
+            }
+        }
     }
+
+    /// <summary>Where an object's markup was found, once the projection has been consulted.</summary>
+    /// <param name="Element">
+    /// The element that declared it, when that element is in the document being edited.
+    /// </param>
+    /// <param name="SourceUri">The file the markup is in, when that file has a URI.</param>
+    /// <param name="IsFromIncludedDocument">Whether the markup came from an include rather than this document.</param>
+    private readonly record struct Declaration(
+        XamlElement? Element,
+        Uri? SourceUri,
+        bool IsFromIncludedDocument);
 
     /// <summary>A boxed origin, because a weak table needs a reference type.</summary>
     private sealed class OriginBox(XamlObjectOrigin value)
