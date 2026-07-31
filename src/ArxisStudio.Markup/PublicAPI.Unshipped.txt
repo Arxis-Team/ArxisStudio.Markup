@@ -29,6 +29,10 @@ ArxisStudio.Markup.FileMarkupSource.Path.get -> string!
 ArxisStudio.Markup.FileMarkupSourceProvider
 ArxisStudio.Markup.FileMarkupSourceProvider.FileMarkupSourceProvider(System.Text.Encoding? defaultEncoding = null) -> void
 ArxisStudio.Markup.FileMarkupSourceProvider.TryGetSourceAsync(System.Uri! uri, System.Threading.CancellationToken cancellationToken) -> System.Threading.Tasks.ValueTask<ArxisStudio.Markup.MarkupSource?>
+ArxisStudio.Markup.IMarkupDependencyGraph
+ArxisStudio.Markup.IMarkupDependencyGraph.GetDependencies(ArxisStudio.Markup.MarkupDocumentId document) -> System.Collections.Generic.IReadOnlySet<ArxisStudio.Markup.MarkupDocumentId>!
+ArxisStudio.Markup.IMarkupDependencyGraph.GetDependents(ArxisStudio.Markup.MarkupDocumentId document) -> System.Collections.Generic.IReadOnlySet<ArxisStudio.Markup.MarkupDocumentId>!
+ArxisStudio.Markup.IMarkupDependencyGraph.SetDependencies(ArxisStudio.Markup.MarkupDocumentId document, System.Collections.Generic.IReadOnlyCollection<ArxisStudio.Markup.MarkupDocumentId>! dependencies) -> void
 ArxisStudio.Markup.IMarkupSourceProvider
 ArxisStudio.Markup.IMarkupSourceProvider.TryGetSourceAsync(System.Uri! uri, System.Threading.CancellationToken cancellationToken) -> System.Threading.Tasks.ValueTask<ArxisStudio.Markup.MarkupSource?>
 ArxisStudio.Markup.InMemoryMarkupSourceProvider
@@ -40,6 +44,18 @@ ArxisStudio.Markup.InMemoryMarkupSourceProvider.TryGetSourceAsync(System.Uri! ur
 ArxisStudio.Markup.InMemoryMarkupSourceProvider.Update(System.Uri! uri, ArxisStudio.Markup.SourceText! text) -> void
 ArxisStudio.Markup.InMemoryMarkupSourceProvider.Update(System.Uri! uri, string! text) -> void
 ArxisStudio.Markup.InMemoryMarkupSourceProvider.Uris.get -> System.Collections.Generic.IReadOnlyCollection<System.Uri!>!
+ArxisStudio.Markup.MarkupDependencyGraph
+ArxisStudio.Markup.MarkupDependencyGraph.Clear() -> void
+ArxisStudio.Markup.MarkupDependencyGraph.Documents.get -> System.Collections.Generic.IReadOnlyCollection<ArxisStudio.Markup.MarkupDocumentId>!
+ArxisStudio.Markup.MarkupDependencyGraph.GetDependencies(ArxisStudio.Markup.MarkupDocumentId document) -> System.Collections.Generic.IReadOnlySet<ArxisStudio.Markup.MarkupDocumentId>!
+ArxisStudio.Markup.MarkupDependencyGraph.GetDependents(ArxisStudio.Markup.MarkupDocumentId document) -> System.Collections.Generic.IReadOnlySet<ArxisStudio.Markup.MarkupDocumentId>!
+ArxisStudio.Markup.MarkupDependencyGraph.GetTransitiveDependencies(ArxisStudio.Markup.MarkupDocumentId document) -> System.Collections.Generic.IReadOnlySet<ArxisStudio.Markup.MarkupDocumentId>!
+ArxisStudio.Markup.MarkupDependencyGraph.GetTransitiveDependents(ArxisStudio.Markup.MarkupDocumentId document) -> System.Collections.Generic.IReadOnlySet<ArxisStudio.Markup.MarkupDocumentId>!
+ArxisStudio.Markup.MarkupDependencyGraph.IsInCycle(ArxisStudio.Markup.MarkupDocumentId document) -> bool
+ArxisStudio.Markup.MarkupDependencyGraph.MarkupDependencyGraph() -> void
+ArxisStudio.Markup.MarkupDependencyGraph.Remove(ArxisStudio.Markup.MarkupDocumentId document) -> bool
+ArxisStudio.Markup.MarkupDependencyGraph.SetDependencies(ArxisStudio.Markup.MarkupDocumentId document, System.Collections.Generic.IReadOnlyCollection<ArxisStudio.Markup.MarkupDocumentId>! dependencies) -> void
+ArxisStudio.Markup.MarkupDependencyGraph.TryFindCycle(ArxisStudio.Markup.MarkupDocumentId document, out System.Collections.Generic.IReadOnlyList<ArxisStudio.Markup.MarkupDocumentId>! cycle) -> bool
 ArxisStudio.Markup.MarkupDocument
 ArxisStudio.Markup.MarkupDocument.Id.get -> ArxisStudio.Markup.MarkupDocumentId
 ArxisStudio.Markup.MarkupDocument.MarkupDocument(ArxisStudio.Markup.MarkupDocumentId id, System.Uri! uri, ArxisStudio.Markup.SourceText! text) -> void
@@ -59,9 +75,31 @@ ArxisStudio.Markup.MarkupDocumentId.Value.init -> void
 ArxisStudio.Markup.MarkupSource
 ArxisStudio.Markup.MarkupSource.MarkupSource(System.Uri! uri) -> void
 ArxisStudio.Markup.MarkupSource.Uri.get -> System.Uri!
+ArxisStudio.Markup.MarkupTransaction
+ArxisStudio.Markup.MarkupTransaction.AddDocument(System.Uri! uri, ArxisStudio.Markup.SourceText! text) -> ArxisStudio.Markup.MarkupDocument!
+ArxisStudio.Markup.MarkupTransaction.ApplyChanges(ArxisStudio.Markup.MarkupDocumentId id, System.Collections.Generic.IReadOnlyList<ArxisStudio.Markup.TextChange>! changes) -> ArxisStudio.Markup.MarkupDocument!
+ArxisStudio.Markup.MarkupTransaction.ChangedDocumentCount.get -> int
+ArxisStudio.Markup.MarkupTransaction.Commit() -> void
+ArxisStudio.Markup.MarkupTransaction.Description.get -> string!
+ArxisStudio.Markup.MarkupTransaction.Dispose() -> void
+ArxisStudio.Markup.MarkupTransaction.GetDocument(ArxisStudio.Markup.MarkupDocumentId id) -> ArxisStudio.Markup.MarkupDocument!
+ArxisStudio.Markup.MarkupTransaction.HasChanges.get -> bool
+ArxisStudio.Markup.MarkupTransaction.RemoveDocument(ArxisStudio.Markup.MarkupDocumentId id) -> bool
+ArxisStudio.Markup.MarkupTransaction.Rollback() -> void
+ArxisStudio.Markup.MarkupTransaction.State.get -> ArxisStudio.Markup.MarkupTransactionState
+ArxisStudio.Markup.MarkupTransaction.TryGetDocument(ArxisStudio.Markup.MarkupDocumentId id, out ArxisStudio.Markup.MarkupDocument? document) -> bool
+ArxisStudio.Markup.MarkupTransaction.UpdateDocument(ArxisStudio.Markup.MarkupDocumentId id, ArxisStudio.Markup.SourceText! text) -> ArxisStudio.Markup.MarkupDocument!
+ArxisStudio.Markup.MarkupTransactionState
+ArxisStudio.Markup.MarkupTransactionState.Active = 0 -> ArxisStudio.Markup.MarkupTransactionState
+ArxisStudio.Markup.MarkupTransactionState.Committed = 1 -> ArxisStudio.Markup.MarkupTransactionState
+ArxisStudio.Markup.MarkupTransactionState.RolledBack = 2 -> ArxisStudio.Markup.MarkupTransactionState
 ArxisStudio.Markup.MarkupWorkspace
 ArxisStudio.Markup.MarkupWorkspace.AddDocument(System.Uri! uri, ArxisStudio.Markup.SourceText! text) -> ArxisStudio.Markup.MarkupDocument!
 ArxisStudio.Markup.MarkupWorkspace.ApplyChanges(ArxisStudio.Markup.MarkupDocumentId id, System.Collections.Generic.IReadOnlyList<ArxisStudio.Markup.TextChange>! changes) -> ArxisStudio.Markup.MarkupDocument!
+ArxisStudio.Markup.MarkupWorkspace.BeginTransaction(string! description) -> ArxisStudio.Markup.MarkupTransaction!
+ArxisStudio.Markup.MarkupWorkspace.CanRedo.get -> bool
+ArxisStudio.Markup.MarkupWorkspace.CanUndo.get -> bool
+ArxisStudio.Markup.MarkupWorkspace.ClearHistory() -> void
 ArxisStudio.Markup.MarkupWorkspace.CloseDocument(ArxisStudio.Markup.MarkupDocumentId id) -> bool
 ArxisStudio.Markup.MarkupWorkspace.Count.get -> int
 ArxisStudio.Markup.MarkupWorkspace.DocumentChanged -> System.EventHandler<ArxisStudio.Markup.DocumentChangedEventArgs!>?
@@ -69,9 +107,13 @@ ArxisStudio.Markup.MarkupWorkspace.Documents.get -> System.Collections.Generic.I
 ArxisStudio.Markup.MarkupWorkspace.GetDocument(ArxisStudio.Markup.MarkupDocumentId id) -> ArxisStudio.Markup.MarkupDocument!
 ArxisStudio.Markup.MarkupWorkspace.MarkupWorkspace(ArxisStudio.Markup.IMarkupSourceProvider! sourceProvider) -> void
 ArxisStudio.Markup.MarkupWorkspace.OpenDocumentAsync(System.Uri! uri, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.ValueTask<ArxisStudio.Markup.MarkupDocument!>
+ArxisStudio.Markup.MarkupWorkspace.Redo() -> bool
+ArxisStudio.Markup.MarkupWorkspace.RedoDescription.get -> string?
 ArxisStudio.Markup.MarkupWorkspace.SourceProvider.get -> ArxisStudio.Markup.IMarkupSourceProvider!
 ArxisStudio.Markup.MarkupWorkspace.TryGetDocument(ArxisStudio.Markup.MarkupDocumentId id, out ArxisStudio.Markup.MarkupDocument? document) -> bool
 ArxisStudio.Markup.MarkupWorkspace.TryGetDocumentByUri(System.Uri! uri, out ArxisStudio.Markup.MarkupDocument? document) -> bool
+ArxisStudio.Markup.MarkupWorkspace.Undo() -> bool
+ArxisStudio.Markup.MarkupWorkspace.UndoDescription.get -> string?
 ArxisStudio.Markup.MarkupWorkspace.UpdateDocument(ArxisStudio.Markup.MarkupDocumentId id, ArxisStudio.Markup.SourceText! text) -> ArxisStudio.Markup.MarkupDocument!
 ArxisStudio.Markup.SourceText
 ArxisStudio.Markup.SourceText.Encoding.get -> System.Text.Encoding!

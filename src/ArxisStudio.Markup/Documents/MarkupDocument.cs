@@ -23,6 +23,17 @@ public sealed class MarkupDocument
     {
     }
 
+    /// <summary>
+    /// Creates a snapshot at an explicit version.
+    /// </summary>
+    /// <remarks>
+    /// Reserved for <see cref="MarkupWorkspace"/>, which is the authority on versions for the
+    /// documents it owns: it has to issue versions that have never been used before, including
+    /// when undo restores earlier text.
+    /// </remarks>
+    internal static MarkupDocument Create(MarkupDocumentId id, Uri uri, SourceText text, DocumentVersion version) =>
+        new(id, uri, text, version);
+
     private MarkupDocument(MarkupDocumentId id, Uri uri, SourceText text, DocumentVersion version)
     {
         ArgumentNullException.ThrowIfNull(uri);
