@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using System.Collections.Immutable;
 using System.Linq;
@@ -99,6 +100,57 @@ public sealed class XamlElement : XamlSyntaxNode
     /// its prefix is not in scope.
     /// </summary>
     public string? NamespaceUri => NamespaceContext.LookupNamespace(Name.Prefix);
+
+    /// <summary>
+    /// Gets a value indicating whether the element's name has the <c>Owner.Member</c> shape,
+    /// as <c>&lt;Grid.RowDefinitions&gt;</c> does.
+    /// </summary>
+    /// <remarks>
+    /// The shape is all this package can see. Whether the member is a collection, a content
+    /// property, an attached property or something else needs CLR metadata, which belongs to
+    /// the loader.
+    /// </remarks>
+    public bool IsPropertyElementSyntax => Name.IsDotted;
+
+    /// <summary>Gets the owner part of a property-element name, or <see langword="null"/>.</summary>
+    public string? OwnerName => Name.OwnerName;
+
+    /// <summary>Gets the member part of a property-element name, or <see langword="null"/>.</summary>
+    public string? MemberName => Name.MemberName;
+
+    /// <summary>Gets the element's XAML-language directives, such as <c>x:Name</c>.</summary>
+    public IEnumerable<XamlAttribute> Directives =>
+        _attributes.Where(static attribute => attribute.IsDirective);
+
+    /// <summary>Gets the element's design-time attributes, such as <c>d:DesignWidth</c>.</summary>
+    public IEnumerable<XamlAttribute> DesignTimeAttributes =>
+        _attributes.Where(static attribute => attribute.IsDesignTime);
+
+    /// <summary>
+    /// Reads a XAML-language directive's value.
+    /// </summary>
+    /// <remarks>
+    /// Matched by namespace rather than prefix, so this finds <c>x:Name</c> in a document that
+    /// spells the XAML namespace with any prefix at all.
+    /// </remarks>
+    /// <param name="localName">The directive's local name, such as <c>Name</c> or <c>Key</c>.</param>
+    /// <returns>The directive's raw text, or <see langword="null"/> when the element has no such directive.</returns>
+    public string? GetDirective(string localName) => GetDirectiveAttribute(localName)?.GetValueText();
+
+    /// <summary>Finds a XAML-language directive.</summary>
+    /// <param name="localName">The directive's local name.</param>
+    /// <returns>The attribute, or <see langword="null"/>.</returns>
+    public XamlAttribute? GetDirectiveAttribute(string localName) =>
+        _attributes.FirstOrDefault(attribute =>
+            attribute.IsDirective && string.Equals(attribute.Name.LocalName, localName, StringComparison.Ordinal));
+
+    /// <summary>Reads a design-time attribute's value.</summary>
+    /// <param name="localName">The attribute's local name, such as <c>DesignWidth</c>.</param>
+    /// <returns>The raw text, or <see langword="null"/> when the element has no such attribute.</returns>
+    public string? GetDesignTimeAttribute(string localName) =>
+        _attributes.FirstOrDefault(attribute =>
+            attribute.IsDesignTime && string.Equals(attribute.Name.LocalName, localName, StringComparison.Ordinal))
+        ?.GetValueText();
 
     /// <summary>Finds an attribute by its written name.</summary>
     /// <param name="name">The name as written, prefix included.</param>

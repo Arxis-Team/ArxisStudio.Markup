@@ -105,6 +105,78 @@ public sealed class XamlDocument : XamlSyntaxNode
         return Parse(SourceText.From(text), options);
     }
 
+    /// <summary>
+    /// Opens an editor for making several changes as one operation.
+    /// </summary>
+    /// <remarks>
+    /// Batching matters: each change is computed against this document's spans, so applying
+    /// them together is the only way for several to be expressed in terms of the same text.
+    /// The single-edit methods on this type each open and apply an editor of their own.
+    /// </remarks>
+    /// <returns>The editor. This document is unaffected until <see cref="XamlDocumentEditor.Apply"/>.</returns>
+    public XamlDocumentEditor Edit() => new(this);
+
+    /// <summary>Sets an attribute's value, adding the attribute if the element does not have it.</summary>
+    /// <param name="element">The element to change.</param>
+    /// <param name="name">The attribute name as it should be written.</param>
+    /// <param name="value">The value to set.</param>
+    /// <returns>A new document with the change applied.</returns>
+    public XamlDocument SetAttribute(XamlElement element, XamlQualifiedName name, XamlValue value) =>
+        Edit().SetAttribute(element, name, value).Apply();
+
+    /// <summary>Sets an attribute to raw attribute text.</summary>
+    /// <param name="element">The element to change.</param>
+    /// <param name="name">The attribute name as it should be written.</param>
+    /// <param name="text">The raw value text.</param>
+    /// <returns>A new document with the change applied.</returns>
+    public XamlDocument SetAttribute(XamlElement element, XamlQualifiedName name, string text) =>
+        Edit().SetAttribute(element, name, text).Apply();
+
+    /// <summary>Removes an attribute.</summary>
+    /// <param name="element">The element to change.</param>
+    /// <param name="name">The attribute name as written.</param>
+    /// <returns>A new document with the change applied, or this one when the attribute is absent.</returns>
+    public XamlDocument RemoveAttribute(XamlElement element, XamlQualifiedName name) =>
+        Edit().RemoveAttribute(element, name).Apply();
+
+    /// <summary>Inserts XAML as a child of an element.</summary>
+    /// <param name="parent">The element to insert into.</param>
+    /// <param name="index">The position among the parent's child elements.</param>
+    /// <param name="xaml">The XAML text to insert.</param>
+    /// <returns>A new document with the change applied.</returns>
+    public XamlDocument InsertElement(XamlElement parent, int index, string xaml) =>
+        Edit().InsertElement(parent, index, xaml).Apply();
+
+    /// <summary>Removes an element.</summary>
+    /// <param name="element">The element to remove.</param>
+    /// <returns>A new document with the change applied.</returns>
+    public XamlDocument RemoveElement(XamlElement element) =>
+        Edit().RemoveElement(element).Apply();
+
+    /// <summary>Moves an element to a position under a new parent.</summary>
+    /// <param name="element">The element to move.</param>
+    /// <param name="newParent">The element to move it under.</param>
+    /// <param name="index">The position among the new parent's child elements.</param>
+    /// <returns>A new document with the change applied.</returns>
+    public XamlDocument MoveElement(XamlElement element, XamlElement newParent, int index) =>
+        Edit().MoveElement(element, newParent, index).Apply();
+
+    /// <summary>
+    /// Writes the document out in the requested mode.
+    /// </summary>
+    /// <remarks>
+    /// <see cref="XamlWriteMode.Preserve"/> is the default everywhere and reproduces an
+    /// unchanged document byte for byte. <see cref="XamlWriteMode.Format"/> reflows the whole
+    /// document and is never reached by accident — saving never needs it.
+    /// </remarks>
+    /// <param name="mode">How to write the document.</param>
+    /// <param name="options">Formatting options, used only in <see cref="XamlWriteMode.Format"/>.</param>
+    /// <returns>The document's text.</returns>
+    public string GetText(XamlWriteMode mode, XamlFormattingOptions? options = null) =>
+        mode == XamlWriteMode.Format
+            ? XamlFormatter.Format(this, options ?? XamlFormattingOptions.Default)
+            : GetText();
+
     /// <summary>Gets every diagnostic the parse produced, in source order.</summary>
     /// <returns>The document's diagnostics.</returns>
     public IEnumerable<MarkupDiagnostic> GetDiagnostics() => Diagnostics;

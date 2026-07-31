@@ -29,6 +29,31 @@ public readonly record struct XamlQualifiedName(string? Prefix, string LocalName
     /// <summary>Gets a value indicating whether the name carries a prefix.</summary>
     public bool HasPrefix => Prefix is not null;
 
+    /// <summary>
+    /// Gets a value indicating whether the local name has the <c>Owner.Member</c> shape.
+    /// </summary>
+    /// <remarks>
+    /// This is a statement about the text and nothing more. <c>Grid.Row</c> and
+    /// <c>Button.Background</c> both have the shape; whether either names an attached
+    /// property, a styled property or a plain CLR property cannot be known without metadata
+    /// this package deliberately does not have.
+    /// </remarks>
+    public bool IsDotted => LocalName.Contains('.', StringComparison.Ordinal);
+
+    /// <summary>
+    /// Gets the part of a dotted local name before the first dot, or <see langword="null"/>
+    /// when the name is not dotted.
+    /// </summary>
+    public string? OwnerName =>
+        IsDotted ? LocalName[..LocalName.IndexOf('.', StringComparison.Ordinal)] : null;
+
+    /// <summary>
+    /// Gets the part of a dotted local name after the first dot, or <see langword="null"/>
+    /// when the name is not dotted.
+    /// </summary>
+    public string? MemberName =>
+        IsDotted ? LocalName[(LocalName.IndexOf('.', StringComparison.Ordinal) + 1)..] : null;
+
     /// <summary>Creates an unprefixed name.</summary>
     /// <param name="localName">The local name.</param>
     /// <returns>The name.</returns>

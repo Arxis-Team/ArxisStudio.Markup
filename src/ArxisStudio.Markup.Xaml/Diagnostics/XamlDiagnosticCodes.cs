@@ -65,4 +65,22 @@ public static class XamlDiagnosticCodes
 
     /// <summary>The document has no root element.</summary>
     public const string MissingRootElement = "AXM1019";
+
+    /// <summary>A markup extension ran to the end of the value without <c>}</c>.</summary>
+    public const string UnterminatedMarkupExtension = "AXM1030";
+
+    /// <summary>A markup extension opened but named no type.</summary>
+    public const string ExpectedMarkupExtensionName = "AXM1031";
+
+    /// <summary>A quoted markup-extension argument was not closed by its opening quote.</summary>
+    public const string UnterminatedQuotedArgument = "AXM1032";
+
+    /// <summary>Text follows a markup extension's closing brace.</summary>
+    public const string MalformedMarkupExtension = "AXM1033";
+
+    /// <summary>An edit targeted a node that belongs to a different document.</summary>
+    public const string ForeignNode = "AXM1040";
+
+    /// <summary>Two edits in one operation would change overlapping regions of the document.</summary>
+    public const string ConflictingEdits = "AXM1041";
 }
