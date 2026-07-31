@@ -1,91 +1,46 @@
 using System;
-using System.Threading;
-using System.Threading.Tasks;
-using ArxisStudio.Markup.Xaml;
 using Avalonia;
-using Avalonia.Headless;
 
 namespace ArxisStudio.Markup.Xaml.Loader.Sample;
 
 /// <summary>
-/// A showcase of what the three packages do, driven entirely through their public API.
+/// A windowed showcase of what the three packages do, driven entirely through their public API.
 /// </summary>
 /// <remarks>
 /// <para>
-/// This demonstrates library usage and nothing else. It has no window, no selection, no property
-/// inspector and no way to edit anything by pointing at it — all of which the contract's
-/// out-of-scope list rules out, and any of which would make this the visual designer the
-/// repository exists not to be.
+/// A showcase, not a designer. The contract's out-of-scope list rules out selection adorners, a
+/// property-inspector UI, drag and drop, pointer or keyboard interception and Play/Stop UI, and
+/// none of them is here: nothing is edited by pointing at the preview, nothing is drawn over it,
+/// and no input destined for it is intercepted. What the window does is show a document, show
+/// the objects the library builds from it, and show what it says about both.
 /// </para>
 /// <para>
-/// It runs on Avalonia's headless platform because building Avalonia objects needs Avalonia set
-/// up, and a showcase of the loader that never builds one would be showing the wrong half. A
-/// host with a real window does exactly what is done here and then puts the root object on
-/// screen; that last step is the host's, not this library's.
+/// The window's own interface is written in C# rather than XAML on purpose. Every piece of
+/// markup on screen is then the library's subject rather than the application's own chrome,
+/// which removes any question about which XAML is being demonstrated and which is scaffolding.
 /// </para>
 /// </remarks>
 internal static class Program
 {
-    private static async Task<int> Main()
+    [STAThread]
+    private static int Main(string[] args)
     {
-        // SetupWithoutStarting establishes Dispatcher.UIThread without running a message loop,
-        // which is all the loader's default dispatcher needs.
-        AppBuilder.Configure<Application>()
-            .UseHeadless(new AvaloniaHeadlessPlatformOptions())
-            .SetupWithoutStarting();
-
-        using var cancellation = new CancellationTokenSource(TimeSpan.FromMinutes(2));
-
         try
         {
-            // SetupWithoutStarting makes this thread the one Avalonia objects belong to, so the
-            // showcase runs inline rather than posting to a loop that is not turning.
-            await RunAsync(cancellation.Token);
-
-            Console.WriteLine();
-            Console.WriteLine("Everything above ran against the packages as published. Nothing was compiled,");
-            Console.WriteLine("and no document was rewritten. See docs/limitations.md for what is not here.");
-
-            return 0;
+            return BuildAvaloniaApp().StartWithClassicDesktopLifetime(args);
         }
         catch (Exception error)
         {
-            Console.Error.WriteLine();
-            Console.Error.WriteLine($"The showcase stopped: {error}");
+            Console.Error.WriteLine($"The showcase could not start: {error}");
 
             return 1;
         }
     }
 
-    private static async Task RunAsync(CancellationToken cancellationToken)
-    {
-        Console.WriteLine("ArxisStudio.Markup — what the three packages do");
-        Console.WriteLine();
-        Console.WriteLine("  ArxisStudio.Markup              text, documents, workspace, dependencies");
-        Console.WriteLine("  ArxisStudio.Markup.Xaml         lossless syntax model, editing, writing");
-        Console.WriteLine("  ArxisStudio.Markup.Xaml.Loader  live Avalonia objects, resolution, updates");
-
-        XamlDocument document = SyntaxShowcase.RoundTrip();
-
-        SyntaxShowcase.Malformed();
-        SyntaxShowcase.Edit(document);
-        SyntaxShowcase.Values(document);
-
-        WorkspaceShowcase.Workspace();
-
-        await WorkspaceShowcase.GraphAsync(cancellationToken);
-
-        (XamlLoadEnvironment environment, InMemoryResourceResolver resources) = LoaderShowcase.Environment();
-
-        await using (XamlLoadSession session = await LoaderShowcase
-            .LoadAsync(environment, XamlLoadMode.Runtime, cancellationToken))
-        {
-            LoaderShowcase.Mapping(session);
-            LoaderShowcase.Edit(session);
-        }
-
-        await UpdateShowcase.DesignAsync(environment, cancellationToken);
-        await UpdateShowcase.UpdatesAsync(environment, cancellationToken);
-        await UpdateShowcase.SourceUpdateAsync(environment, resources, cancellationToken);
-    }
+    /// <summary>Builds the application, as an Avalonia entry point is expected to.</summary>
+    /// <returns>The configured builder.</returns>
+    internal static AppBuilder BuildAvaloniaApp() =>
+        AppBuilder.Configure<ShowcaseApplication>()
+            .UsePlatformDetect()
+            .LogToTrace();
 }

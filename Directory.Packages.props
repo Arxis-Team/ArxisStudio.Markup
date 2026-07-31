@@ -15,6 +15,9 @@
     <PackageVersion Include="Avalonia.Markup.Xaml.Loader" Version="12.1.1" />
     <PackageVersion Include="Avalonia.Headless" Version="12.1.1" />
     <PackageVersion Include="Avalonia.Headless.XUnit" Version="12.1.1" />
+    <!-- The sample is a windowed showcase, so it needs a real backend and a theme. -->
+    <PackageVersion Include="Avalonia.Desktop" Version="12.1.1" />
+    <PackageVersion Include="Avalonia.Themes.Fluent" Version="12.1.1" />
   </ItemGroup>
 
   <!-- Test stack. Avalonia.Headless.XUnit 12.1.1 depends on xunit.v3 3.2.2. -->

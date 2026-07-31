@@ -14,7 +14,8 @@
     exactly what a showcase that prints its results rather than drawing them needs.
   -->
   <ItemGroup>
-    <PackageReference Include="Avalonia.Headless" />
+    <PackageReference Include="Avalonia.Desktop" />
+    <PackageReference Include="Avalonia.Themes.Fluent" />
   </ItemGroup>
 
 </Project>
