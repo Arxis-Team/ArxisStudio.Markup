@@ -8,4 +8,13 @@
     <ProjectReference Include="../../src/ArxisStudio.Markup.Xaml.Loader/ArxisStudio.Markup.Xaml.Loader.csproj" />
   </ItemGroup>
 
+  <!--
+    Building Avalonia objects needs Avalonia set up, and this sample has no window to set it up
+    with. The headless platform establishes Dispatcher.UIThread and nothing else, which is
+    exactly what a showcase that prints its results rather than drawing them needs.
+  -->
+  <ItemGroup>
+    <PackageReference Include="Avalonia.Headless" />
+  </ItemGroup>
+
 </Project>

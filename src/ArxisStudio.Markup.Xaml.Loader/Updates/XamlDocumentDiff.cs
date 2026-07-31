@@ -322,11 +322,50 @@ internal static class XamlDocumentDiff
         return node as XamlElement;
     }
 
+    /// <summary>
+    /// Describes a change to what an element is or holds, as the smallest thing that can be
+    /// rebuilt on its own.
+    /// </summary>
+    /// <remarks>
+    /// A style's setter, a theme's, a template's content and a keyed resource's value are all
+    /// changes to an element, and none of them can be rebuilt without the thing that owns them.
+    /// Attributes are classified the same way, for the same reason.
+    /// </remarks>
     private static XamlDocumentChange Structural(
         XamlElement before,
         XamlElement after,
-        bool replacesObject = true) =>
-        new(XamlUpdateStrategy.ReloadSubtree, before, after, null) { ReplacesObject = replacesObject };
+        bool replacesObject = true)
+    {
+        if (Container(before) is { } container)
+        {
+            return new XamlDocumentChange(
+                container.Strategy, container.Element, Ancestor(after, container.Depth), null)
+            {
+                ReplacesObject = true,
+            };
+        }
+
+        // A property element is a member of its parent rather than a thing of its own, so it
+        // produced no object and there is nothing to rebuild it into. What changed is what the
+        // element that owns it holds.
+        int levels = 0;
+        XamlElement target = before;
+
+        while (target.IsPropertyElementSyntax && target.Parent is XamlElement owner)
+        {
+            target = owner;
+            levels++;
+        }
+
+        return new XamlDocumentChange(
+            XamlUpdateStrategy.ReloadSubtree,
+            target,
+            levels == 0 ? after : Ancestor(after, levels),
+            null)
+        {
+            ReplacesObject = levels == 0 && replacesObject,
+        };
+    }
 
     /// <summary>Gets the attributes that can make a difference to an object.</summary>
     private static IEnumerable<XamlAttribute> Meaningful(XamlElement element) =>

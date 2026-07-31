@@ -47,6 +47,7 @@ public sealed class XamlObjectMap
     private readonly TextProjection _projection;
     private readonly IReadOnlyDictionary<Uri, TextProjection> _fragments;
     private readonly HashSet<Uri> _observed = new(XamlUri.Comparer);
+    private readonly HashSet<object> _carried = new(ReferenceEqualityComparer.Instance);
 
     private Uri? _documentSourceUri;
 
@@ -113,7 +114,31 @@ public sealed class XamlObjectMap
         XamlDocument document,
         object root,
         TextProjection projection,
-        IReadOnlyDictionary<Uri, TextProjection> fragments)
+        IReadOnlyDictionary<Uri, TextProjection> fragments) =>
+        Build(document, root, projection, fragments, null);
+
+    /// <summary>
+    /// Builds a map for a tree after an update, carrying forward what an update already knows.
+    /// </summary>
+    /// <remarks>
+    /// Avalonia records where it built an object, once, against the text it was given. An update
+    /// that adds or removes a line leaves every later object recorded at a position that now
+    /// describes something else, and no arithmetic recovers it — the objects were never rebuilt,
+    /// so there is nothing newer to read. What an update does know is which element of the new
+    /// document stands where each element of the old one stood, and that is what is carried.
+    /// </remarks>
+    /// <param name="document">The document the objects were created from.</param>
+    /// <param name="root">The object the document produced.</param>
+    /// <param name="projection">The text the document as a whole was built from.</param>
+    /// <param name="fragments">The projection behind each separately loaded fragment, by the name Avalonia gave it.</param>
+    /// <param name="carried">Objects already known to belong to elements of <paramref name="document"/>.</param>
+    /// <returns>The map.</returns>
+    internal static XamlObjectMap Build(
+        XamlDocument document,
+        object root,
+        TextProjection projection,
+        IReadOnlyDictionary<Uri, TextProjection> fragments,
+        IReadOnlyDictionary<XamlElement, object>? carried)
     {
         ArgumentNullException.ThrowIfNull(document);
         ArgumentNullException.ThrowIfNull(root);
@@ -128,9 +153,70 @@ public sealed class XamlObjectMap
             _documentSourceUri = XamlSourceInfo.GetXamlSourceInfo(root)?.SourceUri,
         };
 
+        foreach ((XamlElement element, object target) in
+            carried ?? (IReadOnlyDictionary<XamlElement, object>)ImmutableDictionary<XamlElement, object>.Empty)
+        {
+            map._objectsByElement[element] = target;
+            map._elementsByObject.AddOrUpdate(target, element);
+            map._carried.Add(target);
+        }
+
         map.Walk(document, root, XamlObjectOrigin.Document, new HashSet<object>(ReferenceEqualityComparer.Instance));
 
         return map;
+    }
+
+    /// <summary>
+    /// Pairs this map's objects with the elements that stand in the same places in a changed
+    /// document.
+    /// </summary>
+    /// <remarks>
+    /// Elements are paired by position among their siblings, and the walk stops descending where
+    /// the two documents stop agreeing — below that the objects were rebuilt, and the text they
+    /// were rebuilt from is what says where they came from.
+    /// </remarks>
+    /// <param name="from">The document this map is keyed by.</param>
+    /// <param name="to">The document it is being re-keyed to.</param>
+    /// <returns>What each element of <paramref name="to"/> stands for.</returns>
+    internal IReadOnlyDictionary<XamlElement, object> Carry(XamlDocument from, XamlDocument to)
+    {
+        ArgumentNullException.ThrowIfNull(from);
+        ArgumentNullException.ThrowIfNull(to);
+
+        var carried = new Dictionary<XamlElement, object>();
+
+        if (from.Root is { } before && to.Root is { } after)
+        {
+            Pair(before, after, carried);
+        }
+
+        return carried;
+    }
+
+    private void Pair(XamlElement before, XamlElement after, Dictionary<XamlElement, object> carried)
+    {
+        if (before.Name != after.Name)
+        {
+            return;
+        }
+
+        if (_objectsByElement.TryGetValue(before, out object? target))
+        {
+            carried[after] = target;
+        }
+
+        XamlElement[] beforeChildren = [.. before.Elements];
+        XamlElement[] afterChildren = [.. after.Elements];
+
+        if (beforeChildren.Length != afterChildren.Length)
+        {
+            return;
+        }
+
+        for (int index = 0; index < beforeChildren.Length; index++)
+        {
+            Pair(beforeChildren[index], afterChildren[index], carried);
+        }
     }
 
     /// <summary>Gets the object an element produced.</summary>
@@ -226,7 +312,10 @@ public sealed class XamlObjectMap
         // mistake this map exists to avoid. A resource or a style is not that case: the element
         // that declares it is genuinely the element that declares it, and an update that
         // rebuilds one has to be able to find what it built.
+        // An object carried across an update already has its element, and it is the one the
+        // update paired it with rather than one derived from a position it predates.
         if (element is not null
+            && !_carried.Contains(current)
             && origin is XamlObjectOrigin.Document or XamlObjectOrigin.Resource or XamlObjectOrigin.Style)
         {
             _elementsByObject.AddOrUpdate(current, element);

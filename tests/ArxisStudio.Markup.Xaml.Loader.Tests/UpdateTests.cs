@@ -651,6 +651,38 @@ public sealed class UpdateTests
     }
 
     [AvaloniaFact]
+    public async Task AnUpdateThatAddsALineDoesNotBreakTheNextOne()
+    {
+        await using XamlLoadSession session = await Load(View("Text=\"before\""));
+
+        // A comment is trivia: the first update changes no object at all. What it does change is
+        // every line number after it, and the map is rebuilt from positions recorded before it.
+        XamlUpdateResult comment = await Update(
+            session,
+            $"<Border xmlns=\"{AvaloniaNamespace}\"\n" +
+            "        xmlns:x=\"http://schemas.microsoft.com/winfx/2006/xaml\"\n" +
+            $"        xmlns:d=\"{DesignNamespace}\">\n" +
+            "  <!-- a line that was not there before -->\n" +
+            "  <TextBlock Text=\"before\" />\n" +
+            "</Border>");
+
+        Assert.True(comment.Applied);
+        Assert.Equal(XamlUpdateStrategy.None, comment.Strategy);
+
+        XamlUpdateResult second = await Update(
+            session,
+            $"<Border xmlns=\"{AvaloniaNamespace}\"\n" +
+            "        xmlns:x=\"http://schemas.microsoft.com/winfx/2006/xaml\"\n" +
+            $"        xmlns:d=\"{DesignNamespace}\">\n" +
+            "  <!-- a line that was not there before -->\n" +
+            "  <TextBlock Text=\"after\" />\n" +
+            "</Border>");
+
+        Assert.True(second.Applied, string.Join(" | ", second.Diagnostics));
+        Assert.Equal("after", ((TextBlock)session.GetRoot<Border>().Child!).Text);
+    }
+
+    [AvaloniaFact]
     public async Task AnUpdateOnADisposedSessionThrows()
     {
         XamlLoadSession session = await Load(View("Text=\"x\""));

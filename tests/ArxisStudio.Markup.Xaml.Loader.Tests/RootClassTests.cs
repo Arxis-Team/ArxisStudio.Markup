@@ -86,34 +86,42 @@ public sealed class RootClassTests
     }
 
     [AvaloniaFact]
-    public async Task AMistypedMarkupExtensionIsReportedAgainstItsValue()
+    public async Task AMistypedExtensionFromTheDocumentsOwnNamespaceIsReported()
     {
         (XamlLoadSession? session, XamlLoadResult result) = await XamlLoadSession.TryCreateAsync(
-            Parse(ViewXaml(content: "  <Button Content=\"{StaticResourse Missing}\" />\n")),
+            Parse(
+                $"<UserControl xmlns=\"{AvaloniaNamespace}\" xmlns:x=\"{XamlNamespace}\"\n" +
+                $"             xmlns:local=\"using:{typeof(CustomerView).Namespace}\"\n" +
+                $"             x:Class=\"{ViewClass}\">\n" +
+                "  <Button Content=\"{local:NoSuchExtension}\" />\n" +
+                "</UserControl>"),
             Environment(),
             cancellationToken: TestContext.Current.CancellationToken);
 
         await using (session)
         {
-            // Avalonia's own report for this is about an emitter, at a position in a text the
-            // caller never wrote. This one names the extension and points at the value.
+            // The environment's resolver is the authority for a namespace the document brought
+            // in itself, so a name it cannot find is a name that will not resolve at all.
             MarkupDiagnostic reported = Assert.Single(
                 result.Diagnostics,
                 static d => d.Code == XamlLoaderDiagnosticCodes.MarkupExtensionFailure);
 
-            Assert.Contains("StaticResourse", reported.Message, StringComparison.Ordinal);
+            Assert.Contains("NoSuchExtension", reported.Message, StringComparison.Ordinal);
             Assert.NotNull(reported.Span);
         }
     }
 
     [AvaloniaFact]
-    public async Task TheExtensionsXamlItselfDefinesAreNotReported()
+    public async Task TheExtensionsAvaloniaAndXamlDefineAreNotReported()
     {
         await using XamlLoadSession session = await XamlLoadSession.CreateAsync(
             Parse(ViewXaml(content: "  <Button Content=\"{Binding Name}\" Tag=\"{x:Null}\" />\n")),
             Environment(),
             cancellationToken: TestContext.Current.CancellationToken);
 
+        // Avalonia's compiler finds its own extensions through machinery this library does not
+        // model — IXamlTypeResolver resolves UserControl from that namespace and not Binding —
+        // so a check based on it would report the commonest construct in Avalonia XAML.
         Assert.DoesNotContain(
             session.Diagnostics,
             static d => d.Code == XamlLoaderDiagnosticCodes.MarkupExtensionFailure);

@@ -240,9 +240,14 @@ public sealed partial class XamlLoadSession
                 "The update could not be applied, and the objects were left as they were.");
         }
 
+        // What survives the change keeps the object it already had, paired by where it sits.
+        // Rebuilding that from Avalonia's recorded positions would read them against a document
+        // they predate, and an update that added a line would break every one after it.
+        IReadOnlyDictionary<XamlElement, object> carried = Objects.Carry(Document, updated);
+
         Document = updated;
         Projection = projection;
-        Objects = XamlObjectMap.Build(updated, RootObject, projection, _fragments);
+        Objects = XamlObjectMap.Build(updated, RootObject, projection, _fragments, carried);
         PendingDocument = null;
 
         // A fragment whose objects the walk never reached has been replaced by a later one, and

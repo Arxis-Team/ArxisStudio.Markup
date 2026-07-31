@@ -127,14 +127,27 @@ internal static class XamlAttributeChecks
         removals.Add(attribute.Span);
     }
 
+    /// <summary>The namespaces whose markup extensions this cannot have an opinion about.</summary>
+    /// <remarks>
+    /// XAML's own — <c>x:Static</c>, <c>x:Type</c>, <c>x:Null</c> — are language rather than
+    /// types. Avalonia's own are types, but its compiler finds them through machinery this
+    /// library does not model: <c>IXamlTypeResolver</c> resolves <c>UserControl</c> from the
+    /// Avalonia namespace and not <c>Binding</c> from the same one, so a check based on it would
+    /// report the single most common construct in Avalonia XAML as an error. A diagnostic with
+    /// no discriminating power is worse than none.
+    /// </remarks>
+    private static readonly string[] NotOurs =
+        [XamlNamespaces.Xaml, "https://github.com/avaloniaui", "http://schemas.microsoft.com/winfx/2006/xaml/presentation"];
+
     /// <summary>
     /// Checks that a markup extension names something that exists.
     /// </summary>
     /// <remarks>
-    /// XAML's own extensions — <c>x:Static</c>, <c>x:Type</c>, <c>x:Null</c> — are language, not
-    /// types, and are left alone. For the rest the convention is that <c>{Foo}</c> is the type
-    /// <c>Foo</c> or <c>FooExtension</c>, so failing to find either is a name that will not
-    /// resolve however the document is loaded.
+    /// Only where the environment's type resolver is the same authority the load will use: an
+    /// extension in a namespace the document itself brought in, where <c>{Foo}</c> is by
+    /// convention the type <c>Foo</c> or <c>FooExtension</c> and failing to find either is a name
+    /// that will not resolve however the document is loaded. See <see cref="NotOurs"/> for the
+    /// namespaces this stands down on, and why.
     /// </remarks>
     private static async ValueTask CheckExtensionAsync(
         XamlDocument document,
@@ -146,7 +159,7 @@ internal static class XamlAttributeChecks
     {
         if (attribute.Parent is not XamlElement element
             || element.NamespaceContext.LookupNamespace(extension.TypeName.Prefix) is not { } namespaceUri
-            || string.Equals(namespaceUri, XamlNamespaces.Xaml, StringComparison.Ordinal))
+            || NotOurs.Contains(namespaceUri, StringComparer.Ordinal))
         {
             return;
         }
