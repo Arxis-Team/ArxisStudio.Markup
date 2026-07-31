@@ -207,6 +207,39 @@ ArxisStudio.Markup.TextPosition.Equals(ArxisStudio.Markup.TextPosition other) ->
 ArxisStudio.Markup.TextPosition.Line.get -> int
 ArxisStudio.Markup.TextPosition.TextPosition() -> void
 ArxisStudio.Markup.TextPosition.TextPosition(int Line, int Column) -> void
+ArxisStudio.Markup.TextProjection
+ArxisStudio.Markup.TextProjection.GetProjectedOffset(int sourceOffset) -> int
+ArxisStudio.Markup.TextProjection.GetProjectedSpan(ArxisStudio.Markup.TextSpan sourceSpan) -> ArxisStudio.Markup.TextSpan
+ArxisStudio.Markup.TextProjection.IsIdentity.get -> bool
+ArxisStudio.Markup.TextProjection.Map(ArxisStudio.Markup.TextPosition projectedPosition) -> ArxisStudio.Markup.TextProjectionPosition
+ArxisStudio.Markup.TextProjection.Map(int projectedOffset) -> ArxisStudio.Markup.TextProjectionPosition
+ArxisStudio.Markup.TextProjection.Segments.get -> System.Collections.Immutable.ImmutableArray<ArxisStudio.Markup.TextProjectionSegment!>
+ArxisStudio.Markup.TextProjection.Source.get -> ArxisStudio.Markup.SourceText!
+ArxisStudio.Markup.TextProjection.SourceUri.get -> System.Uri?
+ArxisStudio.Markup.TextProjection.Text.get -> ArxisStudio.Markup.SourceText!
+ArxisStudio.Markup.TextProjectionBuilder
+ArxisStudio.Markup.TextProjectionBuilder.IsEmpty.get -> bool
+ArxisStudio.Markup.TextProjectionBuilder.Replace(ArxisStudio.Markup.TextSpan span, ArxisStudio.Markup.TextProjection! replacement, ArxisStudio.Markup.TextSpan replacementSpan) -> void
+ArxisStudio.Markup.TextProjectionBuilder.Replace(ArxisStudio.Markup.TextSpan span, string! text) -> void
+ArxisStudio.Markup.TextProjectionBuilder.TextProjectionBuilder(ArxisStudio.Markup.SourceText! source, System.Uri? sourceUri = null) -> void
+ArxisStudio.Markup.TextProjectionBuilder.ToProjection() -> ArxisStudio.Markup.TextProjection!
+ArxisStudio.Markup.TextProjectionPosition
+ArxisStudio.Markup.TextProjectionPosition.Deconstruct(out System.Uri? SourceUri, out int Offset, out bool IsOriginal) -> void
+ArxisStudio.Markup.TextProjectionPosition.Equals(ArxisStudio.Markup.TextProjectionPosition other) -> bool
+ArxisStudio.Markup.TextProjectionPosition.IsOriginal.get -> bool
+ArxisStudio.Markup.TextProjectionPosition.IsOriginal.init -> void
+ArxisStudio.Markup.TextProjectionPosition.Offset.get -> int
+ArxisStudio.Markup.TextProjectionPosition.Offset.init -> void
+ArxisStudio.Markup.TextProjectionPosition.SourceUri.get -> System.Uri?
+ArxisStudio.Markup.TextProjectionPosition.SourceUri.init -> void
+ArxisStudio.Markup.TextProjectionPosition.TextProjectionPosition() -> void
+ArxisStudio.Markup.TextProjectionPosition.TextProjectionPosition(System.Uri? SourceUri, int Offset, bool IsOriginal) -> void
+ArxisStudio.Markup.TextProjectionSegment
+ArxisStudio.Markup.TextProjectionSegment.IsOriginal.get -> bool
+ArxisStudio.Markup.TextProjectionSegment.IsSynthesized.get -> bool
+ArxisStudio.Markup.TextProjectionSegment.ProjectedSpan.get -> ArxisStudio.Markup.TextSpan
+ArxisStudio.Markup.TextProjectionSegment.SourceSpan.get -> ArxisStudio.Markup.TextSpan
+ArxisStudio.Markup.TextProjectionSegment.SourceUri.get -> System.Uri?
 ArxisStudio.Markup.TextSpan
 ArxisStudio.Markup.TextSpan.Contains(ArxisStudio.Markup.TextSpan span) -> bool
 ArxisStudio.Markup.TextSpan.Contains(int position) -> bool
@@ -247,6 +280,8 @@ override ArxisStudio.Markup.TextLine.ToString() -> string!
 override ArxisStudio.Markup.TextMarkupSource.GetTextAsync(System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.ValueTask<ArxisStudio.Markup.SourceText!>
 override ArxisStudio.Markup.TextPosition.GetHashCode() -> int
 override ArxisStudio.Markup.TextPosition.ToString() -> string!
+override ArxisStudio.Markup.TextProjectionPosition.GetHashCode() -> int
+override ArxisStudio.Markup.TextProjectionSegment.ToString() -> string!
 override ArxisStudio.Markup.TextSpan.GetHashCode() -> int
 override ArxisStudio.Markup.TextSpan.ToString() -> string!
 static ArxisStudio.Markup.DocumentVersion.Initial.get -> ArxisStudio.Markup.DocumentVersion
@@ -279,6 +314,9 @@ static ArxisStudio.Markup.TextPosition.operator <=(ArxisStudio.Markup.TextPositi
 static ArxisStudio.Markup.TextPosition.operator ==(ArxisStudio.Markup.TextPosition left, ArxisStudio.Markup.TextPosition right) -> bool
 static ArxisStudio.Markup.TextPosition.operator >(ArxisStudio.Markup.TextPosition left, ArxisStudio.Markup.TextPosition right) -> bool
 static ArxisStudio.Markup.TextPosition.operator >=(ArxisStudio.Markup.TextPosition left, ArxisStudio.Markup.TextPosition right) -> bool
+static ArxisStudio.Markup.TextProjection.Identity(ArxisStudio.Markup.SourceText! source, System.Uri? sourceUri = null) -> ArxisStudio.Markup.TextProjection!
+static ArxisStudio.Markup.TextProjectionPosition.operator !=(ArxisStudio.Markup.TextProjectionPosition left, ArxisStudio.Markup.TextProjectionPosition right) -> bool
+static ArxisStudio.Markup.TextProjectionPosition.operator ==(ArxisStudio.Markup.TextProjectionPosition left, ArxisStudio.Markup.TextProjectionPosition right) -> bool
 static ArxisStudio.Markup.TextSpan.FromBounds(int start, int end) -> ArxisStudio.Markup.TextSpan
 static ArxisStudio.Markup.TextSpan.operator !=(ArxisStudio.Markup.TextSpan left, ArxisStudio.Markup.TextSpan right) -> bool
 static ArxisStudio.Markup.TextSpan.operator ==(ArxisStudio.Markup.TextSpan left, ArxisStudio.Markup.TextSpan right) -> bool
@@ -287,4 +325,6 @@ static ArxisStudio.Markup.TextSpan.operator ==(ArxisStudio.Markup.TextSpan left,
 ~override ArxisStudio.Markup.MarkupLocation.Equals(object obj) -> bool
 ~override ArxisStudio.Markup.TextChange.Equals(object obj) -> bool
 ~override ArxisStudio.Markup.TextPosition.Equals(object obj) -> bool
+~override ArxisStudio.Markup.TextProjectionPosition.Equals(object obj) -> bool
+~override ArxisStudio.Markup.TextProjectionPosition.ToString() -> string
 ~override ArxisStudio.Markup.TextSpan.Equals(object obj) -> bool
