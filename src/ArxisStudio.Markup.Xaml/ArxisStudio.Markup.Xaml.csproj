@@ -9,4 +9,12 @@
     <ProjectReference Include="../ArxisStudio.Markup/ArxisStudio.Markup.csproj" />
   </ItemGroup>
 
+  <!--
+    The contract asks for lexing and parsing to be benchmarked separately, and the lexer is not
+    public API — measuring it is not a reason to make it one. Nothing else is granted access.
+  -->
+  <ItemGroup>
+    <InternalsVisibleTo Include="ArxisStudio.Markup.Benchmarks" />
+  </ItemGroup>
+
 </Project>
