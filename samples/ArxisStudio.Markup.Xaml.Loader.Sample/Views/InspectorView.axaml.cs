@@ -151,10 +151,16 @@ internal sealed partial class InspectorView : UserControl
     private void ShowMarkup() => Markup.Text = _session?.Document.GetText() ?? string.Empty;
 
     private void OnUndo(object? sender, RoutedEventArgs e) =>
-        _ = Step(static workspace => workspace.Undo(), "Отменено");
+        _ = Step(
+            static workspace => workspace.Undo(),
+            static workspace => workspace.Redo(),
+            "Отменено");
 
     private void OnRedo(object? sender, RoutedEventArgs e) =>
-        _ = Step(static workspace => workspace.Redo(), "Повторено");
+        _ = Step(
+            static workspace => workspace.Redo(),
+            static workspace => workspace.Undo(),
+            "Повторено");
 
     private void OnDelete(object? sender, RoutedEventArgs e) =>
         _ = EditAsync(
@@ -249,14 +255,19 @@ internal sealed partial class InspectorView : UserControl
         document.DescendantElements().FirstOrDefault(candidate => candidate.Span == element.Span);
 
     /// <summary>Moves the history and brings everything else along.</summary>
-    private async Task Step(Func<XamlWorkspace, bool> move, string what)
+    /// <remarks>
+    /// The inverse is handed along with the move, because putting the history back is not always
+    /// a matter of undoing: a refused undo has to be redone, and undoing again would step past
+    /// the action the user asked about into the one before it.
+    /// </remarks>
+    private async Task Step(Func<XamlWorkspace, bool> move, Func<XamlWorkspace, bool> inverse, string what)
     {
         if (_workspace is null || !move(_workspace))
         {
             return;
         }
 
-        await SyncAsync(_workspace.GetDocument(_documentId), what);
+        await SyncAsync(_workspace.GetDocument(_documentId), what, inverse);
     }
 
     /// <summary>
@@ -267,7 +278,10 @@ internal sealed partial class InspectorView : UserControl
     /// objects disagreeing is the one state this library exists to prevent, and a history holding
     /// an edit the tree never took would be exactly that.
     /// </remarks>
-    private async Task SyncAsync(XamlDocument document, string what)
+    private async Task SyncAsync(
+        XamlDocument document,
+        string what,
+        Func<XamlWorkspace, bool>? rollback = null)
     {
         XamlUpdateResult result = await _session!.ApplyDocumentUpdateAsync(document, CancellationToken.None);
 
@@ -282,7 +296,7 @@ internal sealed partial class InspectorView : UserControl
         }
         else
         {
-            _workspace!.Undo();
+            (rollback ?? (static workspace => workspace.Undo()))(_workspace!);
         }
 
         _report.Caption("ДИАГНОСТИКА").Diagnostics(result.Diagnostics, _session.Document.SourceText);
