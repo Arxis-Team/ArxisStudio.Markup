@@ -13,10 +13,10 @@ Written against **v0.1.0-preview**. Every example here uses only published API.
 
 | Guide | What it covers |
 | --- | --- |
-| [Documents](documents.md) | Text, spans, parsing, round-trip, navigating a syntax tree, diagnostics |
+| [Documents](documents.md) | Text, spans, parsing, round-trip, navigating a syntax tree, element paths, diagnostics |
 | [Editing](editing.md) | Changing attributes and elements without disturbing anything else |
 | [Workspace and history](workspace.md) | Several open documents, transactions, undo and redo |
-| [Loading](loading.md) | Environments, resolvers, sessions, objects ↔ elements, members and values |
+| [Loading](loading.md) | Environments, resolvers, sessions, objects ↔ elements, enumerating members, values |
 | [Updates](updates.md) | Bringing running objects in line with a changed document, design mode, includes |
 
 [Known limitations](../limitations.md) is the honest list of what these packages do not do. Read it
@@ -89,6 +89,10 @@ await File.WriteAllTextAsync(path, session.Document.GetText());
 ```
 
 Nothing was compiled, and no application was launched.
+
+A tool that keeps state about an element — which one is selected, which nodes are expanded — holds a
+`XamlElementPath` rather than the element itself, because an edit replaces every element in the
+document. See [Referring to an element after an edit](documents.md#referring-to-an-element-after-an-edit).
 
 ## Errors
 

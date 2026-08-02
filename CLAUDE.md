@@ -90,4 +90,4 @@ Do not use `XDocument` as the round-trip representation — it cannot preserve t
 - **`IMarkupSourceProvider` rather than the contract's `IXamlSourceProvider`**, and Avalonia resolving types independently of `IXamlTypeResolver` — see `docs/adr/0004-loader-boundaries.md`.
 - **The out-of-scope list governs `src/` rather than the whole repository**, which is what lets the showcase carry a property inspector — see `docs/adr/0006-inspector-in-the-sample.md`.
 
-Two more ADRs record decisions rather than deviations: `0005-resource-includes.md` (includes resolved by projecting the document) and `0007-undo-belongs-to-the-workspace.md` (where undo lives, and which of the two write directions a tool should use).
+Three more ADRs record decisions rather than deviations: `0005-resource-includes.md` (includes resolved by projecting the document), `0007-undo-belongs-to-the-workspace.md` (where undo lives, and which of the two write directions a tool should use) and `0008-an-index-counts-content.md` (an editing index counts content children, and property elements are not positions).

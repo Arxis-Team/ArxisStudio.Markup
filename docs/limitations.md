@@ -99,14 +99,40 @@ the document — see `docs/adr/0005-resource-includes.md` for why. That leaves f
   no longer has them and cannot be put back where it was, and the update is refused with `AXM3041`.
   Wrapping an element whose parent stacks or docks it works. A tool that needs the other case
   creates a new session from the edited document.
+- **A value is converted the way loading converts it, and a type with no way to read its own text
+  cannot be set.** Attribute text goes through the member's `TypeConverter`, and where there is none
+  through a public static `Parse` — which is how Avalonia types such as `Thickness` and
+  `CornerRadius` are read, since they declare no converter. A member whose type offers neither is
+  refused with a diagnostic rather than handed a string it would throw on.
+- **A setter that refuses a value of the right type stops the run where it is.** Everything that can
+  be checked is checked before anything is written — the element still has an object, the member
+  exists and can be written, the text converts to something the member holds — so the ordinary case
+  costs nothing. A validating setter refusing afterwards is reported and the update says it was not
+  applied, but changes already made are not undone. Recreating the session is what certainly
+  restores agreement.
 - **A refused rebuild can leave the objects part-way.** Every fragment is built before any object
   is touched, so a fragment that will not build refuses the update cleanly; but the replacements
   themselves are applied one after another, and one that fails after another has succeeded stops
   there. The document is left alone, so the two disagree until the caller reloads. Recreating the
   session is the only thing that certainly restores agreement.
+- **Duplicating carries `x:Key`.** The names inside a copy are taken out by default, because a name
+  scope refuses a second `x:Name` and the copy would not load. A key is not a name and is left as
+  written, so duplicating a keyed resource produces two entries under one key, which a resource
+  dictionary refuses in the same way. Which key the copy should have is a question about the tool's
+  naming, not about copying.
 - **Wrapping and replacing do not reformat what they are given.** A multi-line wrapper or
   replacement arrives written as the caller wrote it; only the wrapped element is re-indented, by
   the step the document already uses. This matches insertion, which has always behaved this way.
+
+## Members
+
+- **An attached member exists only once its owner has been initialised.** `GetMembers` reads
+  Avalonia's registry, and Avalonia registers an attached property in the static constructor of the
+  type that declares it. Before anything has caused `Grid` to be initialised, `Grid.Row` is not a
+  member of anything. The answer is therefore not cached, so a tool that resolves types as documents
+  ask for them sees the list grow while it runs — but a list taken at startup is not the whole list.
+- **Which members are worth showing is not answered here.** A control has upwards of two hundred
+  settable members. Listing them is the library's job; choosing among them is the tool's.
 
 ## Everything else
 

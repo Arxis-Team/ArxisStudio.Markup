@@ -16,7 +16,7 @@ The current development scope is limited to the markup libraries described in th
 
 ## Status
 
-Milestones 0 to 13 are implemented, and every item under *Definition of done for the first preview release* holds. The state at the end of Milestone 11 is tagged `v0.1.0-preview`; milestones 12 and 13 came after it. This document stays the contract: the milestones below are the plan, not a record of what happened.
+Milestones 0 to 14 are implemented, and every item under *Definition of done for the first preview release* holds. The state at the end of Milestone 11 is tagged `v0.1.0-preview`; milestones 12 to 14 came after it. This document stays the contract: the milestones below are the plan, not a record of what happened.
 
 Documentation for people building on these packages lives in [`docs/api/`](docs/api/README.md), and what the packages deliberately do not do is in [`docs/limitations.md`](docs/limitations.md).
 
@@ -574,6 +574,37 @@ Represent property elements without requiring resolved CLR metadata:
 
 The syntax package may identify the `Owner.Member` shape but must not claim that the member is a Styled, Direct, Attached, CLR, or event member. That classification belongs to Loader.
 
+#### Element model and paths
+
+A property element is a member of its parent rather than one of the things beside it: it produces no object, it cannot be named, and it cannot change places with a control. Every caller needs that distinction, so publish it rather than leaving each one to filter for itself:
+
+```csharp
+IEnumerable<XamlElement> content = element.ContentElements;
+IEnumerable<XamlElement> members = element.MemberElements;
+
+int position = element.IndexInContent;
+string? identity = element.Identity;      // x:Name, then a literal Name
+```
+
+`Identity` is the rule the loader pairs objects by across an edit. `x:Key` is not part of it: a key is where a resource is filed, not what an element is called.
+
+Provide a reference to an element that survives the document being edited, because a tool that remembers a selection cannot remember an element — an edit replaces every element in the document — and remembering a span is worse, since an edit above one moves it:
+
+```csharp
+public readonly record struct XamlPathStep(string? MemberName, int Index);
+
+public sealed class XamlElementPath
+{
+    public static XamlElementPath Root { get; }
+    public static XamlElementPath Of(XamlElement element);
+    public XamlElement? Resolve(XamlDocument document);
+    public XamlElementPath? Parent { get; }
+    public ImmutableArray<XamlPathStep> Steps { get; }
+}
+```
+
+A step is either a position among content children or a member name and a position inside it, so an element inside `<Border.Resources>` is addressable. Equality and hashing are by value, so a path can key a dictionary of expanded nodes. A property element has no path of its own.
+
 #### Design-time namespaces
 
 Preserve and expose:
@@ -626,7 +657,15 @@ document.RemoveAttribute(element, name);
 document.InsertElement(parent, index, child);
 document.RemoveElement(element);
 document.MoveElement(element, newParent, index);
+document.ReplaceElement(element, xaml);
+document.WrapElement(element, wrapperXaml);
+document.UnwrapElement(element);
+document.DuplicateElement(element, XamlDuplicateNames.Remove);
 ```
+
+`index` counts content children only. A property element is not a position, so index 0 in a parent that declares one means before its first content child and after the member — which is what a caller asking for "first" means, and what counting `Elements` got wrong.
+
+Duplicating takes the names out of the copy by default: a name scope refuses a second `x:Name`, so a copy that kept them would not load. `x:Key` is carried as written and collides in the same way, which is the caller's to resolve.
 
 Every edit must:
 
@@ -883,6 +922,14 @@ Every resolved member descriptor must report:
 - whether it is read-only;
 - underlying Avalonia property, CLR property, or event metadata.
 
+A tool offering a property list must be able to ask which members a type has rather than keeping a table of names:
+
+```csharp
+ImmutableArray<XamlMemberDescriptor> members = session.GetMembers(target);
+```
+
+Registered Avalonia properties, attached properties under their written `Owner.Member` names, and public CLR properties. Which of them are worth showing stays the tool's decision. The answer is not cached as a whole, because Avalonia registers an attached property in the static constructor of the type that declares it: `Grid.Row` becomes a member of every control only once something has caused `Grid` to be initialised.
+
 #### Controlled property editing
 
 Preferred edits must go through the session:
@@ -914,6 +961,8 @@ One operation must:
 7. emit diagnostics and change notifications.
 
 If any required step fails, the operation must not leave document and object state silently inconsistent.
+
+Text is converted the way loading converts it — the member's `TypeConverter`, or the public static `Parse` that Avalonia types such as `Thickness` and `CornerRadius` are read by instead. Text the member cannot hold is an ordinary user error: a diagnostic with the attribute's span, the objects left as they were, and nothing thrown.
 
 #### Runtime values versus source expressions
 
