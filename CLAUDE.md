@@ -65,7 +65,7 @@ Parsing and text editing are UI-thread independent. Avalonia object creation and
 
 ## Hard boundaries
 
-Never add to these packages: MSBuild evaluation, `.sln`/`.csproj`/`project.assets.json` reading, NuGet search or restore, C# compilation, Roslyn analysis, IDE integration, a visual designer, selection adorners, property-inspector UI, drag and drop, pointer/keyboard interception, or a sandbox for untrusted XAML. This governs `src/`; a sample may demonstrate what a host builds on the published API — the showcase has a property inspector for exactly that reason, recorded in `docs/adr/0006-inspector-in-the-sample.md`. External environments enter only through the resolver/provider interfaces (`IXamlSourceProvider`, `IXamlAssemblyResolver`, `IXamlTypeResolver`, `IXamlResourceResolver`, `IXamlRootInstanceFactory`). Do not create placeholder implementations for out-of-scope features.
+Never add to these packages: MSBuild evaluation, `.sln`/`.csproj`/`project.assets.json` reading, NuGet search or restore, C# compilation, Roslyn analysis, IDE integration, a visual designer, selection adorners, property-inspector UI, drag and drop, pointer/keyboard interception, or a sandbox for untrusted XAML. This governs `src/`; a sample may demonstrate what a host builds on the published API — the showcase has a property inspector for exactly that reason, recorded in `docs/adr/0006-inspector-in-the-sample.md`. External environments enter only through the resolver/provider interfaces (`IMarkupSourceProvider`, `IXamlAssemblyResolver`, `IXamlTypeResolver`, `IXamlResourceResolver`, `IXamlRootInstanceFactory`, `IXamlDispatcher`) — the contract calls the first of those `IXamlSourceProvider`, see `docs/adr/0004-loader-boundaries.md`. Do not create placeholder implementations for out-of-scope features.
 
 Use public Avalonia APIs only. Do not copy, fork, or depend on Avalonia/XamlX internal compiler details without a recorded ADR.
 
@@ -76,6 +76,8 @@ Do not use `XDocument` as the round-trip representation — it cannot preserve t
 - Central package management: every version lives in `Directory.Packages.props`, `PackageReference` elements carry no `Version`.
 - Nullable enabled, warnings as errors, implicit usings disabled, XML docs required on public APIs.
 - `Microsoft.CodeAnalysis.PublicApiAnalyzers` is active: new public API must be added to the owning project's `PublicAPI.Unshipped.txt` or the build fails. Run `tools/sync-public-api.py <project>` to derive that file from the build rather than writing it by hand — `dotnet format analyzers --diagnostics RS0016` looks like the official route and stops converging part-way. Review the resulting diff: it is the reviewable summary of what the change added to the public surface.
+- The surface in `PublicAPI.Shipped.txt` is a promise. Removing or renaming an entry there is a breaking change and belongs in a diff someone read on purpose; the sync tool refuses to do it and says so. Adding goes to `Unshipped` as usual.
+- Public API documentation lives in `docs/api/`. A change to the published surface that leaves those guides describing something else is not finished.
 - Prefer immutable public models. Keep reflection behind cached resolver services. No global mutable state, no service locators.
 - Add a test with every functional change; add a failing test before fixing a bug.
 - Small commits with one architectural purpose each.
@@ -85,3 +87,7 @@ Do not use `XDocument` as the round-trip representation — it cannot preserve t
 - **Target framework is `net10.0`**, not the `net8.0` suggested by README — see `docs/adr/0001-target-framework.md`.
 - **Avalonia 12.1.1**, which forces the test stack to `xunit.v3` and the headless attribute to `[AvaloniaFact]` — see `docs/adr/0002-avalonia-version.md`.
 - **A fourth test project**, `ArxisStudio.Markup.Architecture.Tests`, beyond the three in the contract's layout — see `docs/adr/0003-architecture-tests.md`.
+- **`IMarkupSourceProvider` rather than the contract's `IXamlSourceProvider`**, and Avalonia resolving types independently of `IXamlTypeResolver` — see `docs/adr/0004-loader-boundaries.md`.
+- **The out-of-scope list governs `src/` rather than the whole repository**, which is what lets the showcase carry a property inspector — see `docs/adr/0006-inspector-in-the-sample.md`.
+
+Two more ADRs record decisions rather than deviations: `0005-resource-includes.md` (includes resolved by projecting the document) and `0007-undo-belongs-to-the-workspace.md` (where undo lives, and which of the two write directions a tool should use).

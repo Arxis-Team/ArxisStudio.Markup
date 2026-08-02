@@ -16,7 +16,9 @@ The current development scope is limited to the markup libraries described in th
 
 ## Status
 
-Milestones 0 to 11 are implemented, and every item under *Definition of done for the first preview release* holds; that state is tagged `v0.1.0-preview`. Development continues from Milestone 12. This document stays the contract: the milestones below are the plan, not a record of what happened.
+Milestones 0 to 13 are implemented, and every item under *Definition of done for the first preview release* holds. The state at the end of Milestone 11 is tagged `v0.1.0-preview`; milestones 12 and 13 came after it. This document stays the contract: the milestones below are the plan, not a record of what happened.
+
+Documentation for people building on these packages lives in [`docs/api/`](docs/api/README.md), and what the packages deliberately do not do is in [`docs/limitations.md`](docs/limitations.md).
 
 The initial package family consists of:
 
@@ -1137,7 +1139,7 @@ Loader diagnostics should cover at least:
 
 ## Public API usage sketches
 
-The following examples illustrate intended usage. Exact signatures may evolve during implementation, but the architectural boundaries must remain.
+These sketched the intended shape before there was an implementation, and the implementation kept it. They are left here because they say what the boundaries are for; [`docs/api/`](docs/api/README.md) is where the API is actually documented, with examples that compile against the published surface.
 
 ### Parse and preserve a document
 
@@ -1205,15 +1207,18 @@ var root = session.GetRoot<Control>();
 ### Edit through the runtime session
 
 ```csharp
-session.SetValue(
+XamlEditResult result = session.SetValue(
     selectedButton,
     Layoutable.WidthProperty,
     320d);
 
-await document.SaveAsync(cancellationToken);
+await File.WriteAllTextAsync(
+    path,
+    session.Document.GetText(),
+    cancellationToken);
 ```
 
-The runtime object and source document must remain synchronized.
+The runtime object and source document must remain synchronized. Where a document is written to is the host's business, so there is no `Save` on a document; a tool with an undo history writes through `XamlWorkspace` instead, which is what puts the edit in the history — see `docs/adr/0007-undo-belongs-to-the-workspace.md`.
 
 ### Update an in-memory resource file
 

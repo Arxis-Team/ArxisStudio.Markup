@@ -7,6 +7,8 @@ something outside this repository, that is said plainly.
 The three rules in `README.md` are never traded away for any of it: the document stays the source
 of truth, an unchanged document round-trips byte for byte, and unknown content survives.
 
+What the packages *do* is documented in [`api/`](api/README.md).
+
 ## Includes
 
 `ResourceInclude` and `StyleInclude` are resolved through `IXamlResourceResolver` by projecting
