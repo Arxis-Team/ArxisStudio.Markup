@@ -16,6 +16,7 @@ ArxisStudio.Markup.Xaml.XamlWorkspace.Apply(ArxisStudio.Markup.Xaml.XamlDocument
 ArxisStudio.Markup.Xaml.XamlWorkspace.Apply(string! description, params ArxisStudio.Markup.Xaml.XamlDocumentEditor![]! editors) -> System.Collections.Immutable.ImmutableArray<ArxisStudio.Markup.Xaml.XamlDocument!>
 ArxisStudio.Markup.Xaml.XamlWorkspace.CanRedo.get -> bool
 ArxisStudio.Markup.Xaml.XamlWorkspace.CanUndo.get -> bool
+ArxisStudio.Markup.Xaml.XamlWorkspace.Dispose() -> void
 ArxisStudio.Markup.Xaml.XamlWorkspace.DocumentChanged -> System.EventHandler<ArxisStudio.Markup.Xaml.XamlDocumentChangedEventArgs!>?
 ArxisStudio.Markup.Xaml.XamlWorkspace.GetDocument(ArxisStudio.Markup.MarkupDocumentId id) -> ArxisStudio.Markup.Xaml.XamlDocument!
 ArxisStudio.Markup.Xaml.XamlWorkspace.OpenAsync(System.Uri! uri, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.ValueTask<ArxisStudio.Markup.Xaml.XamlDocument!>

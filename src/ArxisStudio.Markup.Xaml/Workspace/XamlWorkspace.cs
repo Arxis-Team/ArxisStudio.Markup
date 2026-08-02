@@ -30,7 +30,7 @@ namespace ArxisStudio.Markup.Xaml;
 /// drawing a tree does constantly — costs a dictionary lookup rather than a parse.
 /// </para>
 /// </remarks>
-public sealed class XamlWorkspace
+public sealed class XamlWorkspace : IDisposable
 {
     private readonly ConcurrentDictionary<MarkupDocumentId, (DocumentVersion Version, XamlDocument Document)> _parsed
         = new();
@@ -176,6 +176,20 @@ public sealed class XamlWorkspace
         return [.. targets.Select(target => Parse(Workspace.GetDocument(target.Document.Id)))];
     }
 
+    /// <summary>
+    /// Stops listening to the workspace underneath and lets go of what has been parsed.
+    /// </summary>
+    /// <remarks>
+    /// The subscription is what keeps this alive: a markup workspace outlives the views over it,
+    /// and one that was closed without this would go on parsing every edit and raising events at
+    /// whatever was still listening to it.
+    /// </remarks>
+    public void Dispose()
+    {
+        Workspace.DocumentChanged -= OnDocumentChanged;
+        _parsed.Clear();
+    }
+
     /// <summary>Undoes the last action.</summary>
     /// <returns><see langword="true"/> if there was one.</returns>
     public bool Undo() => Workspace.Undo();
@@ -228,6 +242,13 @@ public sealed class XamlWorkspace
 
     private void OnDocumentChanged(object? sender, DocumentChangedEventArgs e)
     {
+        // A closed document has no current version to hold a parse of, and keeping the last one
+        // would make "one entry per open document" quietly untrue.
+        if (e.Kind == DocumentChangeKind.Closed)
+        {
+            _parsed.TryRemove(e.DocumentId, out _);
+        }
+
         if (DocumentChanged is not { } handler)
         {
             return;

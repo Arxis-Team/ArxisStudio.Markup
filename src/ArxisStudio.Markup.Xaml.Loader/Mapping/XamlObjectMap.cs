@@ -214,9 +214,9 @@ public sealed class XamlObjectMap
             return;
         }
 
-        if (XamlElementIdentity.Pair(beforeChildren, afterChildren) is { } pairs)
+        if (XamlElementIdentity.Pair(beforeChildren, afterChildren) is { } pairing)
         {
-            foreach ((XamlElement child, XamlElement updated) in pairs)
+            foreach ((XamlElement child, XamlElement updated) in pairing.All)
             {
                 Pair(child, updated, carried);
             }

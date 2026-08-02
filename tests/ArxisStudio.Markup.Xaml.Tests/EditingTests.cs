@@ -439,6 +439,57 @@ public sealed class EditingTests
     }
 
     [Fact]
+    public void UnwrappingLeavesAPropertyElementWhereItBelongs()
+    {
+        XamlDocument document = XamlDocument.Parse(
+            "<StackPanel>\n" +
+            "  <Grid>\n" +
+            "    <Grid.ColumnDefinitions>\n" +
+            "      <ColumnDefinition Width=\"*\" />\n" +
+            "    </Grid.ColumnDefinitions>\n" +
+            "    <Button />\n" +
+            "  </Grid>\n" +
+            "</StackPanel>");
+
+        string result = document.UnwrapElement(Element(document, "Grid")).GetText();
+
+        // Promoting Grid.ColumnDefinitions to stand beside the button would put a member of a
+        // grid where no grid is, which is markup that means nothing.
+        Assert.DoesNotContain("Grid.ColumnDefinitions", result, StringComparison.Ordinal);
+        Assert.Equal("<StackPanel>\n  <Button />\n</StackPanel>", result);
+    }
+
+    [Fact]
+    public void WrappingDoesNotIndentTheTextAControlDisplays()
+    {
+        XamlDocument document = XamlDocument.Parse(
+            "<StackPanel>\n" +
+            "  <TextBox AcceptsReturn=\"True\">line one\nline two</TextBox>\n" +
+            "</StackPanel>");
+
+        string result = document
+            .WrapElement(Element(document, "TextBox"), "<Border></Border>")
+            .GetText();
+
+        // The value is what the control displays. Indenting it would change what the user sees,
+        // which is not what wrapping was asked to do.
+        Assert.Contains(">line one\nline two<", result, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void WrappingTheRootKeepsTheDocumentsLineEndings()
+    {
+        XamlDocument document = XamlDocument.Parse("<Grid>\r\n  <Button />\r\n</Grid>\r\n");
+
+        string result = document.WrapElement(document.Root!, "<Border></Border>").GetText();
+
+        // The root has no line above it to learn from, and answering "line feed" would put a
+        // second kind of line ending into a file that has one.
+        Assert.DoesNotContain("<Border>\n", result, StringComparison.Ordinal);
+        Assert.Contains("<Border>\r\n", result, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void UnwrappingAnElementWithNothingInItRemovesIt()
     {
         XamlDocument document = XamlDocument.Parse("<Grid>\n  <Border></Border>\n  <Button />\n</Grid>");

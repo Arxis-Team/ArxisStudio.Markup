@@ -47,23 +47,34 @@ internal static class XamlElementIdentity
     /// Pairs two versions of one element's children, by identity where there is one and by
     /// position otherwise.
     /// </summary>
+    /// <remarks>
+    /// Content and members are paired separately. A property element — <c>&lt;Grid.Children&gt;</c>,
+    /// <c>&lt;Border.Resources&gt;</c> — is a member of its parent rather than a thing beside its
+    /// siblings: it produces no object of its own, it cannot be named, and it cannot change places
+    /// with a control. Pairing it as though it could is what put an element that produced no
+    /// object into an order of objects.
+    /// </remarks>
     /// <param name="before">The children as they were, in document order.</param>
     /// <param name="after">The children as they now read, in document order.</param>
     /// <returns>
-    /// The pairs, in the new document's order, or <see langword="null"/> when identity cannot
-    /// decide and position has to.
+    /// The pairing, or <see langword="null"/> when identity cannot decide and position has to.
     /// </returns>
-    internal static IReadOnlyList<(XamlElement Before, XamlElement After)>? Pair(
+    internal static XamlElementPairing? Pair(
         IReadOnlyList<XamlElement> before,
         IReadOnlyList<XamlElement> after)
     {
-        if (before.Count != after.Count)
+        XamlElement[] content = [.. before.Where(static element => !element.IsPropertyElementSyntax)];
+        XamlElement[] recontent = [.. after.Where(static element => !element.IsPropertyElementSyntax)];
+        XamlElement[] members = [.. before.Where(static element => element.IsPropertyElementSyntax)];
+        XamlElement[] remembers = [.. after.Where(static element => element.IsPropertyElementSyntax)];
+
+        if (content.Length != recontent.Length || members.Length != remembers.Length)
         {
             return null;
         }
 
-        Dictionary<string, XamlElement>? named = Named(before);
-        Dictionary<string, XamlElement>? renamed = Named(after);
+        Dictionary<string, XamlElement>? named = Named(content);
+        Dictionary<string, XamlElement>? renamed = Named(recontent);
 
         if (named is null || renamed is null || named.Count == 0 || !named.Keys.ToHashSet().SetEquals(renamed.Keys))
         {
@@ -72,11 +83,11 @@ internal static class XamlElementIdentity
             return null;
         }
 
-        XamlElement[] anonymous = [.. before.Where(element => Of(element) is null)];
-        var pairs = new List<(XamlElement Before, XamlElement After)>(after.Count);
+        XamlElement[] anonymous = [.. content.Where(element => Of(element) is null)];
+        var pairs = new List<(XamlElement Before, XamlElement After)>(recontent.Length);
         int next = 0;
 
-        foreach (XamlElement element in after)
+        foreach (XamlElement element in recontent)
         {
             if (Of(element) is { } identity)
             {
@@ -90,22 +101,29 @@ internal static class XamlElementIdentity
             }
         }
 
-        return pairs;
+        return new XamlElementPairing
+        {
+            Content = pairs,
+
+            // Members keep their order because there is no order for them to keep: which member
+            // a property element is, is its name, and that is compared where its content is.
+            Members = [.. members.Zip(remembers)],
+        };
     }
 
     /// <summary>
     /// Reports whether a pairing puts anything anywhere other than where it already was.
     /// </summary>
     /// <param name="before">The children as they were, in document order.</param>
-    /// <param name="pairs">The pairing, in the new document's order.</param>
+    /// <param name="pairing">The pairing.</param>
     /// <returns><see langword="true"/> when the order changed.</returns>
-    internal static bool Moved(
-        IReadOnlyList<XamlElement> before,
-        IReadOnlyList<(XamlElement Before, XamlElement After)> pairs)
+    internal static bool Moved(IReadOnlyList<XamlElement> before, XamlElementPairing pairing)
     {
-        for (int index = 0; index < pairs.Count; index++)
+        XamlElement[] content = [.. before.Where(static element => !element.IsPropertyElementSyntax)];
+
+        for (int index = 0; index < pairing.Content.Count; index++)
         {
-            if (!ReferenceEquals(before[index], pairs[index].Before))
+            if (!ReferenceEquals(content[index], pairing.Content[index].Before))
             {
                 return true;
             }

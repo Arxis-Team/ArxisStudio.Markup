@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Collections.Immutable;
 using System.Linq;
+using System.Text;
 
 namespace ArxisStudio.Markup.Xaml;
 
@@ -325,7 +326,7 @@ public sealed class XamlDocumentEditor
 
         return Replace(
             element.Span,
-            opening + line + indent + step + Reindent(element.GetText(), step) + line + indent + closing);
+            opening + line + indent + step + Reindent(element, step) + line + indent + closing);
     }
 
     /// <summary>
@@ -336,6 +337,12 @@ public sealed class XamlDocumentEditor
     /// The children move out one level, indented to match where their wrapper stood. An element
     /// with no child elements is simply removed: unwrapping an empty wrapper leaves nothing, and
     /// that is the only thing it can mean.
+    /// </para>
+    /// <para>
+    /// Property elements are not children in this sense and do not come out. A
+    /// <c>&lt;Grid.ColumnDefinitions&gt;</c> is a member of the grid it is written inside, and
+    /// promoting it to stand beside its former siblings would produce markup that means nothing
+    /// and does not parse where it lands.
     /// </para>
     /// <para>
     /// Whether the slot the wrapper occupied will take more than one child is a question about
@@ -353,7 +360,7 @@ public sealed class XamlDocumentEditor
         ArgumentNullException.ThrowIfNull(element);
         Validate(element);
 
-        XamlElement[] children = [.. element.Elements];
+        XamlElement[] children = [.. element.Elements.Where(static child => !child.IsPropertyElementSyntax)];
 
         if (children.Length == 0)
         {
@@ -366,7 +373,7 @@ public sealed class XamlDocumentEditor
 
         return Replace(
             element.Span,
-            string.Join(separator, children.Select(child => Outdent(child.GetText(), step))));
+            string.Join(separator, children.Select(child => Outdent(child, step))));
     }
 
     /// <summary>Gets the text changes these edits amount to, ordered and non-overlapping.</summary>
@@ -548,7 +555,15 @@ public sealed class XamlDocumentEditor
         return "  ";
     }
 
-    /// <summary>Gets the line break the document is written with.</summary>
+    /// <summary>
+    /// Gets the line break the document is written with.
+    /// </summary>
+    /// <remarks>
+    /// Looking backwards first, because the break above an element is the one it sits under.
+    /// Looking forwards after that, because the root element has nothing above it — and answering
+    /// "line feed" for it would put a line ending into a file written with carriage returns that
+    /// the whole package otherwise promises to leave alone.
+    /// </remarks>
     private string NewLineFor(XamlElement element)
     {
         SourceText text = _document.SourceText;
@@ -561,25 +576,114 @@ public sealed class XamlDocumentEditor
             }
         }
 
+        for (int index = 0; index < text.Length; index++)
+        {
+            if (text[index] == '\n')
+            {
+                return index > 0 && text[index - 1] == '\r' ? "\r\n" : "\n";
+            }
+        }
+
         return "\n";
     }
 
     /// <summary>
-    /// Indents every line of a block but the first, which is already in place.
+    /// Indents every line of an element but the first, which is already in place.
     /// </summary>
     /// <remarks>
+    /// <para>
     /// Written against the line feed alone, so that a file using carriage returns keeps them: the
     /// insertion lands after the break either way, and normalising the endings here would rewrite
     /// every line of a block that was only supposed to move sideways.
+    /// </para>
+    /// <para>
+    /// A line break inside a value is left alone. The text of a multi-line
+    /// <c>&lt;TextBox&gt;</c> or a <c>CDATA</c> section is content the author wrote, not layout
+    /// this may adjust, and indenting it would change what the control displays — which is
+    /// exactly the kind of edit nobody asked for.
+    /// </para>
     /// </remarks>
-    private static string Reindent(string text, string step) =>
-        text.Replace("\n", "\n" + step, StringComparison.Ordinal);
+    private static string Reindent(XamlElement element, string step) =>
+        Relayout(element, step, indent: true);
 
-    /// <summary>Takes one level of indentation off every line of a block but the first.</summary>
-    private static string Outdent(string text, string step) =>
-        step.Length == 0
-            ? text
-            : text.Replace("\n" + step, "\n", StringComparison.Ordinal);
+    /// <summary>Takes one level of indentation off every line of an element but the first.</summary>
+    private static string Outdent(XamlElement element, string step) =>
+        step.Length == 0 ? element.GetText() : Relayout(element, step, indent: false);
+
+    private static string Relayout(XamlElement element, string step, bool indent)
+    {
+        string text = element.GetText();
+        List<TextSpan> values = ValueRunsOf(element);
+        var builder = new StringBuilder(text.Length);
+
+        for (int index = 0; index < text.Length; index++)
+        {
+            char character = text[index];
+
+            builder.Append(character);
+
+            if (character != '\n' || values.Any(run => run.Start <= index && index < run.End))
+            {
+                continue;
+            }
+
+            if (indent)
+            {
+                builder.Append(step);
+            }
+            else if (index + 1 + step.Length <= text.Length
+                && text.AsSpan(index + 1, step.Length).SequenceEqual(step))
+            {
+                index += step.Length;
+            }
+        }
+
+        return builder.ToString();
+    }
+
+    /// <summary>
+    /// Finds the parts of an element's text that are a value rather than layout, relative to its
+    /// own start.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// Whitespace between two elements is layout and is what indentation is made of; whitespace
+    /// between two pieces of text is part of what that text says.
+    /// </para>
+    /// <para>
+    /// So a value is taken to run from the first thing an element says to the last, and the line
+    /// breaks in between belong to it. Reading the text nodes alone would miss them: a line break
+    /// inside a value is trivia between two of them, not part of either.
+    /// </para>
+    /// </remarks>
+    private static List<TextSpan> ValueRunsOf(XamlElement element)
+    {
+        int start = element.Span.Start;
+        var runs = new List<TextSpan>();
+
+        Collect(element);
+
+        return runs;
+
+        void Collect(XamlElement current)
+        {
+            XamlSyntaxNode[] said =
+            [
+                .. current.Content.Where(static node =>
+                    node is XamlCData || (node is XamlText && node.GetSourceText().Trim().Length > 0)),
+            ];
+
+            if (said.Length > 0)
+            {
+                runs.Add(TextSpan.FromBounds(said[0].Span.Start - start, said[^1].Span.End - start));
+            }
+
+            foreach (XamlElement child in current.Content.OfType<XamlElement>())
+            {
+                Collect(child);
+            }
+        }
+    }
 
     /// <summary>
     /// Works out what to remove along with an element: its own line when it has one to itself,

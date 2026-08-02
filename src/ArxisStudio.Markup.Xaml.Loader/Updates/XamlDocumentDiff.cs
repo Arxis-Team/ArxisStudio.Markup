@@ -176,13 +176,12 @@ internal static class XamlDocumentDiff
             return;
         }
 
-        IReadOnlyList<(XamlElement Before, XamlElement After)>? pairs =
-            XamlElementIdentity.Pair(beforeChildren, afterChildren);
+        XamlElementPairing? pairing = XamlElementIdentity.Pair(beforeChildren, afterChildren);
 
         // Nothing names these children, so the only thing that says which is which is where each
         // one sits. A move is then indistinguishable from two elements having swapped contents,
         // and the conservative reading is the one that cannot put a value on the wrong object.
-        if (pairs is null)
+        if (pairing is null)
         {
             for (int index = 0; index < beforeChildren.Length; index++)
             {
@@ -192,12 +191,12 @@ internal static class XamlDocumentDiff
             return;
         }
 
-        if (XamlElementIdentity.Moved(beforeChildren, pairs))
+        if (XamlElementIdentity.Moved(beforeChildren, pairing))
         {
             changes.Add(Reorder(before, after));
         }
 
-        foreach ((XamlElement child, XamlElement updated) in pairs)
+        foreach ((XamlElement child, XamlElement updated) in pairing.All)
         {
             CompareElements(child, updated, changes);
         }

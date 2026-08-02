@@ -1008,6 +1008,71 @@ public sealed class UpdateTests
     }
 
     [AvaloniaFact]
+    public async Task NamedSiblingsMoveUnderAParentThatAlsoHasAPropertyElement()
+    {
+        string Grid(string children) =>
+            $"<Grid xmlns=\"{AvaloniaNamespace}\"\n" +
+            "      xmlns:x=\"http://schemas.microsoft.com/winfx/2006/xaml\">\n" +
+            "  <Grid.ColumnDefinitions>\n" +
+            "    <ColumnDefinition Width=\"*\" />\n" +
+            "    <ColumnDefinition Width=\"*\" />\n" +
+            "  </Grid.ColumnDefinitions>\n" +
+            children +
+            "\n</Grid>";
+
+        await using XamlLoadSession session = await Load(Grid(
+            "  <TextBlock x:Name=\"Title\" Grid.Column=\"0\" Text=\"Title\" />\n" +
+            "  <Button x:Name=\"Save\" Grid.Column=\"1\" Content=\"Save\" />"));
+
+        var grid = session.GetRoot<Grid>();
+        Control save = grid.Children[1];
+
+        XamlUpdateResult result = await Update(session, Grid(
+            "  <Button x:Name=\"Save\" Grid.Column=\"1\" Content=\"Save\" />\n" +
+            "  <TextBlock x:Name=\"Title\" Grid.Column=\"0\" Text=\"Title\" />"));
+
+        // Grid.ColumnDefinitions is a member of the grid, not a thing beside its children: it
+        // produced no object, and putting it in an order of objects refused the whole update.
+        Assert.True(result.Applied, string.Join(" | ", result.Diagnostics));
+        Assert.Equal(XamlUpdateStrategy.ReorderChildren, result.Strategy);
+        Assert.Same(save, grid.Children[0]);
+    }
+
+    [AvaloniaFact]
+    public async Task ARefusedUpdateLeavesNothingBehindForTheNextOne()
+    {
+        await using XamlLoadSession session = await Load(Panel(
+            "  <TextBlock x:Name=\"Title\" Text=\"before\" />\n" +
+            "  <Button x:Name=\"Save\" Content=\"Save\" />"));
+
+        // A structural change to markup that will not build: the attempt gets as far as working
+        // out what each rebuilt element produced, and then refuses.
+        XamlUpdateResult refused = await Update(session, Panel(
+            "  <TextBlock x:Name=\"Title\" Text=\"before\" />\n" +
+            "  <Button x:Name=\"Save\" NotAProperty=\"x\" Content=\"Save\" />"));
+
+        Assert.False(refused.Applied);
+
+        XamlUpdateResult accepted = await Update(session, Panel(
+            "  <TextBlock x:Name=\"Title\" Text=\"after\" />\n" +
+            "  <Button x:Name=\"Save\" Content=\"Save\" />"));
+
+        Assert.True(accepted.Applied, string.Join(" | ", accepted.Diagnostics));
+
+        // Nothing the refused attempt worked out may reach this document: its elements belong to
+        // a version the session never adopted, and its objects were thrown away.
+        foreach (XamlElement element in session.Document.DescendantElements())
+        {
+            if (session.GetObject(element) is { } target)
+            {
+                Assert.Same(element, session.GetElement(target));
+            }
+        }
+
+        Assert.Equal("after", session.GetRoot<StackPanel>().Children.OfType<TextBlock>().Single().Text);
+    }
+
+    [AvaloniaFact]
     public async Task AnUpdateOnADisposedSessionThrows()
     {
         XamlLoadSession session = await Load(View("Text=\"x\""));

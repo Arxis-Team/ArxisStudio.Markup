@@ -354,6 +354,12 @@ public sealed partial class XamlLoadSession
         var rebuilds = new List<(XamlDocumentChange Change, object Previous, object Fresh, Uri? RuntimeUri)>();
         var reorders = new List<(XamlElement Parent, IReadOnlyList<XamlElement> Order)>();
 
+        // Cleared here rather than after a successful apply: an attempt that gets part-way and
+        // then refuses leaves pairs behind, keyed by elements of a document this session never
+        // adopted and pointing at objects it threw away. Carrying those into the next update
+        // would answer a question about this document with an object from a rejected one.
+        _rebuilt.Clear();
+
         // Building every fragment first means a fragment that will not build refuses the update
         // rather than stopping halfway through a tree that is already part-way rebuilt.
         foreach ((XamlDocumentChange change, TextProjection fragment) in fragments)
@@ -397,7 +403,7 @@ public sealed partial class XamlLoadSession
             {
                 if (change.OldElement is not { } parent
                     || change.NewElement is not { } reordered
-                    || XamlElementIdentity.Pair([.. parent.Elements], [.. reordered.Elements]) is not { } pairs)
+                    || XamlElementIdentity.Pair([.. parent.Elements], [.. reordered.Elements]) is not { } pairing)
                 {
                     diagnostics.Add(MarkupDiagnostic.Synchronization(
                         XamlLoaderDiagnosticCodes.UpdateNotApplied,
@@ -408,9 +414,10 @@ public sealed partial class XamlLoadSession
                     return false;
                 }
 
-                // The elements of the loaded document, in the order the new one gives them: the
-                // map is keyed by the document the objects were built from.
-                reorders.Add((parent, [.. pairs.Select(static pair => pair.Before)]));
+                // The elements of the loaded document, in the order the new one gives them, and
+                // only the ones that produced an object: the map is keyed by the document the
+                // objects were built from, and a property element is not one of them.
+                reorders.Add((parent, [.. pairing.Content.Select(static pair => pair.Before)]));
 
                 continue;
             }
