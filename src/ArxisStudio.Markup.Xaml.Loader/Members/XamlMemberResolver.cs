@@ -1,5 +1,7 @@
 using System;
 using System.Collections.Concurrent;
+using System.Collections.Generic;
+using System.Collections.Immutable;
 using System.Linq;
 using System.Reflection;
 using Avalonia;
@@ -28,6 +30,79 @@ public sealed class XamlMemberResolver
 
     /// <summary>Gets the shared instance.</summary>
     public static XamlMemberResolver Instance { get; } = new();
+
+    /// <summary>
+    /// Lists the members of a type that a document can set.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// Every registered Avalonia property the type carries, plus its public writable CLR
+    /// properties. A tool that offers a property list needs this; working it out from the
+    /// registry and reflection is the same code in every such tool, and getting the attached
+    /// ones right is the part people get wrong.
+    /// </para>
+    /// <para>
+    /// Which of them are worth showing is still the tool's decision — a hundred inherited
+    /// properties is a correct answer and a useless panel. What is answered here is which exist
+    /// and what each one is.
+    /// </para>
+    /// <para>
+    /// The answer can grow between calls, and deliberately is not cached as a whole. Avalonia
+    /// registers an attached property in the static constructor of the type that declares it, so
+    /// <c>Grid.Row</c> exists as a member of every control only once something has caused
+    /// <c>Grid</c> to be initialised. A tool that resolves types as documents ask for them will
+    /// see that happen while it is running, and a list answered from a cache taken beforehand
+    /// would never catch up. The descriptors themselves still come from the shared cache.
+    /// </para>
+    /// </remarks>
+    /// <param name="targetType">The type to list.</param>
+    /// <returns>The members, ordered by name.</returns>
+    /// <exception cref="ArgumentNullException"><paramref name="targetType"/> is <see langword="null"/>.</exception>
+    public ImmutableArray<XamlMemberDescriptor> Enumerate(Type targetType)
+    {
+        ArgumentNullException.ThrowIfNull(targetType);
+
+        return Discover(targetType);
+    }
+
+    private ImmutableArray<XamlMemberDescriptor> Discover(Type targetType)
+    {
+        var names = new HashSet<string>(StringComparer.Ordinal);
+        var members = new List<XamlMemberDescriptor>();
+
+        if (typeof(AvaloniaObject).IsAssignableFrom(targetType))
+        {
+            foreach (AvaloniaProperty property in AvaloniaPropertyRegistry.Instance.GetRegistered(targetType))
+            {
+                if (names.Add(property.Name))
+                {
+                    members.Add(Resolve(targetType, property));
+                }
+            }
+
+            // Attached properties are written as Owner.Member and are not registered on the type
+            // that carries them, so the simple name alone would never find them.
+            foreach (AvaloniaProperty property in AvaloniaPropertyRegistry.Instance.GetRegisteredAttached(targetType))
+            {
+                string name = $"{property.OwnerType.Name}.{property.Name}";
+
+                if (names.Add(name))
+                {
+                    members.Add(Resolve(targetType, name, property.OwnerType));
+                }
+            }
+        }
+
+        foreach (PropertyInfo property in targetType.GetProperties(BindingFlags.Public | BindingFlags.Instance))
+        {
+            if (property.GetIndexParameters().Length == 0 && names.Add(property.Name))
+            {
+                members.Add(Resolve(targetType, property.Name));
+            }
+        }
+
+        return [.. members.OrderBy(static member => member.Name, StringComparer.Ordinal)];
+    }
 
     /// <summary>Resolves a member name against a type.</summary>
     /// <param name="targetType">The type the member is written on.</param>

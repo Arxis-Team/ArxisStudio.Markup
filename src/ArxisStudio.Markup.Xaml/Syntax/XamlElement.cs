@@ -92,8 +92,77 @@ public sealed class XamlElement : XamlSyntaxNode
     public IEnumerable<XamlNamespaceDeclaration> NamespaceDeclarations =>
         _attributes.OfType<XamlNamespaceDeclaration>();
 
-    /// <summary>Gets the element's child elements in source order.</summary>
+    /// <summary>Gets the element's child elements in source order, property elements included.</summary>
     public IEnumerable<XamlElement> Elements => _content.OfType<XamlElement>();
+
+    /// <summary>
+    /// Gets the child elements that stand beside each other rather than name a member.
+    /// </summary>
+    /// <remarks>
+    /// What a tool means by "the things inside this one". A property element is a member of its
+    /// parent — <c>&lt;Grid.ColumnDefinitions&gt;</c> is not a thing next to the buttons, it is
+    /// where the grid's columns are written — so it takes no part in ordering, is not moved
+    /// between siblings, and is not counted when a caller says "the first child".
+    /// </remarks>
+    public IEnumerable<XamlElement> ContentElements =>
+        Elements.Where(static element => !element.IsPropertyElementSyntax);
+
+    /// <summary>Gets the child elements that name a member of this one, in source order.</summary>
+    public IEnumerable<XamlElement> MemberElements =>
+        Elements.Where(static element => element.IsPropertyElementSyntax);
+
+    /// <summary>
+    /// Gets what the document calls this element, or <see langword="null"/> when it calls it
+    /// nothing.
+    /// </summary>
+    /// <remarks>
+    /// <c>x:Name</c> first, then <c>Name</c>, which Avalonia treats as the same thing on anything
+    /// that has it. A name written as an expression is not an identity: what it stands for is
+    /// decided while the objects are being built, so two documents cannot be compared on it.
+    /// </remarks>
+    public string? Identity
+    {
+        get
+        {
+            if (GetDirective(XamlDirectives.Name) is { } directive)
+            {
+                return directive;
+            }
+
+            return GetAttribute(XamlQualifiedName.Unprefixed("Name"))?.GetValue() is XamlLiteralValue literal
+                ? literal.Text
+                : null;
+        }
+    }
+
+    /// <summary>
+    /// Gets this element's position among its parent's content children, or <c>-1</c> when it has
+    /// no parent element or is one of its members.
+    /// </summary>
+    public int IndexInContent
+    {
+        get
+        {
+            if (IsPropertyElementSyntax || Parent is not XamlElement parent)
+            {
+                return -1;
+            }
+
+            var index = 0;
+
+            foreach (XamlElement sibling in parent.ContentElements)
+            {
+                if (ReferenceEquals(sibling, this))
+                {
+                    return index;
+                }
+
+                index++;
+            }
+
+            return -1;
+        }
+    }
 
     /// <summary>
     /// Gets the namespace URI this element's name resolves to, or <see langword="null"/> when

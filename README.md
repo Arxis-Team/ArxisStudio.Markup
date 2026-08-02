@@ -1624,6 +1624,38 @@ Exit criteria:
 - an editor opened on a version the workspace has moved past is refused rather than approximated;
 - the showcase performs structural edits and undoes them without a line added to `src/`.
 
+### Milestone 14: an element model for tools
+
+Milestone 13 answered whether a designer can be built on these packages. Building one found that
+the editing primitives are complete and the *model* is not: a host re-derives the same handful of
+rules every time — which children produce objects, what an element is called, how to keep a
+reference to one across an edit, which members a type has. The same rule appears five times inside
+this repository, which is what an absent API member looks like.
+
+- Publish the distinction between content and member elements, which every caller needs and every
+  caller currently writes by hand.
+- Publish the identity rule — `x:Name`, then a literal `Name` — instead of leaving it internal.
+- Add a stable reference to an element that survives an edit, an undo and a redo, so a tool's
+  selection and expansion state do not depend on spans or on live objects.
+- Add duplication, which is otherwise three unobvious steps.
+- Make an insertion index count the children a caller means, and record why that is a fix rather
+  than a second method.
+- Let a tool enumerate a type's members rather than inventing the list.
+- Fix what enumerating found: a value written as text for a type with no `TypeConverter` — a
+  `Thickness`, a `CornerRadius` — reached the setter as a string, and the exception it raised came
+  out of an update instead of being reported as a diagnostic.
+
+Exit criteria:
+
+- inserting at index 0 into a parent that declares a property element lands before the first
+  content child and after the property element;
+- a path resolves to the same element after an unrelated edit, and equality is by value;
+- duplicating produces a copy that loads;
+- text a member cannot hold is refused with a diagnostic and a span, the objects are left as they
+  were, and nothing is thrown;
+- the showcase's tree, selection and property list are expressed in the published model, and the
+  code it needed for them is gone.
+
 ## Definition of done for the first preview release
 
 The first preview release is ready when all of the following are true:

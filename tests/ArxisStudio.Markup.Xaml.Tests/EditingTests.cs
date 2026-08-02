@@ -500,6 +500,96 @@ public sealed class EditingTests
     }
 
     [Fact]
+    public void AnIndexCountsContentChildrenAndNotMembers()
+    {
+        XamlDocument document = XamlDocument.Parse(
+            "<StackPanel>\n" +
+            "  <StackPanel.Resources>\n" +
+            "    <SolidColorBrush x:Key=\"Accent\" Color=\"Red\" />\n" +
+            "  </StackPanel.Resources>\n" +
+            "  <Button />\n" +
+            "</StackPanel>");
+
+        string result = document
+            .InsertElement(document.Root!, 0, "<TextBlock />")
+            .GetText();
+
+        // "First control" means after the resources, not before them: a property element is
+        // where a member is written, not a thing standing beside the buttons.
+        Assert.Contains("</StackPanel.Resources>\n  <TextBlock />\n  <Button />", result, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void InsertingIntoAParentThatOnlyDeclaresMembersLandsAfterThem()
+    {
+        XamlDocument document = XamlDocument.Parse(
+            "<StackPanel>\n" +
+            "  <StackPanel.Resources>\n" +
+            "    <SolidColorBrush x:Key=\"Accent\" Color=\"Red\" />\n" +
+            "  </StackPanel.Resources>\n" +
+            "</StackPanel>");
+
+        string result = document.InsertElement(document.Root!, 0, "<Button />").GetText();
+
+        Assert.Contains("</StackPanel.Resources>\n  <Button />", result, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void DuplicatingPutsAnAnonymousCopyStraightAfterTheOriginal()
+    {
+        XamlDocument document = Parse();
+
+        string result = document.DuplicateElement(Named(document, "SaveButton")).GetText();
+
+        // A copy that kept the name would have declared it twice, and a loader that enforces the
+        // rule refuses the whole document.
+        Assert.Equal(2, Occurrences(result, "<Button"));
+        Assert.Equal(1, Occurrences(result, "x:Name='SaveButton'"));
+
+        // Straight after the original and before what followed it, with everything else the
+        // original was written with carried across.
+        int original = result.IndexOf("<Button", StringComparison.Ordinal);
+        int copy = result.IndexOf("<Button", original + 1, StringComparison.Ordinal);
+
+        Assert.InRange(copy, original, result.IndexOf("<TextBlock", StringComparison.Ordinal));
+        Assert.Contains("Width = \"320\"  Content=\"Save\"", result[copy..], StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void DuplicatingCanKeepTheNamesForACallerThatWillRenameThem()
+    {
+        XamlDocument document = Parse();
+
+        string result = document
+            .DuplicateElement(Named(document, "SaveButton"), XamlDuplicateNames.Keep)
+            .GetText();
+
+        Assert.Equal(2, Occurrences(result, "x:Name='SaveButton'"));
+    }
+
+    [Fact]
+    public void DuplicatingTheRootIsRejectedRatherThanGuessed()
+    {
+        XamlDocument document = Parse();
+
+        Assert.Throws<InvalidOperationException>(() => document.DuplicateElement(document.Root!));
+    }
+
+    private static int Occurrences(string text, string value)
+    {
+        var count = 0;
+        var at = 0;
+
+        while ((at = text.IndexOf(value, at, StringComparison.Ordinal)) >= 0)
+        {
+            count++;
+            at += value.Length;
+        }
+
+        return count;
+    }
+
+    [Fact]
     public void AnEditorWithNothingRecordedReturnsTheSameDocument()
     {
         XamlDocument document = Parse();

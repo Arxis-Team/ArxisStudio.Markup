@@ -91,14 +91,50 @@ element.MemberName              // "Resources", for a property element
 element.OwnerName               // "Border", for a property element
 ```
 
-`Elements` is every child element **including property elements**. Filter when you mean content:
+`Elements` is every child element **including property elements**. The two are told apart for you,
+and this is the split a tree, an insertion index and an object mapping all mean:
 
 ```csharp
-IEnumerable<XamlElement> content = element.Elements.Where(child => !child.IsPropertyElementSyntax);
+IEnumerable<XamlElement> content = element.ContentElements;  // the children that produce objects
+IEnumerable<XamlElement> members = element.MemberElements;   // <Border.Resources> and its like
+
+int position = element.IndexInContent;   // among content siblings; -1 for a root or a member
+string? identity = element.Identity;     // x:Name, then a literal Name; null when unnamed
 ```
+
+`Identity` is the rule the loader pairs objects by across an edit, so keying a tool's own state on
+it agrees with what the library does. It deliberately excludes `x:Key`: a key is where a resource is
+filed, not what an element is called, and joining them into one string is a tool's decision — ask
+for `element.GetDirective(XamlDirectives.Key)` when that is what you want.
 
 `Content` is everything inside the element in order — elements, text, CDATA, comments, processing
 instructions — which is what makes whitespace and comments visible rather than lost.
+
+## Referring to an element after an edit
+
+An element belongs to the parse it came from. Edit the document and every element in it is a
+different object at a different offset, so a tool cannot remember the element — and remembering its
+span is worse, because an edit above it moves the span while the element stays where it was.
+
+`XamlElementPath` says where an element sits, structurally:
+
+```csharp
+XamlElementPath path = XamlElementPath.Of(button);
+
+XamlDocument edited = document.SetAttribute(other, XamlQualifiedName.Parse("Text"), "…");
+
+XamlElement? sameButton = path.Resolve(edited);   // null when nothing is there any more
+XamlElementPath? container = path.Parent;         // where to select after a deletion
+
+path.Steps        // ImmutableArray<XamlPathStep>: (MemberName, Index)
+path.ToString()   // "/1/Resources:0"
+```
+
+Paths are equal by value and hash by value, so they work as the key of a dictionary of expanded
+nodes or as the field a selection is held in. They survive an edit, an undo and a redo, and mean the
+same thing in two parses of the same text. They are *positions*, not identifiers: inserting a
+sibling above an element changes its path, which is correct. Where a document names its elements,
+`Identity` is the stabler thing to key on.
 
 ## Attributes and values
 

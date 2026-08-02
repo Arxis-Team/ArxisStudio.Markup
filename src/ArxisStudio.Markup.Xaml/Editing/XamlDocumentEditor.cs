@@ -26,6 +26,9 @@ namespace ArxisStudio.Markup.Xaml;
 /// </remarks>
 public sealed class XamlDocumentEditor
 {
+    /// <summary>A name no real document uses, for the wrapper a copied fragment is parsed in.</summary>
+    private const string FragmentName = "ArxisStudioMarkupFragment";
+
     private readonly XamlDocument _document;
     private readonly List<TextChange> _changes = [];
     private readonly List<MarkupDiagnostic> _diagnostics = [];
@@ -161,8 +164,8 @@ public sealed class XamlDocumentEditor
     /// </summary>
     /// <param name="parent">The element to insert into.</param>
     /// <param name="index">
-    /// The position among <paramref name="parent"/>'s child elements. A value at or beyond the
-    /// end appends.
+    /// The position among <paramref name="parent"/>'s content children — property elements are
+    /// not counted. A value at or beyond the end appends.
     /// </param>
     /// <param name="xaml">The XAML text to insert.</param>
     /// <returns>This editor, for chaining.</returns>
@@ -193,7 +196,7 @@ public sealed class XamlDocumentEditor
 
     /// <summary>Inserts a copy of an element as a child of another.</summary>
     /// <param name="parent">The element to insert into.</param>
-    /// <param name="index">The position among the parent's child elements.</param>
+    /// <param name="index">The position among the parent's content children.</param>
     /// <param name="element">The element whose text is inserted.</param>
     /// <returns>This editor, for chaining.</returns>
     /// <exception cref="ArgumentNullException"><paramref name="parent"/> or <paramref name="element"/> is <see langword="null"/>.</exception>
@@ -202,6 +205,72 @@ public sealed class XamlDocumentEditor
         ArgumentNullException.ThrowIfNull(element);
 
         return InsertElement(parent, index, element.GetText());
+    }
+
+    /// <summary>
+    /// Puts a copy of an element straight after it, among the same siblings.
+    /// </summary>
+    /// <remarks>
+    /// The copy arrives written exactly as the original was, apart from the names, which are
+    /// taken out unless the caller says otherwise — see <see cref="XamlDuplicateNames"/> for why
+    /// that is the default.
+    /// </remarks>
+    /// <param name="element">The element to copy.</param>
+    /// <param name="names">What to do with the names inside the copy.</param>
+    /// <returns>This editor, for chaining.</returns>
+    /// <exception cref="ArgumentNullException"><paramref name="element"/> is <see langword="null"/>.</exception>
+    /// <exception cref="InvalidOperationException">
+    /// <paramref name="element"/> belongs to a different document, or is the root and so has no
+    /// siblings to be copied among.
+    /// </exception>
+    public XamlDocumentEditor DuplicateElement(
+        XamlElement element,
+        XamlDuplicateNames names = XamlDuplicateNames.Remove)
+    {
+        ArgumentNullException.ThrowIfNull(element);
+        Validate(element);
+
+        if (element.Parent is not XamlElement parent)
+        {
+            throw new InvalidOperationException(
+                $"Element '{element.Name}' is the root of its document and has no siblings to be " +
+                "copied among.");
+        }
+
+        string text = names == XamlDuplicateNames.Keep ? element.GetText() : Anonymous(element);
+
+        return InsertElement(parent, element.IndexInContent + 1, text);
+    }
+
+    /// <summary>
+    /// Renders an element's text with every name in it taken out.
+    /// </summary>
+    /// <remarks>
+    /// Parsed inside a wrapper that declares the XAML namespace, because a fragment lifted out of
+    /// its document does not carry the prefix its own <c>x:Name</c> is written with — and an
+    /// attribute whose prefix is bound to nothing is not the directive it looks like.
+    /// </remarks>
+    private static string Anonymous(XamlElement element)
+    {
+        var copy = XamlDocument.Parse(
+            $"<{FragmentName} xmlns:x=\"{XamlNamespaces.Xaml}\">{element.GetText()}</{FragmentName}>");
+
+        XamlDocumentEditor editor = copy.Edit();
+
+        foreach (XamlElement node in copy.DescendantElements())
+        {
+            if (node.GetDirectiveAttribute(XamlDirectives.Name) is { } directive)
+            {
+                editor.RemoveAttribute(node, directive.Name);
+            }
+
+            if (node.GetAttribute(XamlQualifiedName.Unprefixed("Name")) is { } attribute)
+            {
+                editor.RemoveAttribute(node, attribute.Name);
+            }
+        }
+
+        return editor.Apply().Root!.ContentElements.First().GetText();
     }
 
     /// <summary>
@@ -214,7 +283,7 @@ public sealed class XamlDocumentEditor
     /// </remarks>
     /// <param name="element">The element to move.</param>
     /// <param name="newParent">The element to move it under.</param>
-    /// <param name="index">The position among the new parent's child elements.</param>
+    /// <param name="index">The position among the new parent's content children.</param>
     /// <returns>This editor, for chaining.</returns>
     /// <exception cref="ArgumentNullException"><paramref name="element"/> or <paramref name="newParent"/> is <see langword="null"/>.</exception>
     /// <exception cref="InvalidOperationException">
@@ -360,7 +429,7 @@ public sealed class XamlDocumentEditor
         ArgumentNullException.ThrowIfNull(element);
         Validate(element);
 
-        XamlElement[] children = [.. element.Elements.Where(static child => !child.IsPropertyElementSyntax)];
+        XamlElement[] children = [.. element.ContentElements];
 
         if (children.Length == 0)
         {
@@ -470,14 +539,29 @@ public sealed class XamlDocumentEditor
             : " ";
     }
 
-    /// <summary>Finds where content goes, and what whitespace should surround it.</summary>
+    /// <summary>
+    /// Finds where content goes, and what whitespace should surround it.
+    /// </summary>
+    /// <remarks>
+    /// The index counts content children only. A property element is where a member is written
+    /// rather than a thing standing beside its siblings, and counting it would make "insert as the
+    /// first control" land before a parent's resources — a position no caller can have meant. See
+    /// <c>docs/adr/0008-an-index-counts-content.md</c>.
+    /// </remarks>
     private (int Position, string Prefix, string Suffix) ContentInsertionPointFor(XamlElement parent, int index)
     {
-        XamlElement[] children = [.. parent.Elements];
+        XamlElement[] children = [.. parent.ContentElements];
 
         if (children.Length == 0)
         {
-            return (parent.StartTagSpan.End, string.Empty, string.Empty);
+            // After the members when there are any, because a parent that declares its resources
+            // and then its content reads that way round, and the first control put into one
+            // should not arrive above them.
+            XamlElement? last = parent.MemberElements.LastOrDefault();
+
+            return last is null
+                ? (parent.StartTagSpan.End, string.Empty, string.Empty)
+                : (last.Span.End, LeadingWhitespaceOf(last), string.Empty);
         }
 
         if (index >= children.Length)

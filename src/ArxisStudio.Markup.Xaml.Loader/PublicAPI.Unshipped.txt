@@ -1,1 +1,3 @@
 #nullable enable
+ArxisStudio.Markup.Xaml.Loader.XamlLoadSession.GetMembers(object! target) -> System.Collections.Immutable.ImmutableArray<ArxisStudio.Markup.Xaml.Loader.XamlMemberDescriptor!>
+ArxisStudio.Markup.Xaml.Loader.XamlMemberResolver.Enumerate(System.Type! targetType) -> System.Collections.Immutable.ImmutableArray<ArxisStudio.Markup.Xaml.Loader.XamlMemberDescriptor!>

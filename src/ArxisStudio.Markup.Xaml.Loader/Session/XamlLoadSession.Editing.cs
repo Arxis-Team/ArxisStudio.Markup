@@ -111,6 +111,26 @@ public sealed partial class XamlLoadSession
     }
 
     /// <summary>
+    /// Lists the members of an object that a document can set.
+    /// </summary>
+    /// <remarks>
+    /// What a property panel is built from. Which of them to show is the caller's decision; what
+    /// each one is — a styled property, an attached one, an event, what it holds and whether it
+    /// can be written — is answered here.
+    /// </remarks>
+    /// <param name="target">The object to list.</param>
+    /// <returns>The members, ordered by name.</returns>
+    /// <exception cref="ArgumentNullException"><paramref name="target"/> is <see langword="null"/>.</exception>
+    /// <exception cref="ObjectDisposedException">The session has been disposed.</exception>
+    public ImmutableArray<XamlMemberDescriptor> GetMembers(object target)
+    {
+        ArgumentNullException.ThrowIfNull(target);
+        ObjectDisposedException.ThrowIf(_disposed, this);
+
+        return XamlMemberResolver.Instance.Enumerate(target.GetType());
+    }
+
+    /// <summary>
     /// Sets a property on the object and in the document, as one operation.
     /// </summary>
     /// <remarks>

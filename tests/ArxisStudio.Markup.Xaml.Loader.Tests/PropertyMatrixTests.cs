@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Immutable;
 using System.Linq;
 using System.Threading.Tasks;
 using ArxisStudio.Markup.Xaml.Loader.TestControls;
@@ -374,5 +375,31 @@ public sealed class PropertyMatrixTests
 
         Assert.Contains("Label=\"two\"", saved, StringComparison.Ordinal);
         Assert.Contains("Counter=\"9\"", saved, StringComparison.Ordinal);
+    }
+
+    [AvaloniaFact]
+    public async Task MembersOfATypeCanBeListedRatherThanGuessed()
+    {
+        await using XamlLoadSession session = await Load(
+            $"<Border xmlns=\"{AvaloniaNamespace}\" xmlns:x=\"http://schemas.microsoft.com/winfx/2006/xaml\" />");
+
+        var border = session.GetRoot<Border>();
+        ImmutableArray<XamlMemberDescriptor> members = session.GetMembers(border);
+
+        Assert.Contains(members, member => member.Name == "Width" && member.CanWrite);
+        Assert.Contains(members, member => member.Name == "Padding");
+
+        // Attached members are written Owner.Member and are not registered on the type that
+        // carries them, so a list built from the simple names alone would miss every one. They
+        // also only exist once their owner has been initialised, which is why this touches Grid
+        // before asking and why the answer is not cached.
+        _ = Grid.RowProperty;
+
+        Assert.Contains(
+            session.GetMembers(border), member => member.Name == "Grid.Row" && member.IsAttached);
+
+        // Ordered and without duplicates, so a panel can show them as they come.
+        Assert.Equal(members, members.OrderBy(static member => member.Name, StringComparer.Ordinal));
+        Assert.Equal(members.Length, members.Select(static member => member.Name).Distinct().Count());
     }
 }

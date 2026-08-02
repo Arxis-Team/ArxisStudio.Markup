@@ -182,6 +182,15 @@ public sealed class XamlDocument : XamlSyntaxNode
     public XamlDocument UnwrapElement(XamlElement element) =>
         Edit().UnwrapElement(element).Apply();
 
+    /// <summary>Puts a copy of an element straight after it, among the same siblings.</summary>
+    /// <param name="element">The element to copy.</param>
+    /// <param name="names">What to do with the names inside the copy.</param>
+    /// <returns>A new document with the change applied.</returns>
+    public XamlDocument DuplicateElement(
+        XamlElement element,
+        XamlDuplicateNames names = XamlDuplicateNames.Remove) =>
+        Edit().DuplicateElement(element, names).Apply();
+
     /// <summary>Moves an element to a position under a new parent.</summary>
     /// <param name="element">The element to move.</param>
     /// <param name="newParent">The element to move it under.</param>

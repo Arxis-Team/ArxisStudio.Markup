@@ -25,23 +25,12 @@ internal static class XamlElementIdentity
 {
     /// <summary>Gets the identity an element declares, if it declares one.</summary>
     /// <remarks>
-    /// <c>x:Name</c> first, then <c>Name</c>, which Avalonia treats as the same thing on anything
-    /// that has it. A name written as an expression is not an identity: what it stands for is
-    /// decided while the objects are being built, and two documents cannot be compared on it.
+    /// The rule itself is <see cref="XamlElement.Identity"/>; this exists so that the places
+    /// deciding which element is which read as one thing rather than four.
     /// </remarks>
     /// <param name="element">The element to read.</param>
     /// <returns>The identity, or <see langword="null"/> when the element declares none.</returns>
-    internal static string? Of(XamlElement element)
-    {
-        if (element.GetDirective("Name") is { } directive)
-        {
-            return directive;
-        }
-
-        XamlAttribute? attribute = element.GetAttribute(XamlQualifiedName.Parse("Name"));
-
-        return attribute?.GetValue() is XamlLiteralValue ? attribute.GetValueText() : null;
-    }
+    internal static string? Of(XamlElement element) => element.Identity;
 
     /// <summary>
     /// Pairs two versions of one element's children, by identity where there is one and by

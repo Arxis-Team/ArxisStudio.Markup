@@ -138,8 +138,21 @@ member.AttachedAccessors
 
 Attached members work by their written name: `session.GetMember(control, "Grid.Row")`.
 
-To offer a property list, decide which names to show yourself and ask about each one. Which
-properties are worth showing is a product question; what a name means is the library's.
+To offer a property list, ask what the object has:
+
+```csharp
+ImmutableArray<XamlMemberDescriptor> members = session.GetMembers(control);
+```
+
+Every registered Avalonia property the type carries, every attached property registered for it —
+under its written `Owner.Member` name — and its public CLR properties, ordered by name and without
+duplicates. Which of them are worth showing is still yours to decide: a control has upwards of two
+hundred settable members, which is a correct answer and a useless panel. What is answered here is
+which exist and what each one is.
+
+The answer can grow while your tool runs, and is deliberately not cached as a whole. Avalonia
+registers an attached property in the static constructor of the type that declares it, so `Grid.Row`
+becomes a member of every control only once something has caused `Grid` to be initialised.
 
 ## Values
 

@@ -70,9 +70,12 @@ editor.WrapElement(element, "<Border Padding=\"8\"></Border>");
 editor.UnwrapElement(border);
 ```
 
-`index` counts among the parent's child elements; a value at or beyond the end appends. Inserting
-copies the indentation of the sibling it lands next to. Inserting into a self-closing element is
-rejected rather than guessed at — give it a start and end tag first.
+`index` counts **content children only** — property elements are not positions, so index 0 in a
+panel that declares `<Panel.Resources>` is before its first control and after the resources. A value
+at or beyond the end appends. `element.IndexInContent` is the index an element already sits at, so
+"put it back where it was" needs no counting. Inserting copies the indentation of the sibling it
+lands next to. Inserting into a self-closing element is rejected rather than guessed at — give it a
+start and end tag first.
 
 `RemoveElement` takes the whole line when the element had that line to itself, so removal does not
 leave its indentation behind as a blank.
@@ -97,34 +100,21 @@ no part in reordering.
 
 ## Duplicating
 
-There is no `Duplicate`, because it is two calls and a decision only you can make:
-
 ```csharp
-XamlElement[] siblings = [.. parent.Elements.Where(child => !child.IsPropertyElementSyntax)];
-
-editor.InsertElement(parent, Array.IndexOf(siblings, element) + 1, element.GetText());
+editor.DuplicateElement(element);                              // names removed
+editor.DuplicateElement(element, XamlDuplicateNames.Keep);     // names kept
 ```
 
-The decision is names. Avalonia registers an `x:Name` once per scope and refuses a second, so a
-copy that keeps them will not load. What "duplicate" means for names — strip them, number them,
-prompt — is a product question, and the library does not answer it for you. To strip them, parse
-the copy inside a wrapper that declares the XAML namespace, because a fragment lifted out of its
-document does not carry the prefix its own `x:Name` is written with:
+The copy goes straight after the original, among the same siblings, written exactly as the original
+is written — attributes, children, comments and all.
 
-```csharp
-var copy = XamlDocument.Parse($"<Fragment xmlns:x=\"{XamlNamespaces.Xaml}\">{element.GetText()}</Fragment>");
-XamlDocumentEditor scrub = copy.Edit();
+Names are the reason this takes an option. Avalonia registers an `x:Name` once per scope and refuses
+a second, so a copy that keeps them will not load as it stands. `Remove` — the default — strips
+`x:Name` and a literal `Name` from the copy and everything inside it, which is what makes the result
+loadable. `Keep` is for a caller that will rename them itself before the document is loaded again.
 
-foreach (XamlElement node in copy.DescendantElements())
-{
-    if (node.GetDirectiveAttribute(XamlDirectives.Name) is { } directive)
-    {
-        scrub.RemoveAttribute(node, directive.Name);
-    }
-}
-
-string anonymous = scrub.Apply().Root!.Elements.First().GetText();
-```
+Duplicating the root is rejected: it has no parent to be duplicated within, and a document has one
+root.
 
 ## Getting the changes out
 
