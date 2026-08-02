@@ -130,6 +130,9 @@ path.Steps        // ImmutableArray<XamlPathStep>: (MemberName, Index)
 path.ToString()   // "/1/Resources:0"
 ```
 
+A property element has no path: it is the name of the step that goes through it rather than a
+position of its own, and `Of` says so rather than handing back a path that resolves to nothing.
+
 Paths are equal by value and hash by value, so they work as the key of a dictionary of expanded
 nodes or as the field a selection is held in. They survive an edit, an undo and a redo, and mean the
 same thing in two parses of the same text. They are *positions*, not identifiers: inserting a

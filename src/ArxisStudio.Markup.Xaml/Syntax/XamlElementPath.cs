@@ -55,12 +55,25 @@ public sealed class XamlElementPath : IEquatable<XamlElementPath>
         Steps.IsEmpty ? null : new XamlElementPath(Steps[..^1]);
 
     /// <summary>Works out the path to an element.</summary>
+    /// <remarks>
+    /// A property element cannot be described. It is the name of the step that goes through it
+    /// rather than a position of its own, so there is nothing for a path to point at — ask for the
+    /// path to what it contains, or to the element that declares it.
+    /// </remarks>
     /// <param name="element">The element to describe.</param>
     /// <returns>The path from its document's root.</returns>
     /// <exception cref="ArgumentNullException"><paramref name="element"/> is <see langword="null"/>.</exception>
+    /// <exception cref="ArgumentException"><paramref name="element"/> is a property element.</exception>
     public static XamlElementPath Of(XamlElement element)
     {
         ArgumentNullException.ThrowIfNull(element);
+
+        if (element.IsPropertyElementSyntax)
+        {
+            throw new ArgumentException(
+                $"'{element.Name}' is a property element, which has no position of its own.",
+                nameof(element));
+        }
 
         var steps = new List<XamlPathStep>();
         XamlElement current = element;

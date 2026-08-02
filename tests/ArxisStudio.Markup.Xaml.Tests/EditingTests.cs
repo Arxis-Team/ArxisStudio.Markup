@@ -596,4 +596,60 @@ public sealed class EditingTests
 
         Assert.Same(document, document.Edit().Apply());
     }
+    [Fact]
+    public void DuplicatingStripsNamesWhateverPrefixTheDocumentBindsThemWith()
+    {
+        // A document is free to call the XAML namespace anything. Assuming 'x' left the names in
+        // and produced a copy that will not load, which is the one thing the default prevents.
+        var document = XamlDocument.Parse(
+            "<StackPanel xmlns='https://github.com/avaloniaui'\n" +
+            "            xmlns:xaml='http://schemas.microsoft.com/winfx/2006/xaml'>\n" +
+            "  <Button xaml:Name='Save' Content='Save' />\n" +
+            "</StackPanel>");
+
+        XamlElement button = document.Root!.ContentElements.First();
+        string result = document.DuplicateElement(button).GetText();
+
+        Assert.Equal(2, Occurrences(result, "<Button"));
+        Assert.Equal(1, Occurrences(result, "xaml:Name='Save'"));
+    }
+
+    [Fact]
+    public void DuplicatingAPropertyElementIsRejectedRatherThanMisplaced()
+    {
+        var document = XamlDocument.Parse(
+            "<Grid xmlns='https://github.com/avaloniaui'>\n" +
+            "  <Grid.ColumnDefinitions>\n" +
+            "    <ColumnDefinition Width='*' />\n" +
+            "  </Grid.ColumnDefinitions>\n" +
+            "  <TextBlock Text='Body' />\n" +
+            "</Grid>");
+
+        XamlElement member = document.Root!.MemberElements.Single();
+
+        Assert.Throws<InvalidOperationException>(() => document.DuplicateElement(member));
+    }
+
+    [Fact]
+    public void APropertyElementHasNoPathOfItsOwn()
+    {
+        var document = XamlDocument.Parse(
+            "<Grid xmlns='https://github.com/avaloniaui'>\n" +
+            "  <Grid.ColumnDefinitions>\n" +
+            "    <ColumnDefinition Width='*' />\n" +
+            "  </Grid.ColumnDefinitions>\n" +
+            "</Grid>");
+
+        XamlElement member = document.Root!.MemberElements.Single();
+
+        // Silently answering with a path that resolves to nothing would have a tool storing it as
+        // a selection and wondering later why the selection disappeared.
+        Assert.Throws<ArgumentException>(() => XamlElementPath.Of(member));
+
+        // What it contains is addressable, and that is what a caller means.
+        Assert.Same(
+            member.ContentElements.Single(),
+            XamlElementPath.Of(member.ContentElements.Single()).Resolve(document));
+    }
+
 }

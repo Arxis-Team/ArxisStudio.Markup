@@ -445,6 +445,25 @@ public sealed class PropertyMatrixTests
         // session is still holding.
         Assert.Equal(new Thickness(1), border.Margin);
     }
+    [AvaloniaFact]
+    public async Task TextARefusedParseChokesOnIsReportedRatherThanThrown()
+    {
+        // PathFigures has no TypeConverter and its Parse raises InvalidDataException rather than
+        // the FormatException most types raise. A conversion that listed the exceptions it knew
+        // about would let this one out of a public async API.
+        await using XamlLoadSession session = await Load(
+            $"<PathGeometry xmlns=\"{AvaloniaNamespace}\" Figures=\"M 0,0 L 10,10\" />");
+
+        XamlDocument updated = session.Document.SetAttribute(
+            session.Document.Root!, XamlQualifiedName.Parse("Figures"), "certainly not a path");
+
+        XamlUpdateResult result = await session.ApplyDocumentUpdateAsync(
+            updated, TestContext.Current.CancellationToken);
+
+        Assert.False(result.Applied);
+        Assert.Contains(result.Diagnostics, static d => d.Severity == MarkupDiagnosticSeverity.Error);
+    }
+
 
 
 }

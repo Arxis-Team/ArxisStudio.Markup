@@ -95,11 +95,13 @@ internal static class XamlValueConversion
             return true;
         }
         catch (TargetInvocationException error)
-            when (error.InnerException is FormatException or ArgumentException or OverflowException)
         {
-            // The type knows how to read its own text and says this is not it. Reported by the
-            // caller as a refused conversion, like any other.
-            throw new FormatException(error.InnerException.Message, error.InnerException);
+            // The type knows how to read its own text and says this is not it. Whatever it threw
+            // is a refused conversion — PathFigures.Parse raises InvalidDataException, others
+            // raise FormatException — and listing the ones seen so far would let the next type
+            // throw its way out of an update.
+            throw new FormatException(
+                error.InnerException?.Message ?? error.Message, error.InnerException ?? error);
         }
     }
 }

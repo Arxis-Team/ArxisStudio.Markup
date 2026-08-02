@@ -114,7 +114,12 @@ a second, so a copy that keeps them will not load as it stands. `Remove` — the
 loadable. `Keep` is for a caller that will rename them itself before the document is loaded again.
 
 Duplicating the root is rejected: it has no parent to be duplicated within, and a document has one
-root.
+root. So is duplicating a property element — an element has each of its members once, so there is no
+position for a second `<Grid.ColumnDefinitions>` to take.
+
+`x:Key` is copied unchanged, and a resource dictionary refuses a second entry under the same key
+just as a name scope refuses a second name. Give the copy a key of its own before the document is
+loaded again; which key is a question about your tool's naming.
 
 ## Getting the changes out
 

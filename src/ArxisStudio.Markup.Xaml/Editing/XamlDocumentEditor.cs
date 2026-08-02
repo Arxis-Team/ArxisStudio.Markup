@@ -211,17 +211,26 @@ public sealed class XamlDocumentEditor
     /// Puts a copy of an element straight after it, among the same siblings.
     /// </summary>
     /// <remarks>
+    /// <para>
     /// The copy arrives written exactly as the original was, apart from the names, which are
     /// taken out unless the caller says otherwise — see <see cref="XamlDuplicateNames"/> for why
     /// that is the default.
+    /// </para>
+    /// <para>
+    /// <c>x:Key</c> is copied as it stands, and a resource dictionary refuses a second entry
+    /// under the same key just as a name scope refuses a second name. Duplicating a keyed resource
+    /// therefore produces a document that will not load until the caller gives the copy a key of
+    /// its own — which key is a question about the tool's naming, not about copying.
+    /// </para>
     /// </remarks>
     /// <param name="element">The element to copy.</param>
     /// <param name="names">What to do with the names inside the copy.</param>
     /// <returns>This editor, for chaining.</returns>
     /// <exception cref="ArgumentNullException"><paramref name="element"/> is <see langword="null"/>.</exception>
     /// <exception cref="InvalidOperationException">
-    /// <paramref name="element"/> belongs to a different document, or is the root and so has no
-    /// siblings to be copied among.
+    /// <paramref name="element"/> belongs to a different document, is the root and so has no
+    /// siblings to be copied among, or is a property element, which is a member of its parent
+    /// rather than one of a number of things beside it.
     /// </exception>
     public XamlDocumentEditor DuplicateElement(
         XamlElement element,
@@ -237,6 +246,15 @@ public sealed class XamlDocumentEditor
                 "copied among.");
         }
 
+        if (element.IsPropertyElementSyntax)
+        {
+            // A second <Grid.ColumnDefinitions> is not a copy of anything: an element has each of
+            // its members once, and the position a copy would take does not exist.
+            throw new InvalidOperationException(
+                $"Element '{element.Name}' is a property element. Duplicate what it contains, or " +
+                "the element that declares it.");
+        }
+
         string text = names == XamlDuplicateNames.Keep ? element.GetText() : Anonymous(element);
 
         return InsertElement(parent, element.IndexInContent + 1, text);
@@ -246,14 +264,15 @@ public sealed class XamlDocumentEditor
     /// Renders an element's text with every name in it taken out.
     /// </summary>
     /// <remarks>
-    /// Parsed inside a wrapper that declares the XAML namespace, because a fragment lifted out of
-    /// its document does not carry the prefix its own <c>x:Name</c> is written with — and an
-    /// attribute whose prefix is bound to nothing is not the directive it looks like.
+    /// Parsed inside a wrapper that declares every namespace the element had in scope, because a
+    /// fragment lifted out of its document carries none of them — and an attribute whose prefix is
+    /// bound to nothing is not the directive it looks like. Assuming the prefix is <c>x</c> would
+    /// have worked for most documents and silently left the names in the rest.
     /// </remarks>
     private static string Anonymous(XamlElement element)
     {
         var copy = XamlDocument.Parse(
-            $"<{FragmentName} xmlns:x=\"{XamlNamespaces.Xaml}\">{element.GetText()}</{FragmentName}>");
+            $"<{FragmentName}{Declarations(element)}>{element.GetText()}</{FragmentName}>");
 
         XamlDocumentEditor editor = copy.Edit();
 
@@ -271,6 +290,28 @@ public sealed class XamlDocumentEditor
         }
 
         return editor.Apply().Root!.ContentElements.First().GetText();
+    }
+
+    /// <summary>Writes an element's in-scope namespaces as declarations for a wrapper to carry.</summary>
+    private static string Declarations(XamlElement element)
+    {
+        var text = new StringBuilder();
+
+        foreach ((string prefix, string uri) in element.NamespaceContext.GetInScopeDeclarations())
+        {
+            text.Append(prefix.Length == 0 ? " xmlns=\"" : $" xmlns:{prefix}=\"")
+                .Append(uri)
+                .Append('"');
+        }
+
+        // The XAML namespace even where the document never declared it, so that the wrapper is
+        // always able to say what an x:Name is — an element that carries none is unaffected.
+        if (element.NamespaceContext.LookupPrefix(XamlNamespaces.Xaml) is null)
+        {
+            text.Append($" xmlns:x=\"{XamlNamespaces.Xaml}\"");
+        }
+
+        return text.ToString();
     }
 
     /// <summary>

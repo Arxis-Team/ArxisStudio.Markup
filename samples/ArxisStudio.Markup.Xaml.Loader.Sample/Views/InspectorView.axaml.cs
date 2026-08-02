@@ -423,7 +423,9 @@ internal sealed partial class InspectorView : UserControl
 
         Count.Text = $"{_properties.Count} из {members.Count}";
 
-        if (_properties.Count == 0)
+        // Only when the object really has nothing to offer. Saying it because a filter matched
+        // nothing would be false, and it would wipe the report of the edit the user is reading.
+        if (_properties.Count == 0 && filter.Length == 0)
         {
             _report.Clear().Note("у этого объекта нет свойств, которые можно задать атрибутом");
         }

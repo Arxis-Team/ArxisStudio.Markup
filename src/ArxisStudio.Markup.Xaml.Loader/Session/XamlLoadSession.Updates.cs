@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Collections.Immutable;
 using System.Linq;
+using System.Reflection;
 using System.Threading;
 using System.Threading.Tasks;
 using Avalonia.LogicalTree;
@@ -339,11 +340,22 @@ public sealed partial class XamlLoadSession
     }
 
     /// <summary>
-    /// Writes every change onto the objects, or writes none of them.
+    /// Writes every change onto the objects, or reports why it stopped.
     /// </summary>
     /// <remarks>
-    /// Each change is checked before any is made. A run that stopped halfway would leave the
-    /// objects agreeing with neither document, and nothing would say where the boundary was.
+    /// <para>
+    /// Everything that can be checked is checked before anything is written: that each element
+    /// still has an object, that each member exists and can be written, and that the text converts
+    /// to something the member can hold. A change refused at that point costs nothing, because
+    /// nothing has been done yet.
+    /// </para>
+    /// <para>
+    /// What cannot be checked in advance is a setter that refuses a value of the right type. That
+    /// is reported and stops the run, which may leave earlier changes of the same update applied —
+    /// there is no way back from a rebuilt subtree. The result says the update was not applied, and
+    /// a caller that cannot live with the uncertainty should build a new session from the document
+    /// it wanted.
+    /// </para>
     /// </remarks>
     private bool Write(
         ImmutableArray<XamlDocumentChange> changes,
@@ -523,15 +535,22 @@ public sealed partial class XamlLoadSession
             {
                 XamlDesignValues.Write(target, member, value);
             }
-            catch (Exception error)
-                when (error is InvalidCastException or ArgumentException or InvalidOperationException)
+            catch (Exception error) when (error is InvalidCastException
+                or ArgumentException
+                or InvalidOperationException
+                or TargetInvocationException)
             {
                 // A value of the right type the property still refuses — a validating setter, a
                 // negative length. Reported like any other refused value; an exception out of an
                 // update is for broken invariants, not for what a document says.
+                //
+                // TargetInvocationException among them because a CLR property and an attached
+                // accessor pair are written by reflection, which wraps whatever the setter threw.
+                Exception refusal = (error as TargetInvocationException)?.InnerException ?? error;
+
                 diagnostics.Add(MarkupDiagnostic.Synchronization(
                     XamlLoaderDiagnosticCodes.IncompatibleValue,
-                    $"{target.GetType().Name}.{member.Name} refused the value: {error.Message}",
+                    $"{target.GetType().Name}.{member.Name} refused the value: {refusal.Message}",
                     MarkupDiagnosticSeverity.Error,
                     Document.Uri));
 
