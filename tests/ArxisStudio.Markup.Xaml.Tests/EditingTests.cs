@@ -352,6 +352,103 @@ public sealed class EditingTests
     }
 
     [Fact]
+    public void ReplacingAnElementLeavesItsNeighboursAndItsLineAlone()
+    {
+        XamlDocument document = Parse();
+
+        string result = document
+            .ReplaceElement(Named(document, "SaveButton"), "<ToggleButton Content=\"Save\" />")
+            .GetText();
+
+        Assert.Equal(
+            Source.Replace(
+                "<Button x:Name='SaveButton'   Width = \"320\"  Content=\"Save\" />",
+                "<ToggleButton Content=\"Save\" />",
+                StringComparison.Ordinal),
+            result);
+    }
+
+    [Fact]
+    public void ReplacingIsOneChangeRatherThanARemovalAndAnInsertion()
+    {
+        XamlDocument document = Parse();
+
+        ImmutableArray<TextChange> changes = document.Edit()
+            .ReplaceElement(Named(document, "SaveButton"), "<ToggleButton />")
+            .GetTextChanges();
+
+        // Two changes would be a removal that takes the line and an insertion that puts one
+        // back, and the element's position would then depend on the order they landed in.
+        Assert.Single(changes);
+    }
+
+    [Fact]
+    public void WrappingPutsTheElementInsideAndIndentsItOneLevel()
+    {
+        XamlDocument document = Parse();
+
+        string result = document
+            .WrapElement(Element(document, "TextBlock"), "<Border Padding=\"8\"></Border>")
+            .GetText();
+
+        Assert.Contains(
+            "    <Border Padding=\"8\">\r\n" +
+            "      <TextBlock Text=\"{Binding Customer.Name}\" />\r\n" +
+            "    </Border>",
+            result,
+            StringComparison.Ordinal);
+
+        // Both the step and the line ending came from the file rather than from a default: two
+        // spaces because that is what sits between StackPanel and its children, CRLF because
+        // that is what the document is written with.
+        Assert.DoesNotContain("<Border Padding=\"8\">\n", result, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void WrappingCarriesEverythingTheElementWasWrittenWith()
+    {
+        XamlDocument document = Parse();
+
+        string result = document
+            .WrapElement(Named(document, "SaveButton"), "<Border></Border>")
+            .GetText();
+
+        Assert.Contains("x:Name='SaveButton'   Width = \"320\"  Content=\"Save\"", result, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void AWrapperWithNowhereToPutContentIsRejectedRatherThanGuessed()
+    {
+        XamlDocument document = Parse();
+
+        Assert.Throws<InvalidOperationException>(
+            () => document.WrapElement(Element(document, "TextBlock"), "<Border />"));
+    }
+
+    [Fact]
+    public void UnwrappingLiftsTheChildrenOutAndBringsThemBackALevel()
+    {
+        XamlDocument document = Parse();
+        XamlDocument wrapped = document.WrapElement(Element(document, "TextBlock"), "<Border></Border>");
+
+        XamlDocument unwrapped = wrapped.UnwrapElement(Element(wrapped, "Border"));
+
+        // Wrapping and unwrapping is a round trip: the document is character for character what
+        // it was, indentation included.
+        Assert.Equal(Source, unwrapped.GetText());
+    }
+
+    [Fact]
+    public void UnwrappingAnElementWithNothingInItRemovesIt()
+    {
+        XamlDocument document = XamlDocument.Parse("<Grid>\n  <Border></Border>\n  <Button />\n</Grid>");
+
+        string result = document.UnwrapElement(Element(document, "Border")).GetText();
+
+        Assert.Equal("<Grid>\n  <Button />\n</Grid>", result);
+    }
+
+    [Fact]
     public void AnEditorWithNothingRecordedReturnsTheSameDocument()
     {
         XamlDocument document = Parse();

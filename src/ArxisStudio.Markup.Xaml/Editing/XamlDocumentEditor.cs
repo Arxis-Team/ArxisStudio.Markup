@@ -239,6 +239,136 @@ public sealed class XamlDocumentEditor
         return InsertElement(newParent, index, text);
     }
 
+    /// <summary>
+    /// Replaces an element with other XAML, in place.
+    /// </summary>
+    /// <remarks>
+    /// One change over the element's own span, which is what makes this different from removing
+    /// and inserting: the element's position among its siblings, the whitespace on either side of
+    /// it and everything else on its line are not part of the change and cannot be disturbed by
+    /// it. Turning a <c>Button</c> into a <c>ToggleButton</c> is one edit, not two.
+    /// </remarks>
+    /// <param name="element">The element to replace.</param>
+    /// <param name="xaml">The XAML to put in its place.</param>
+    /// <returns>This editor, for chaining.</returns>
+    /// <exception cref="ArgumentNullException"><paramref name="element"/> or <paramref name="xaml"/> is <see langword="null"/>.</exception>
+    /// <exception cref="InvalidOperationException"><paramref name="element"/> belongs to a different document.</exception>
+    public XamlDocumentEditor ReplaceElement(XamlElement element, string xaml)
+    {
+        ArgumentNullException.ThrowIfNull(element);
+        ArgumentNullException.ThrowIfNull(xaml);
+        Validate(element);
+
+        return Replace(element.Span, xaml);
+    }
+
+    /// <summary>Replaces an element with a copy of another.</summary>
+    /// <param name="element">The element to replace.</param>
+    /// <param name="replacement">The element whose text takes its place.</param>
+    /// <returns>This editor, for chaining.</returns>
+    /// <exception cref="ArgumentNullException"><paramref name="element"/> or <paramref name="replacement"/> is <see langword="null"/>.</exception>
+    public XamlDocumentEditor ReplaceElement(XamlElement element, XamlElement replacement)
+    {
+        ArgumentNullException.ThrowIfNull(replacement);
+
+        return ReplaceElement(element, replacement.GetText());
+    }
+
+    /// <summary>
+    /// Puts an element inside a new one, written where it was.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// The wrapper is given as markup with a start and an end tag — <c>&lt;Border
+    /// Padding="8"&gt;&lt;/Border&gt;</c> — and the element moves in between them, indented one
+    /// level deeper. Everything it was written with comes along unchanged, because what moves is
+    /// its text.
+    /// </para>
+    /// <para>
+    /// One level is measured from the document rather than assumed: the difference between this
+    /// element's indentation and its parent's is what the file already uses, and matching it is
+    /// the difference between an edit that reads as part of the file and one that reads as a
+    /// machine's.
+    /// </para>
+    /// </remarks>
+    /// <param name="element">The element to wrap.</param>
+    /// <param name="wrapperXaml">The wrapper, as markup with somewhere to put content.</param>
+    /// <returns>This editor, for chaining.</returns>
+    /// <exception cref="ArgumentNullException"><paramref name="element"/> or <paramref name="wrapperXaml"/> is <see langword="null"/>.</exception>
+    /// <exception cref="InvalidOperationException">
+    /// <paramref name="element"/> belongs to a different document, or the wrapper is not a single
+    /// element with a start and an end tag.
+    /// </exception>
+    public XamlDocumentEditor WrapElement(XamlElement element, string wrapperXaml)
+    {
+        ArgumentNullException.ThrowIfNull(element);
+        ArgumentNullException.ThrowIfNull(wrapperXaml);
+        Validate(element);
+
+        var wrapper = XamlDocument.Parse(wrapperXaml);
+
+        if (wrapper.Root is not { } root || root.IsEmpty || root.EndTagSpan is not { } endTag)
+        {
+            throw new InvalidOperationException(
+                "A wrapper must be a single element with a start and an end tag, so that there is " +
+                $"somewhere to put what is being wrapped. '{wrapperXaml}' is not.");
+        }
+
+        string opening = wrapper.SourceText.GetText(
+            TextSpan.FromBounds(root.Span.Start, root.StartTagSpan.End));
+        string closing = wrapper.SourceText.GetText(
+            TextSpan.FromBounds(endTag.Start, root.Span.End));
+
+        string indent = IndentOf(element);
+        string step = StepFor(element);
+        string line = NewLineFor(element);
+
+        return Replace(
+            element.Span,
+            opening + line + indent + step + Reindent(element.GetText(), step) + line + indent + closing);
+    }
+
+    /// <summary>
+    /// Replaces an element with what it contains.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// The children move out one level, indented to match where their wrapper stood. An element
+    /// with no child elements is simply removed: unwrapping an empty wrapper leaves nothing, and
+    /// that is the only thing it can mean.
+    /// </para>
+    /// <para>
+    /// Whether the slot the wrapper occupied will take more than one child is a question about
+    /// what the members mean, which this package deliberately cannot answer. Unwrapping several
+    /// children into a single-valued slot produces markup that the loader reports when it tries
+    /// to build it.
+    /// </para>
+    /// </remarks>
+    /// <param name="element">The element to unwrap.</param>
+    /// <returns>This editor, for chaining.</returns>
+    /// <exception cref="ArgumentNullException"><paramref name="element"/> is <see langword="null"/>.</exception>
+    /// <exception cref="InvalidOperationException"><paramref name="element"/> belongs to a different document.</exception>
+    public XamlDocumentEditor UnwrapElement(XamlElement element)
+    {
+        ArgumentNullException.ThrowIfNull(element);
+        Validate(element);
+
+        XamlElement[] children = [.. element.Elements];
+
+        if (children.Length == 0)
+        {
+            return RemoveElement(element);
+        }
+
+        string step = StepFor(children[0]);
+        string line = NewLineFor(element);
+        string separator = line + IndentOf(element);
+
+        return Replace(
+            element.Span,
+            string.Join(separator, children.Select(child => Outdent(child.GetText(), step))));
+    }
+
     /// <summary>Gets the text changes these edits amount to, ordered and non-overlapping.</summary>
     /// <returns>The changes, ready to apply to the document's snapshot.</returns>
     /// <exception cref="InvalidOperationException">Two edits would change overlapping regions.</exception>
@@ -370,6 +500,86 @@ public sealed class XamlDocumentEditor
 
         return _document.SourceText.GetText(TextSpan.FromBounds(start, element.Span.Start));
     }
+
+    /// <summary>
+    /// Gets the indentation an element sits at, when it starts a line of its own.
+    /// </summary>
+    /// <remarks>
+    /// Spaces and tabs only, and only when nothing else precedes it on its line. An element
+    /// written after something else has no indentation of its own to speak of, and pretending
+    /// otherwise would indent by whatever happened to come before it.
+    /// </remarks>
+    private string IndentOf(XamlElement element)
+    {
+        SourceText text = _document.SourceText;
+        int start = element.Span.Start;
+
+        while (start > 0 && text[start - 1] is ' ' or '\t')
+        {
+            start--;
+        }
+
+        return start == 0 || LineBreakEndsAt(text, start)
+            ? text.GetText(TextSpan.FromBounds(start, element.Span.Start))
+            : string.Empty;
+    }
+
+    /// <summary>
+    /// Works out what one level of indentation is in this document, from what it already does.
+    /// </summary>
+    /// <remarks>
+    /// The difference between an element's indentation and its parent's is the step the file was
+    /// written with, whether that is two spaces, four, or a tab. Two spaces only when the
+    /// document does not say — an element written inline, or a root with nothing above it.
+    /// </remarks>
+    private string StepFor(XamlElement element)
+    {
+        string indent = IndentOf(element);
+
+        if (indent.Length > 0
+            && element.Parent is XamlElement parent
+            && IndentOf(parent) is { } outer
+            && indent.Length > outer.Length
+            && indent.StartsWith(outer, StringComparison.Ordinal))
+        {
+            return indent[outer.Length..];
+        }
+
+        return "  ";
+    }
+
+    /// <summary>Gets the line break the document is written with.</summary>
+    private string NewLineFor(XamlElement element)
+    {
+        SourceText text = _document.SourceText;
+
+        for (int index = element.Span.Start; index > 0; index--)
+        {
+            if (text[index - 1] == '\n')
+            {
+                return index > 1 && text[index - 2] == '\r' ? "\r\n" : "\n";
+            }
+        }
+
+        return "\n";
+    }
+
+    /// <summary>
+    /// Indents every line of a block but the first, which is already in place.
+    /// </summary>
+    /// <remarks>
+    /// Written against the line feed alone, so that a file using carriage returns keeps them: the
+    /// insertion lands after the break either way, and normalising the endings here would rewrite
+    /// every line of a block that was only supposed to move sideways.
+    /// </remarks>
+    private static string Reindent(string text, string step) =>
+        text.Replace("\n", "\n" + step, StringComparison.Ordinal);
+
+    /// <summary>Takes one level of indentation off every line of a block but the first.</summary>
+    private static string Outdent(string text, string step) =>
+        step.Length == 0
+            ? text
+            : text.Replace("\n" + step, "\n", StringComparison.Ordinal);
 
     /// <summary>
     /// Works out what to remove along with an element: its own line when it has one to itself,

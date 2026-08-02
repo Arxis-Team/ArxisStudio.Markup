@@ -124,6 +124,15 @@ public sealed partial class XamlLoadSession
     /// because a caller may mean exactly that, but it is reported: an edit that destroys an
     /// expression should never happen unnoticed.
     /// </para>
+    /// <para>
+    /// This writes the session's own document and creates no undo entry. A tool with a history
+    /// records its edits on a <c>XamlDocumentEditor</c>, applies them through
+    /// <c>XamlWorkspace</c> and brings the objects into line with
+    /// <see cref="ApplyDocumentUpdateAsync" /> — see
+    /// <c>docs/adr/0007-undo-belongs-to-the-workspace.md</c>. The two directions must not be
+    /// mixed on one document: the session's document is not the workspace's, and this would
+    /// advance one while the other stood still.
+    /// </para>
     /// </remarks>
     /// <param name="target">The object to change.</param>
     /// <param name="property">The property to set.</param>

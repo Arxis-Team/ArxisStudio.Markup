@@ -162,6 +162,26 @@ public sealed class XamlDocument : XamlSyntaxNode
     public XamlDocument RemoveElement(XamlElement element) =>
         Edit().RemoveElement(element).Apply();
 
+    /// <summary>Replaces an element with other XAML, in place.</summary>
+    /// <param name="element">The element to replace.</param>
+    /// <param name="xaml">The XAML to put in its place.</param>
+    /// <returns>A new document with the change applied.</returns>
+    public XamlDocument ReplaceElement(XamlElement element, string xaml) =>
+        Edit().ReplaceElement(element, xaml).Apply();
+
+    /// <summary>Puts an element inside a new one, written where it was.</summary>
+    /// <param name="element">The element to wrap.</param>
+    /// <param name="wrapperXaml">The wrapper, as markup with somewhere to put content.</param>
+    /// <returns>A new document with the change applied.</returns>
+    public XamlDocument WrapElement(XamlElement element, string wrapperXaml) =>
+        Edit().WrapElement(element, wrapperXaml).Apply();
+
+    /// <summary>Replaces an element with what it contains.</summary>
+    /// <param name="element">The element to unwrap.</param>
+    /// <returns>A new document with the change applied.</returns>
+    public XamlDocument UnwrapElement(XamlElement element) =>
+        Edit().UnwrapElement(element).Apply();
+
     /// <summary>Moves an element to a position under a new parent.</summary>
     /// <param name="element">The element to move.</param>
     /// <param name="newParent">The element to move it under.</param>

@@ -1592,6 +1592,33 @@ Exit criteria:
 - unnamed or ambiguous siblings still fall back to the conservative behaviour;
 - `PublicAPI.Shipped.txt` is populated for all three packages and the unshipped files are empty.
 
+### Milestone 13: the seam a designer is built on
+
+An audit against the question "are these three packages a foundation for a visual designer of
+Avalonia forms and controls" found the primitives almost all present and the seam between them
+missing: `MarkupWorkspace` holds the undo history and knows nothing about XAML, `XamlDocumentEditor`
+expresses structured edits and knows nothing about history, and nothing in the repository put the
+two together. A tool taking the packages as they were would have written an undo stack of its own
+and left this one unused.
+
+- Add the one editing operation the set was missing: replacing an element in place, as one change
+  over its own span rather than a removal and an insertion.
+- Add wrapping and unwrapping, which are the same family and share its indentation reasoning.
+- Add `XamlWorkspace`: structured edits applied through the workspace, so one edit is one undo
+  entry under a name a user would recognise, and edits to several documents are one action.
+- Record which of the two write directions a tool should use, and why undo belongs to the
+  workspace rather than to the tool.
+- Prove it in the showcase: delete, duplicate, wrap and undo, built on the published API alone.
+
+Exit criteria:
+
+- an element can be replaced, wrapped and unwrapped without disturbing anything around it;
+- wrapping then unwrapping returns the document character for character;
+- a structured edit is one undoable action, and undoing it restores the document exactly;
+- an edit spanning two documents is undone by one command;
+- an editor opened on a version the workspace has moved past is refused rather than approximated;
+- the showcase performs structural edits and undoes them without a line added to `src/`.
+
 ## Definition of done for the first preview release
 
 The first preview release is ready when all of the following are true:

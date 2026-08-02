@@ -73,6 +73,24 @@ the document — see `docs/adr/0005-resource-includes.md` for why. That leaves f
   stopped descending into and which no fragment rebuilt — a case an update does not produce, but
   one a caller reaching past `ApplyDocumentUpdateAsync` could.
 
+## Editing and history
+
+- **Two directions of writing, and they do not mix.** `XamlLoadSession.SetValue` writes the object
+  and the session's document in one operation; recording edits on a `XamlDocumentEditor` and
+  applying them through `XamlWorkspace` writes the workspace's document and creates an undo entry.
+  Using both on one document advances one and not the other. `docs/adr/0007` says which to use.
+- **An editor is bound to the text it was opened on.** Its edits are spans into that exact
+  snapshot, so `XamlWorkspace.Apply` refuses an editor opened on a version the workspace has moved
+  past, and refuses two editors for the same document. Record every edit to one document in one
+  editor, and open a new one after each application.
+- **Unwrapping cannot know what the slot will take.** Replacing an element with its children is a
+  question about markup, and whether the member it sat in accepts more than one child is a question
+  about what the member means, which the syntax package deliberately cannot answer. Unwrapping
+  several children into a single-valued slot produces markup the loader reports when it builds it.
+- **Wrapping and replacing do not reformat what they are given.** A multi-line wrapper or
+  replacement arrives written as the caller wrote it; only the wrapped element is re-indented, by
+  the step the document already uses. This matches insertion, which has always behaved this way.
+
 ## Everything else
 
 - **No sandbox.** Loading a document runs constructors, setters, type converters, markup
