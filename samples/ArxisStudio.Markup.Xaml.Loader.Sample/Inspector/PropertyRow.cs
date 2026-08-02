@@ -21,8 +21,30 @@ internal abstract class PropertyRow(string name, string origin) : INotifyPropert
     /// <summary>Gets the member's name.</summary>
     public string Name { get; } = name;
 
-    /// <summary>Gets where the value shown came from.</summary>
-    public string Origin { get; } = origin;
+    private string _origin = origin;
+
+    /// <summary>Gets or sets where the value shown came from.</summary>
+    /// <remarks>
+    /// It changes under the row: writing a property the document did not state makes it stated,
+    /// and a row that went on calling itself inherited would be describing the document as it was
+    /// one edit ago.
+    /// </remarks>
+    public string Origin
+    {
+        get => _origin;
+
+        set
+        {
+            if (string.Equals(_origin, value, StringComparison.Ordinal))
+            {
+                return;
+            }
+
+            _origin = value;
+
+            Raise();
+        }
+    }
 
     /// <summary>Raises <see cref="PropertyChanged"/>.</summary>
     /// <param name="property">The property that changed.</param>

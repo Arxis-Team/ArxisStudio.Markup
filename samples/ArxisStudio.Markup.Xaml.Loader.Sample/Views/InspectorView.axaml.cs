@@ -10,6 +10,7 @@ using ArxisStudio.Markup.Xaml.Loader.Sample.Inspector;
 using ArxisStudio.Markup.Xaml.Loader.Sample.Reporting;
 using Avalonia;
 using Avalonia.Controls;
+using Avalonia.Input;
 using Avalonia.Interactivity;
 
 namespace ArxisStudio.Markup.Xaml.Loader.Sample.Views;
@@ -40,6 +41,9 @@ internal sealed partial class InspectorView : UserControl
         "FontWeight", "Text", "Content", "Spacing", "Orientation", "HorizontalAlignment",
         "VerticalAlignment",
     ];
+
+    private const string Stated = "задано в документе";
+    private const string Inherited = "унаследовано: стиль, тема или значение по умолчанию";
 
     private readonly ObservableCollection<ObjectNode> _nodes = [];
     private readonly ObservableCollection<PropertyRow> _properties = [];
@@ -247,10 +251,10 @@ internal sealed partial class InspectorView : UserControl
         }
 
         bool declared = attribute is not null;
-        string origin = declared ? "задано в документе" : "унаследовано: стиль, тема или значение по умолчанию";
+        string origin = declared ? Stated : Inherited;
         string text = declared ? attribute!.GetValueText() : Effective(target, member);
 
-        void Commit(string value) => _ = CommitAsync(name, value, declared);
+        void Commit(string value) => _ = CommitAsync(name, value);
 
         if (member.ValueType == typeof(bool))
         {
@@ -287,21 +291,45 @@ internal sealed partial class InspectorView : UserControl
         };
     }
 
-    /// <summary>Writes one property into the document, and lets the objects follow.</summary>
-    private async Task CommitAsync(string name, string text, bool declared)
+    /// <summary>Commits the field being typed in, rather than waiting for it to be left.</summary>
+    /// <remarks>
+    /// The binding writes on losing focus, which is right for a field someone is still typing in
+    /// and wrong for one they have finished: pressing Enter is finishing. The row's own setter is
+    /// what commits, so this is the same path as leaving the field and cannot commit twice — the
+    /// binding will write the same text afterwards and the setter will see no change.
+    /// </remarks>
+    private void OnFieldKeyDown(object? sender, KeyEventArgs e)
     {
-        // Clearing a value the document never set asks for nothing: there is no attribute to
-        // remove, and writing an empty one is a conversion error rather than a default.
+        if (e.Key == Key.Enter && sender is TextBox { DataContext: TextPropertyRow row } box)
+        {
+            row.Text = box.Text ?? string.Empty;
+            e.Handled = true;
+        }
+    }
+
+    /// <summary>Writes one property into the document, and lets the objects follow.</summary>
+    private async Task CommitAsync(string name, string text)
+    {
         if (_session is null
             || _selected is not { } target
-            || _session.GetElement(target) is not { } element
-            || (!declared && text.Length == 0))
+            || _session.GetElement(target) is not { } element)
         {
             return;
         }
 
-        XamlDocument edited = _session.Document.SetAttribute(
-            element, XamlQualifiedName.Parse(name), text);
+        // Asked afresh rather than remembered from when the row was built: a property the
+        // document did not state is stated the moment it is first written.
+        var qualified = XamlQualifiedName.Parse(name);
+        bool declared = element.GetAttribute(qualified) is not null;
+
+        // Clearing a value the document never set asks for nothing: there is no attribute to
+        // remove, and writing an empty one is a conversion error rather than a default.
+        if (!declared && text.Length == 0)
+        {
+            return;
+        }
+
+        XamlDocument edited = _session.Document.SetAttribute(element, qualified, text);
 
         XamlUpdateResult result = await _session.ApplyDocumentUpdateAsync(edited, CancellationToken.None);
 
@@ -317,8 +345,21 @@ internal sealed partial class InspectorView : UserControl
 
         _report.Caption("ДИАГНОСТИКА").Diagnostics(result.Diagnostics, _session.Document.SourceText);
 
-        // The document advanced, so every element the rows were built from belongs to the version
-        // before it. The objects did not, which is what selection is keyed on.
+        // Setting a property changed the one attribute that was edited and nothing else, and the
+        // row that was edited already shows what was typed in it. Rebuilding the rows here would
+        // take the caret out of the field the instant Enter committed it, for no change to show.
+        if (result.Applied && result.Strategy == XamlUpdateStrategy.SetProperty)
+        {
+            foreach (PropertyRow row in _properties.Where(row => string.Equals(row.Name, name, StringComparison.Ordinal)))
+            {
+                row.Origin = Stated;
+            }
+
+            return;
+        }
+
+        // Anything larger did more than it was asked, or nothing at all. Either way the rows and
+        // the tree are rebuilt: the objects are what selection is keyed on, and they survive.
         ShowTree();
         ShowProperties();
     }
