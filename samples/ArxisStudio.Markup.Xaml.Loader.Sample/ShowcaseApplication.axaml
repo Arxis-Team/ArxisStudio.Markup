@@ -53,7 +53,7 @@
     </DataTemplate>
 
     <DataTemplate DataType="reporting:FieldRow">
-      <Grid ColumnDefinitions="172,*" Margin="0,0,0,4">
+      <Grid ColumnDefinitions="196,*" Margin="0,0,0,4">
         <TextBlock Grid.Column="0"
                    Classes="muted"
                    Text="{Binding Label}"
@@ -77,7 +77,7 @@
     </DataTemplate>
 
     <DataTemplate DataType="reporting:DiagnosticRow">
-      <Grid ColumnDefinitions="76,74,58,*" Margin="0,0,0,4">
+      <Grid ColumnDefinitions="76,74,74,*" Margin="0,0,0,4">
         <TextBlock Grid.Column="0"
                    Classes="mono severity"
                    Classes.error="{Binding IsError}"

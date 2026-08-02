@@ -51,7 +51,7 @@ internal sealed partial class ObjectsView : UserControl
 
         if (session is null)
         {
-            Summary.Text = "THE DOCUMENT PRODUCED NO OBJECTS";
+            Summary.Text = "ДОКУМЕНТ НЕ ДАЛ НИ ОДНОГО ОБЪЕКТА";
 
             return;
         }
@@ -76,18 +76,18 @@ internal sealed partial class ObjectsView : UserControl
             _objects.Mapped(new ObjectRow(
                 target.GetType().Name,
                 session.GetOrigin(target).ToString(),
-                source?.Segments[^1] ?? "this document",
-                element is null ? "declared there" : $"line {Line(session, element)}: <{element.Name}>"));
+                source?.Segments[^1] ?? "этот документ",
+                element is null ? "объявлен там" : $"строка {Line(session, element)}: <{element.Name}>"));
         }
 
         Summary.Text =
-            $"{session.Objects.Objects.Count.ToString(CultureInfo.InvariantCulture)} OBJECTS REACHED; " +
-            "THOSE WITH MARKUP BEHIND THEM, IN WALK ORDER";
+            $"ОБОЙДЕНО ОБЪЕКТОВ: {session.Objects.Objects.Count.ToString(CultureInfo.InvariantCulture)}; " +
+            "НИЖЕ ТЕ, ЗА КОТОРЫМИ СТОИТ РАЗМЕТКА, В ПОРЯДКЕ ОБХОДА";
 
         Footnote.Text =
-            $"and {anonymous.ToString(CultureInfo.InvariantCulture)} more the walk reached that no " +
-            "markup declares — the empty Resources dictionary every control carries, and the " +
-            "default template the theme gave the button.";
+            $"и ещё {anonymous.ToString(CultureInfo.InvariantCulture)}, до которых обход дошёл и " +
+            "которых не объявляет никакая разметка, — пустой словарь Resources, который несёт " +
+            "каждый контрол, и шаблон по умолчанию, доставшийся кнопке от темы.";
 
         await session.DisposeAsync();
     }

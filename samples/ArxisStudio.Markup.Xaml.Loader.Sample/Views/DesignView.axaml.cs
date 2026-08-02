@@ -60,7 +60,7 @@ internal sealed partial class DesignView : UserControl
 
         if (session is null)
         {
-            report.Clear().Caption("DIAGNOSTICS").Diagnostics(result.Diagnostics);
+            report.Clear().Caption("ДИАГНОСТИКА").Diagnostics(result.Diagnostics);
 
             return;
         }
@@ -84,16 +84,16 @@ internal sealed partial class DesignView : UserControl
         }
 
         report.Clear()
-            .Field("mode", mode.ToString())
-            .Field("Width / Height", $"{Size(view.Width)} x {Size(view.Height)}")
+            .Field("режим", mode.ToString())
+            .Field("ширина / высота", $"{Size(view.Width)} x {Size(view.Height)}")
             .Verdict(
-                "d:Text is still in the document",
+                "d:Text по-прежнему в документе",
                 session.Document.GetText().Contains("d:Text=", StringComparison.Ordinal))
             .Verdict(
-                "and absent from what Avalonia was given",
+                "и отсутствует в том, что получила Avalonia",
                 !session.Projection.Text.ToString().Contains("d:Text=", StringComparison.Ordinal));
     }
 
     private static string Size(double value) =>
-        double.IsNaN(value) ? "auto" : value.ToString(CultureInfo.InvariantCulture);
+        double.IsNaN(value) ? "авто" : value.ToString(CultureInfo.InvariantCulture);
 }

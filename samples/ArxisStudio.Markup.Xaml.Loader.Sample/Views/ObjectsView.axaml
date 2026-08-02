@@ -5,9 +5,9 @@
   <Grid RowDefinitions="Auto,*" Margin="24">
 
     <StackPanel Grid.Row="0" Margin="0,0,0,18">
-      <TextBlock Classes="h1" Text="Which markup each object came from" />
+      <TextBlock Classes="h1" Text="Из какой разметки взялся каждый объект" />
       <TextBlock Classes="lede"
-                 Text="Built from the source information Avalonia records, read back through the projection the includes were spliced into. That is what keeps an object declared in an included file attributed to that file rather than to whichever line of this one sits at the same number — and what stops a template's output being passed off as the control's own declaration. A read-only report: nothing here edits anything, and no object is selected in or drawn over a preview." />
+                 Text="Построено по сведениям об источнике, которые записывает Avalonia, и прочитано обратно через проекцию, в которую были вклеены включения. Именно это оставляет объект, объявленный во включённом файле, приписанным к тому файлу, а не к строке этого файла с тем же номером, — и не даёт выдать вывод шаблона за собственное объявление контрола. Отчёт только для чтения: здесь ничего не редактируется, ни один объект не выделяется в превью и ничего поверх него не рисуется." />
     </StackPanel>
 
     <Border Grid.Row="1" Classes="card">
@@ -16,10 +16,10 @@
         <StackPanel DockPanel.Dock="Top">
           <TextBlock x:Name="Summary" Classes="caption" Margin="0,0,0,10" />
           <Grid ColumnDefinitions="176,104,150,*" Margin="0,0,0,6">
-            <TextBlock Grid.Column="0" Classes="caption" Text="OBJECT" />
-            <TextBlock Grid.Column="1" Classes="caption" Text="ORIGIN" />
-            <TextBlock Grid.Column="2" Classes="caption" Text="DECLARED IN" />
-            <TextBlock Grid.Column="3" Classes="caption" Text="WHERE" />
+            <TextBlock Grid.Column="0" Classes="caption" Text="ОБЪЕКТ" />
+            <TextBlock Grid.Column="1" Classes="caption" Text="ОТКУДА" />
+            <TextBlock Grid.Column="2" Classes="caption" Text="ОБЪЯВЛЕН В" />
+            <TextBlock Grid.Column="3" Classes="caption" Text="ГДЕ ИМЕННО" />
           </Grid>
           <Border Classes="divider" Margin="0,0,0,10" />
         </StackPanel>
@@ -28,7 +28,7 @@
           <StackPanel>
             <ItemsControl x:Name="Objects" />
             <TextBlock x:Name="Footnote" Classes="note" />
-            <TextBlock Classes="caption" Text="DIAGNOSTICS" Margin="0,16,0,6" />
+            <TextBlock Classes="caption" Text="ДИАГНОСТИКА" Margin="0,16,0,6" />
             <ItemsControl x:Name="DiagnosticList" />
           </StackPanel>
         </ScrollViewer>

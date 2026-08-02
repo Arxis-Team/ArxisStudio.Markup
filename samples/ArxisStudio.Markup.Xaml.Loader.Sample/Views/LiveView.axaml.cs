@@ -125,7 +125,7 @@ internal sealed partial class LiveView : UserControl
 
         if (session is null)
         {
-            Show("no objects", false, result.Diagnostics, document.SourceText, []);
+            Show("объекты не построены", false, result.Diagnostics, document.SourceText, []);
 
             return;
         }
@@ -139,7 +139,7 @@ internal sealed partial class LiveView : UserControl
 
         Preview.Content = SampleData.Attach(session.RootObject);
 
-        Show("loaded", true, result.Diagnostics, document.SourceText, []);
+        Show("загружено", true, result.Diagnostics, document.SourceText, []);
     }
 
     private void Show(
@@ -150,21 +150,21 @@ internal sealed partial class LiveView : UserControl
         IReadOnlyList<XamlDocumentChange> changes)
     {
         _report.Clear()
-            .Field("strategy", strategy)
-            .Verdict(applied ? "applied to the running objects" : "not applied", applied);
+            .Field("стратегия", strategy)
+            .Verdict(applied ? "применено к работающим объектам" : "не применено", applied);
 
         if (_session is not null)
         {
             _report.Verdict(
-                "the document still writes back exactly as typed",
+                "документ по-прежнему записывается ровно так, как набран",
                 _session.Document.GetText() == (Editor.Text ?? string.Empty) || !applied);
         }
 
         foreach (XamlDocumentChange change in changes.Take(6))
         {
-            _report.Field("change", change.ToString());
+            _report.Field("изменение", change.ToString());
         }
 
-        _report.Caption("DIAGNOSTICS").Diagnostics(diagnostics, text);
+        _report.Caption("ДИАГНОСТИКА").Diagnostics(diagnostics, text);
     }
 }

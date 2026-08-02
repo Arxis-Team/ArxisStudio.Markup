@@ -65,7 +65,7 @@ internal sealed class DiagnosticRow : ReportRow
         IsWarning = diagnostic.Severity == MarkupDiagnosticSeverity.Warning;
 
         Where = text is not null && diagnostic.Span is { } span && span.End <= text.Length
-            ? $"line {text.Lines.GetPosition(span.Start).Line + 1}"
+            ? $"строка {text.Lines.GetPosition(span.Start).Line + 1}"
             : string.Empty;
     }
 

@@ -93,7 +93,7 @@ internal sealed class Report
 
         if (count == 0)
         {
-            Rows.Add(new NoteRow("nothing reported"));
+            Rows.Add(new NoteRow("ничего не сообщено"));
         }
 
         return this;

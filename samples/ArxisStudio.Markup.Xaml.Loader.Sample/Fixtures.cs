@@ -29,7 +29,7 @@ internal static class Fixtures
                      mc:Ignorable="d"
                      d:DesignWidth="480" d:DesignHeight="240">
 
-          <!-- The resources this view uses come from a file it does not own. -->
+          <!-- Ресурсы, которые использует это представление, лежат в чужом файле. -->
           <UserControl.Resources>
             <ResourceDictionary>
               <ResourceDictionary.MergedDictionaries>
@@ -46,7 +46,7 @@ internal static class Fixtures
                        Foreground="{DynamicResource Accent}" />
             <Border Background="{StaticResource Surface}"
                     Padding="{StaticResource RowPadding}">
-              <Button Name="Save" Content="Save" Width="120" />
+              <Button Name="Save" Content="Сохранить" Width="120" />
             </Border>
           </StackPanel>
         </UserControl>
@@ -76,7 +76,7 @@ internal static class Fixtures
         $$"""
         <UserControl xmlns="{{AvaloniaNamespace}}">
           <StackPanel>
-            <!-- an end tag that closes the wrong element, and an attribute with no value -->
+            <!-- закрывающий тег не того элемента и атрибут без значения -->
             <TextBlock Text="half
             <Button Content
           </Grid>

@@ -40,7 +40,7 @@ internal sealed partial class ResourcesView : UserControl
         GraphList.ItemsSource = _graph.Rows;
         UpdateList.ItemsSource = _updates.Rows;
 
-        _updates.Note("nothing yet — pick an accent");
+        _updates.Note("пока ничего — выберите акцент");
     }
 
     /// <inheritdoc />
@@ -65,7 +65,7 @@ internal sealed partial class ResourcesView : UserControl
 
         if (session is null)
         {
-            _updates.Clear().Caption("DIAGNOSTICS").Diagnostics(result.Diagnostics);
+            _updates.Clear().Caption("ДИАГНОСТИКА").Diagnostics(result.Diagnostics);
 
             return;
         }
@@ -91,11 +91,11 @@ internal sealed partial class ResourcesView : UserControl
         XamlUpdateResult result = await _session.ApplySourceUpdateAsync(Fixtures.PaletteUri, CancellationToken.None);
 
         _updates.Clear()
-            .Field("changed file", Fixtures.PaletteUri.Segments[^1])
-            .Field("strategy", result.Strategy.ToString())
-            .Verdict("applied to the running objects", result.Applied)
-            .Verdict("the document was not changed", _session.Document.GetText() == Fixtures.View)
-            .Caption("DIAGNOSTICS")
+            .Field("изменённый файл", Fixtures.PaletteUri.Segments[^1])
+            .Field("стратегия", result.Strategy.ToString())
+            .Verdict("применено к работающим объектам", result.Applied)
+            .Verdict("документ не изменился", _session.Document.GetText() == Fixtures.View)
+            .Caption("ДИАГНОСТИКА")
             .Diagnostics(result.Diagnostics);
 
         await ShowGraphAsync();
@@ -113,10 +113,10 @@ internal sealed partial class ResourcesView : UserControl
         XamlResourceGraphResult built = await graph.BuildAsync(Fixtures.ViewUri, CancellationToken.None);
 
         _graph.Clear()
-            .Field("documents reached", graph.Documents.Count.ToString(CultureInfo.InvariantCulture))
-            .Field("the view depends on", Names(graph.GetDependencies(Fixtures.ViewUri)))
-            .Field("Brand.axaml is needed by", Names(graph.GetDependents(Fixtures.BrandUri)))
-            .Caption("DIAGNOSTICS")
+            .Field("документов достигнуто", graph.Documents.Count.ToString(CultureInfo.InvariantCulture))
+            .Field("представление зависит от", Names(graph.GetDependencies(Fixtures.ViewUri)))
+            .Field("Brand.axaml нужен для", Names(graph.GetDependents(Fixtures.BrandUri)))
+            .Caption("ДИАГНОСТИКА")
             .Diagnostics(built.Diagnostics);
     }
 

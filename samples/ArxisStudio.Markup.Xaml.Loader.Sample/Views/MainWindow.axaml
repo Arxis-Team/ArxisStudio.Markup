@@ -2,7 +2,7 @@
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:views="using:ArxisStudio.Markup.Xaml.Loader.Sample.Views"
         x:Class="ArxisStudio.Markup.Xaml.Loader.Sample.Views.MainWindow"
-        Title="ArxisStudio.Markup — showcase"
+        Title="ArxisStudio.Markup — витрина"
         Width="1320" Height="860"
         MinWidth="1040" MinHeight="640"
         Background="{DynamicResource AppBackgroundBrush}">
@@ -20,7 +20,7 @@
             <TextBlock Text="ArxisStudio.Markup" FontSize="15" FontWeight="SemiBold" />
             <TextBlock Classes="muted"
                        FontSize="11"
-                       Text="lossless XAML documents, and the live Avalonia objects built from them" />
+                       Text="XAML-документы без потерь и живые объекты Avalonia, построенные из них" />
           </StackPanel>
         </StackPanel>
 
@@ -46,8 +46,8 @@
       <TabItem Classes="nav">
         <TabItem.Header>
           <StackPanel>
-            <TextBlock Classes="nav-title" Text="Live document" />
-            <TextBlock Classes="nav-sub" Text="type in it, and watch the objects follow" />
+            <TextBlock Classes="nav-title" Text="Живой документ" />
+            <TextBlock Classes="nav-sub" Text="правьте его — объекты идут следом" />
           </StackPanel>
         </TabItem.Header>
         <views:LiveView />
@@ -56,8 +56,8 @@
       <TabItem Classes="nav">
         <TabItem.Header>
           <StackPanel>
-            <TextBlock Classes="nav-title" Text="Document" />
-            <TextBlock Classes="nav-sub" Text="round-trip, recovery, and one careful edit" />
+            <TextBlock Classes="nav-title" Text="Документ" />
+            <TextBlock Classes="nav-sub" Text="обратная запись, восстановление и одна аккуратная правка" />
           </StackPanel>
         </TabItem.Header>
         <views:DocumentView />
@@ -66,8 +66,8 @@
       <TabItem Classes="nav">
         <TabItem.Header>
           <StackPanel>
-            <TextBlock Classes="nav-title" Text="Resources" />
-            <TextBlock Classes="nav-sub" Text="files the document only includes" />
+            <TextBlock Classes="nav-title" Text="Ресурсы" />
+            <TextBlock Classes="nav-sub" Text="файлы, которые документ только включает" />
           </StackPanel>
         </TabItem.Header>
         <views:ResourcesView />
@@ -76,8 +76,8 @@
       <TabItem Classes="nav">
         <TabItem.Header>
           <StackPanel>
-            <TextBlock Classes="nav-title" Text="Objects" />
-            <TextBlock Classes="nav-sub" Text="which markup each object came from" />
+            <TextBlock Classes="nav-title" Text="Объекты" />
+            <TextBlock Classes="nav-sub" Text="из какой разметки взялся каждый объект" />
           </StackPanel>
         </TabItem.Header>
         <views:ObjectsView />
@@ -86,8 +86,8 @@
       <TabItem Classes="nav">
         <TabItem.Header>
           <StackPanel>
-            <TextBlock Classes="nav-title" Text="Design mode" />
-            <TextBlock Classes="nav-sub" Text="the same text, loaded two ways" />
+            <TextBlock Classes="nav-title" Text="Режим дизайна" />
+            <TextBlock Classes="nav-sub" Text="один и тот же текст, загруженный дважды" />
           </StackPanel>
         </TabItem.Header>
         <views:DesignView />

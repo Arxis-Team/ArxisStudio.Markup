@@ -7,9 +7,9 @@
   <Grid RowDefinitions="Auto,*" Margin="24">
 
     <StackPanel Grid.Row="0" Margin="0,0,0,18">
-      <TextBlock Classes="h1" Text="Files the document only includes" />
+      <TextBlock Classes="h1" Text="Файлы, которые документ только включает" />
       <TextBlock Classes="lede"
-                 Text="The palette and the brand file exist only in memory. The includes resolve through the environment's own resolver, which is what lets an unsaved edit be what the objects are built from. Change the accent and the loaded tree follows it — the document itself does not change at all." />
+                 Text="Палитра и файл бренда существуют только в памяти. Включения разрешаются через резолвер самой среды — именно это позволяет строить объекты из несохранённой правки. Смените акцент, и загруженное дерево пойдёт следом, а сам документ не изменится ни на символ." />
     </StackPanel>
 
     <Grid Grid.Row="1" ColumnDefinitions="1*,16,1.05*">
@@ -18,7 +18,7 @@
         <DockPanel>
 
           <StackPanel DockPanel.Dock="Top">
-            <TextBlock Classes="caption" Text="THE ACCENT THE PALETTE DECLARES" Margin="0,0,0,8" />
+            <TextBlock Classes="caption" Text="АКЦЕНТ, КОТОРЫЙ ОБЪЯВЛЯЕТ ПАЛИТРА" Margin="0,0,0,8" />
             <ComboBox x:Name="Accent" Width="200" HorizontalAlignment="Left">
               <ComboBox.ItemTemplate>
                 <DataTemplate DataType="system:String">
@@ -35,9 +35,9 @@
                 </DataTemplate>
               </ComboBox.ItemTemplate>
             </ComboBox>
-            <TextBlock Classes="caption" Text="THEMES/PALETTE.AXAML, IN MEMORY" Margin="0,16,0,8" />
+            <TextBlock Classes="caption" Text="THEMES/PALETTE.AXAML, В ПАМЯТИ" Margin="0,16,0,8" />
             <TextBox x:Name="PaletteText" Classes="code" IsReadOnly="True" Height="150" />
-            <TextBlock Classes="caption" Text="THE DEPENDENCY GRAPH THE INCLUDES FORM" Margin="0,16,0,8" />
+            <TextBlock Classes="caption" Text="ГРАФ ЗАВИСИМОСТЕЙ, КОТОРЫЙ ОБРАЗУЮТ ВКЛЮЧЕНИЯ" Margin="0,16,0,8" />
           </StackPanel>
 
           <ScrollViewer>
@@ -52,14 +52,14 @@
 
           <TextBlock DockPanel.Dock="Top"
                      Classes="caption"
-                     Text="THE OBJECTS THE DOCUMENT DESCRIBES"
+                     Text="ОБЪЕКТЫ, КОТОРЫЕ ОПИСЫВАЕТ ДОКУМЕНТ"
                      Margin="0,0,0,10" />
 
           <controls:PreviewSurface x:Name="Preview" DockPanel.Dock="Top" />
 
           <TextBlock DockPanel.Dock="Top"
                      Classes="caption"
-                     Text="WHAT CHANGING THE FILE DID"
+                     Text="ЧТО ДАЛА СМЕНА ФАЙЛА"
                      Margin="0,16,0,8" />
 
           <ScrollViewer>

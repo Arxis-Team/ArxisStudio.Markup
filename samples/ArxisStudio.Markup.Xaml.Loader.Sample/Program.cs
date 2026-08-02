@@ -32,7 +32,7 @@ internal static class Program
         }
         catch (Exception error)
         {
-            Console.Error.WriteLine($"The showcase could not start: {error}");
+            Console.Error.WriteLine($"Витрина не смогла запуститься: {error}");
 
             return 1;
         }

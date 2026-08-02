@@ -6,14 +6,14 @@
     <StackPanel Margin="24" Spacing="16">
 
       <StackPanel>
-        <TextBlock Classes="h1" Text="The document is the source of truth" />
+        <TextBlock Classes="h1" Text="Источник истины — документ" />
         <TextBlock Classes="lede"
-                   Text="A document keeps the exact snapshot it was parsed from, and every node points into it. Writing an unchanged one back is a copy rather than a reformat, and an edit is expressed as changes against its own spans, so nothing it did not name is rewritten. None of this needs Avalonia to be present: it is the half of the library a tool can use without ever building an object." />
+                   Text="Документ хранит ровно тот снимок текста, из которого разобран, и каждый узел указывает внутрь него. Запись неизменённого документа — это копия, а не переформатирование, а правка выражается изменениями к его собственным диапазонам, так что не переписывается ничего, чего она не назвала. Для всего этого Avalonia не нужна: это та половина библиотеки, которой инструмент может пользоваться, не построив ни одного объекта." />
       </StackPanel>
 
       <Border Classes="card">
         <StackPanel>
-          <TextBlock Classes="caption" Text="WHAT PARSING PRODUCED" Margin="0,0,0,10" />
+          <TextBlock Classes="caption" Text="ЧТО ДАЛ РАЗБОР" Margin="0,0,0,10" />
           <ItemsControl x:Name="Facts" />
         </StackPanel>
       </Border>
@@ -22,7 +22,7 @@
 
         <Border Grid.Column="0" Classes="card">
           <StackPanel>
-            <TextBlock Classes="caption" Text="TWO EDITS, BATCHED, APPLIED TOGETHER" Margin="0,0,0,10" />
+            <TextBlock Classes="caption" Text="ДВЕ ПРАВКИ, ОДНОЙ ПАЧКОЙ" Margin="0,0,0,10" />
             <TextBox x:Name="EditedRegion" Classes="code" IsReadOnly="True" Height="196" />
             <ItemsControl x:Name="EditFacts" Margin="0,12,0,0" />
           </StackPanel>
@@ -30,7 +30,7 @@
 
         <Border Grid.Column="2" Classes="card">
           <StackPanel>
-            <TextBlock Classes="caption" Text="A DOCUMENT CAUGHT MID-KEYSTROKE" Margin="0,0,0,10" />
+            <TextBlock Classes="caption" Text="ДОКУМЕНТ, ПОЙМАННЫЙ НА ПОЛУСЛОВЕ" Margin="0,0,0,10" />
             <TextBox x:Name="MalformedText" Classes="code" IsReadOnly="True" Height="196" />
             <ItemsControl x:Name="RecoveryFacts" Margin="0,12,0,0" />
           </StackPanel>
@@ -41,7 +41,7 @@
       <Border Classes="card">
         <StackPanel>
           <TextBlock Classes="caption"
-                     Text="WHAT THE SYNTAX MODEL CAN SAY ABOUT A VALUE, WITH NO CLR TYPE IN SIGHT"
+                     Text="ЧТО СИНТАКСИЧЕСКАЯ МОДЕЛЬ ЗНАЕТ О ЗНАЧЕНИИ, НЕ ВИДЯ НИ ОДНОГО CLR-ТИПА"
                      Margin="0,0,0,10" />
           <ItemsControl x:Name="Extensions" />
         </StackPanel>

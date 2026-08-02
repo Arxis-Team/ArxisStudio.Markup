@@ -6,16 +6,16 @@
   <Grid RowDefinitions="Auto,Auto,*" Margin="24">
 
     <StackPanel Grid.Row="0" Margin="0,0,0,18">
-      <TextBlock Classes="h1" Text="The same text, loaded two ways" />
+      <TextBlock Classes="h1" Text="Один и тот же текст, загруженный дважды" />
       <TextBlock Classes="lede"
-                 Text="Avalonia's loader understands four names in the design namespace and fails the whole document on any other, so a d:Text is taken out of the text it is given and applied afterwards. In run mode it is taken out and not applied, which is what ignoring a design-only value means. The document keeps every one of them either way, which is why both panes below are loaded from the same characters." />
+                 Text="Загрузчик Avalonia понимает четыре имени в пространстве имён дизайна и валит весь документ на любом другом, поэтому d:Text изымается из текста, который ему отдают, и применяется уже после. В режиме выполнения он изымается и не применяется — это и значит «пропустить значение только для дизайна». Документ сохраняет их все в любом случае, поэтому обе панели ниже загружены из одних и тех же символов." />
     </StackPanel>
 
     <Grid Grid.Row="1" ColumnDefinitions="1*,16,1*" Margin="0,0,0,16">
 
       <Border Grid.Column="0" Classes="card">
         <StackPanel>
-          <TextBlock Classes="caption" Text="DESIGN — NO DATA, SO THE DESIGN VALUE SHOWS" Margin="0,0,0,10" />
+          <TextBlock Classes="caption" Text="ДИЗАЙН — ДАННЫХ НЕТ, ВИДНО ЗНАЧЕНИЕ ДЛЯ ДИЗАЙНА" Margin="0,0,0,10" />
           <!-- The design size is honoured, so the pane scrolls rather than cropping the control. -->
           <ScrollViewer HorizontalScrollBarVisibility="Auto">
             <controls:PreviewSurface x:Name="DesignPreview" />
@@ -26,7 +26,7 @@
 
       <Border Grid.Column="2" Classes="card">
         <StackPanel>
-          <TextBlock Classes="caption" Text="RUNTIME — A DATA CONTEXT, SO THE BINDING SHOWS" Margin="0,0,0,10" />
+          <TextBlock Classes="caption" Text="ВЫПОЛНЕНИЕ — ЕСТЬ КОНТЕКСТ ДАННЫХ, ВИДНА ПРИВЯЗКА" Margin="0,0,0,10" />
           <ScrollViewer HorizontalScrollBarVisibility="Auto">
             <controls:PreviewSurface x:Name="RuntimePreview" />
           </ScrollViewer>
@@ -39,11 +39,11 @@
     <Border Grid.Row="2" Classes="card">
       <Grid ColumnDefinitions="1*,16,1*" RowDefinitions="Auto,*">
 
-        <TextBlock Grid.Row="0" Grid.Column="0" Classes="caption" Text="THE DOCUMENT" Margin="0,0,0,8" />
+        <TextBlock Grid.Row="0" Grid.Column="0" Classes="caption" Text="ДОКУМЕНТ" Margin="0,0,0,8" />
         <TextBlock Grid.Row="0"
                    Grid.Column="2"
                    Classes="caption"
-                   Text="WHAT AVALONIA WAS HANDED, IN DESIGN MODE"
+                   Text="ЧТО ПОЛУЧИЛА AVALONIA В РЕЖИМЕ ДИЗАЙНА"
                    Margin="0,0,0,8" />
 
         <TextBox Grid.Row="1" Grid.Column="0" x:Name="DocumentText" Classes="code" IsReadOnly="True" />
