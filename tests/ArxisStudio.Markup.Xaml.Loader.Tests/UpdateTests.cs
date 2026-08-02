@@ -682,6 +682,198 @@ public sealed class UpdateTests
         Assert.Equal("after", ((TextBlock)session.GetRoot<Border>().Child!).Text);
     }
 
+    private static string Panel(string children) =>
+        $"<StackPanel xmlns=\"{AvaloniaNamespace}\"\n" +
+        "            xmlns:x=\"http://schemas.microsoft.com/winfx/2006/xaml\">\n" +
+        children +
+        "\n</StackPanel>";
+
+    [AvaloniaFact]
+    public async Task NamedSiblingsThatChangePlacesAreMovedRatherThanRebuilt()
+    {
+        await using XamlLoadSession session = await Load(Panel(
+            "  <TextBlock x:Name=\"Title\" Text=\"Title\" />\n" +
+            "  <Button x:Name=\"Save\" Content=\"Save\" />"));
+
+        var panel = session.GetRoot<StackPanel>();
+        Control title = panel.Children[0];
+        Control save = panel.Children[1];
+
+        XamlUpdateResult result = await Update(session, Panel(
+            "  <Button x:Name=\"Save\" Content=\"Save\" />\n" +
+            "  <TextBlock x:Name=\"Title\" Text=\"Title\" />"));
+
+        Assert.True(result.Applied, string.Join(" | ", result.Diagnostics));
+        Assert.Equal(XamlUpdateStrategy.ReorderChildren, result.Strategy);
+
+        // The very objects that were there, in the order the document now gives them. A rebuild
+        // would produce equal controls; these are the same ones, so everything they were holding
+        // is still theirs.
+        Assert.Same(save, panel.Children[0]);
+        Assert.Same(title, panel.Children[1]);
+    }
+
+    [AvaloniaFact]
+    public async Task AMovedElementKeepsItsPlaceInTheObjectMap()
+    {
+        await using XamlLoadSession session = await Load(Panel(
+            "  <TextBlock x:Name=\"Title\" Text=\"before\" />\n" +
+            "  <Button x:Name=\"Save\" Content=\"Save\" />"));
+
+        var title = (TextBlock)session.GetRoot<StackPanel>().Children[0];
+
+        await Update(session, Panel(
+            "  <Button x:Name=\"Save\" Content=\"Save\" />\n" +
+            "  <TextBlock x:Name=\"Title\" Text=\"before\" />"));
+
+        // Setting a property after the move has to reach the object that moved, which it can only
+        // do if the map followed the element to where it now is.
+        XamlUpdateResult after = await Update(session, Panel(
+            "  <Button x:Name=\"Save\" Content=\"Save\" />\n" +
+            "  <TextBlock x:Name=\"Title\" Text=\"after\" />"));
+
+        Assert.True(after.Applied, string.Join(" | ", after.Diagnostics));
+        Assert.Equal(XamlUpdateStrategy.SetProperty, after.Strategy);
+        Assert.Equal("after", title.Text);
+    }
+
+    [AvaloniaFact]
+    public async Task AMoveAndAValueChangeTogetherReachTheSameObject()
+    {
+        await using XamlLoadSession session = await Load(Panel(
+            "  <TextBlock x:Name=\"Title\" Text=\"before\" />\n" +
+            "  <Button x:Name=\"Save\" Content=\"Save\" />"));
+
+        var panel = session.GetRoot<StackPanel>();
+        var title = (TextBlock)panel.Children[0];
+
+        XamlUpdateResult result = await Update(session, Panel(
+            "  <Button x:Name=\"Save\" Content=\"Save\" />\n" +
+            "  <TextBlock x:Name=\"Title\" Text=\"after\" />"));
+
+        Assert.True(result.Applied, string.Join(" | ", result.Diagnostics));
+        Assert.Same(title, panel.Children[1]);
+        Assert.Equal("after", title.Text);
+    }
+
+    [AvaloniaFact]
+    public async Task AnUnnamedSiblingMovesWithTheNamedOnesAroundIt()
+    {
+        await using XamlLoadSession session = await Load(Panel(
+            "  <TextBlock x:Name=\"Title\" Text=\"Title\" />\n" +
+            "  <Border Width=\"10\" />"));
+
+        var panel = session.GetRoot<StackPanel>();
+        Control title = panel.Children[0];
+        Control border = panel.Children[1];
+
+        XamlUpdateResult result = await Update(session, Panel(
+            "  <Border Width=\"10\" />\n" +
+            "  <TextBlock x:Name=\"Title\" Text=\"Title\" />"));
+
+        Assert.True(result.Applied, string.Join(" | ", result.Diagnostics));
+        Assert.Equal(XamlUpdateStrategy.ReorderChildren, result.Strategy);
+        Assert.Same(border, panel.Children[0]);
+        Assert.Same(title, panel.Children[1]);
+    }
+
+    [AvaloniaFact]
+    public async Task NameWorksAsAnIdentityWhereItMeansTheSameThing()
+    {
+        await using XamlLoadSession session = await Load(Panel(
+            "  <TextBlock Name=\"Title\" Text=\"Title\" />\n" +
+            "  <Button Name=\"Save\" Content=\"Save\" />"));
+
+        var panel = session.GetRoot<StackPanel>();
+        Control save = panel.Children[1];
+
+        XamlUpdateResult result = await Update(session, Panel(
+            "  <Button Name=\"Save\" Content=\"Save\" />\n" +
+            "  <TextBlock Name=\"Title\" Text=\"Title\" />"));
+
+        Assert.True(result.Applied, string.Join(" | ", result.Diagnostics));
+        Assert.Equal(XamlUpdateStrategy.ReorderChildren, result.Strategy);
+        Assert.Same(save, panel.Children[0]);
+    }
+
+    [AvaloniaFact]
+    public async Task NothingNamedFallsBackToComparingByPosition()
+    {
+        await using XamlLoadSession session = await Load(Panel(
+            "  <TextBlock Text=\"first\" />\n" +
+            "  <TextBlock Text=\"second\" />"));
+
+        XamlUpdateResult result = await Update(session, Panel(
+            "  <TextBlock Text=\"second\" />\n" +
+            "  <TextBlock Text=\"first\" />"));
+
+        // Nothing says which of the two is which, so this is two changed values rather than a
+        // move — the conservative reading, and the one that cannot put a value on the wrong
+        // object.
+        Assert.True(result.Applied, string.Join(" | ", result.Diagnostics));
+        Assert.Equal(XamlUpdateStrategy.SetProperty, result.Strategy);
+    }
+
+    [AvaloniaFact]
+    public async Task ChildrenWrittenAsAPropertyElementAreReorderedToo()
+    {
+        await using XamlLoadSession session = await Load(Panel(
+            "  <StackPanel.Children>\n" +
+            "    <TextBlock x:Name=\"Title\" Text=\"Title\" />\n" +
+            "    <Button x:Name=\"Save\" Content=\"Save\" />\n" +
+            "  </StackPanel.Children>"));
+
+        var panel = session.GetRoot<StackPanel>();
+        Control save = panel.Children[1];
+
+        XamlUpdateResult result = await Update(session, Panel(
+            "  <StackPanel.Children>\n" +
+            "    <Button x:Name=\"Save\" Content=\"Save\" />\n" +
+            "    <TextBlock x:Name=\"Title\" Text=\"Title\" />\n" +
+            "  </StackPanel.Children>"));
+
+        // The parent here is a member rather than an object, so the collection to move things
+        // around in is the one that member holds.
+        Assert.True(result.Applied, string.Join(" | ", result.Diagnostics));
+        Assert.Equal(XamlUpdateStrategy.ReorderChildren, result.Strategy);
+        Assert.Same(save, panel.Children[0]);
+    }
+
+    [AvaloniaFact]
+    public async Task AReorderLeavesTheDocumentExactlyAsItWasWritten()
+    {
+        await using XamlLoadSession session = await Load(Panel(
+            "  <TextBlock x:Name=\"Title\" Text=\"Title\" />\n" +
+            "  <Button x:Name=\"Save\" Content=\"Save\" />"));
+
+        string moved = Panel(
+            "  <Button x:Name=\"Save\"   Content=\"Save\" />\n" +
+            "  <!-- moved above the title -->\n" +
+            "  <TextBlock x:Name=\"Title\" Text=\"Title\" />");
+
+        XamlUpdateResult result = await Update(session, moved);
+
+        Assert.True(result.Applied, string.Join(" | ", result.Diagnostics));
+        Assert.Equal(moved, session.Document.GetText());
+    }
+
+    [AvaloniaFact]
+    public async Task ARenamedElementIsNotTheSameElement()
+    {
+        await using XamlLoadSession session = await Load(Panel(
+            "  <TextBlock x:Name=\"Title\" Text=\"Title\" />\n" +
+            "  <Button x:Name=\"Save\" Content=\"Save\" />"));
+
+        XamlUpdateResult result = await Update(session, Panel(
+            "  <TextBlock x:Name=\"Heading\" Text=\"Title\" />\n" +
+            "  <Button x:Name=\"Save\" Content=\"Save\" />"));
+
+        // The set of names is not the same set, so nothing here is a move; a changed x:Name is
+        // decided while the objects are built and is rebuilt for.
+        Assert.True(result.Applied, string.Join(" | ", result.Diagnostics));
+        Assert.Equal(XamlUpdateStrategy.ReloadSubtree, result.Strategy);
+    }
+
     [AvaloniaFact]
     public async Task AnUpdateOnADisposedSessionThrows()
     {

@@ -15,10 +15,11 @@ namespace ArxisStudio.Markup.Xaml.Loader;
 /// changes every offset in it and changes nothing about the objects it describes.
 /// </para>
 /// <para>
-/// It is deliberately conservative. Elements are paired by position among their siblings and
-/// nothing is matched across a move, so a reordering reads as a structural change rather than as
-/// a clever minimal edit — being wrong about that would leave a control holding a value from the
-/// element that used to be in its place.
+/// Elements are paired by the identity their author declared — <c>x:Name</c>, or <c>Name</c> —
+/// and by position among their siblings where no name decides. See
+/// <see cref="XamlElementIdentity"/> for exactly when a name is allowed to; where it is not, this
+/// stays deliberately conservative, because being wrong about which element is which would leave
+/// a control holding a value from the element that used to be in its place.
 /// </para>
 /// </remarks>
 internal static class XamlDocumentDiff
@@ -163,9 +164,7 @@ internal static class XamlDocumentDiff
         XamlElement[] beforeChildren = [.. before.Elements];
         XamlElement[] afterChildren = [.. after.Elements];
 
-        // A child added, removed or reordered changes what has to exist, not what a property
-        // holds. Pairing survivors across such a change is exactly the cleverness that gets a
-        // control the value of whatever used to sit in its place.
+        // A child added or removed changes what has to exist, not what a property holds.
         if (beforeChildren.Length != afterChildren.Length
             || !SignificantText(before).SequenceEqual(SignificantText(after), StringComparer.Ordinal))
         {
@@ -177,10 +176,51 @@ internal static class XamlDocumentDiff
             return;
         }
 
-        for (int index = 0; index < beforeChildren.Length; index++)
+        IReadOnlyList<(XamlElement Before, XamlElement After)>? pairs =
+            XamlElementIdentity.Pair(beforeChildren, afterChildren);
+
+        // Nothing names these children, so the only thing that says which is which is where each
+        // one sits. A move is then indistinguishable from two elements having swapped contents,
+        // and the conservative reading is the one that cannot put a value on the wrong object.
+        if (pairs is null)
         {
-            CompareElements(beforeChildren[index], afterChildren[index], changes);
+            for (int index = 0; index < beforeChildren.Length; index++)
+            {
+                CompareElements(beforeChildren[index], afterChildren[index], changes);
+            }
+
+            return;
         }
+
+        if (XamlElementIdentity.Moved(beforeChildren, pairs))
+        {
+            changes.Add(Reorder(before, after));
+        }
+
+        foreach ((XamlElement child, XamlElement updated) in pairs)
+        {
+            CompareElements(child, updated, changes);
+        }
+    }
+
+    /// <summary>Describes named siblings having changed places.</summary>
+    /// <remarks>
+    /// Inside a style, a theme or a template there is no collection of live objects to move
+    /// anything around in — what is there is rebuilt whole and put back — so the container has
+    /// the last word, exactly as it does for every other kind of change.
+    /// </remarks>
+    private static XamlDocumentChange Reorder(XamlElement before, XamlElement after)
+    {
+        if (Container(before) is { } container)
+        {
+            return new XamlDocumentChange(
+                container.Strategy, container.Element, Ancestor(after, container.Depth), null)
+            {
+                ReplacesObject = true,
+            };
+        }
+
+        return new XamlDocumentChange(XamlUpdateStrategy.ReorderChildren, before, after, null);
     }
 
     private static void CompareAttributes(

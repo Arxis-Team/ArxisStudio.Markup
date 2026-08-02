@@ -90,6 +90,143 @@ internal static class XamlObjectReplacement
         return Fail(element, diagnostics, $"{owner.GetType().Name} does not say where it holds it");
     }
 
+    /// <summary>Puts an element's children in the order the document now gives them.</summary>
+    /// <remarks>
+    /// <para>
+    /// Nothing is built and nothing is detached: the objects that already exist are moved within
+    /// the collection holding them, so a control keeps its focus, its scroll offset, whatever it
+    /// was animating and anything a caller was holding it for.
+    /// </para>
+    /// <para>
+    /// Everything that can fail is resolved before the first item moves, so a reorder that cannot
+    /// be applied has not half-applied itself.
+    /// </para>
+    /// </remarks>
+    /// <param name="objects">Which element each object came from.</param>
+    /// <param name="parent">The element whose children changed places.</param>
+    /// <param name="order">Its children as they were, in the order the new document gives them.</param>
+    /// <param name="diagnostics">Collects a report when the order cannot be applied.</param>
+    /// <returns><see langword="true"/> if the children were reordered.</returns>
+    internal static bool Reorder(
+        XamlObjectMap objects,
+        XamlElement parent,
+        IReadOnlyList<XamlElement> order,
+        List<MarkupDiagnostic> diagnostics)
+    {
+        if (Children(objects, parent) is not { } slot)
+        {
+            return FailOrder(parent, diagnostics, "nothing in this document holds them");
+        }
+
+        var wanted = new List<object>(order.Count);
+
+        foreach (XamlElement child in order)
+        {
+            if (objects.GetObject(child) is not { } target)
+            {
+                return FailOrder(parent, diagnostics, $"<{child.Name}> produced no object");
+            }
+
+            wanted.Add(target);
+        }
+
+        return Rearrange(slot, wanted)
+            || FailOrder(parent, diagnostics, $"{slot.GetType().Name} does not say how to move an item");
+    }
+
+    /// <summary>Finds the collection an element's children live in.</summary>
+    private static object? Children(XamlObjectMap objects, XamlElement parent)
+    {
+        // A property element names the member the children belong to; the object that has that
+        // member is its own parent.
+        if (parent.IsPropertyElementSyntax)
+        {
+            return parent.Parent is XamlElement owner
+                && parent.MemberName is { } memberName
+                && objects.GetObject(owner) is { } target
+                    ? Read(target, memberName)
+                    : null;
+        }
+
+        return objects.GetObject(parent) switch
+        {
+            // Children is where a panel's unnamed content goes, and it is a property rather than
+            // the panel itself.
+            Panel panel => panel.Children,
+            { } holder => holder,
+            _ => null,
+        };
+    }
+
+    /// <summary>Moves the items of a collection into a given order, without removing any.</summary>
+    /// <remarks>
+    /// Through the collection's own <c>Move</c>, which is what Avalonia's lists offer and what
+    /// keeps a control attached to its parent throughout. Writing the positions instead would put
+    /// one control in two places for as long as it took to write the second, which is how Avalonia
+    /// is made to throw.
+    /// </remarks>
+    private static bool Rearrange(object slot, List<object> order)
+    {
+        if (slot is not IEnumerable items)
+        {
+            return false;
+        }
+
+        var current = new List<object?>();
+
+        foreach (object? item in items)
+        {
+            current.Add(item);
+        }
+
+        // Anything the collection holds that the document does not declare would have to end up
+        // somewhere, and nothing here knows where. That is a reorder this cannot promise.
+        if (current.Count != order.Count)
+        {
+            return false;
+        }
+
+        MethodInfo? move = slot.GetType().GetMethod(
+            "Move", BindingFlags.Public | BindingFlags.Instance, null, [typeof(int), typeof(int)], null);
+
+        if (move is null)
+        {
+            return false;
+        }
+
+        var positions = new int[order.Count];
+
+        for (int target = 0; target < order.Count; target++)
+        {
+            positions[target] = current.FindIndex(item => ReferenceEquals(item, order[target]));
+
+            if (positions[target] < 0)
+            {
+                return false;
+            }
+        }
+
+        // Resolved above, applied here: by this point nothing left can refuse.
+        for (int target = 0; target < order.Count; target++)
+        {
+            int position = current.FindIndex(target, item => ReferenceEquals(item, order[target]));
+
+            if (position == target)
+            {
+                continue;
+            }
+
+            move.Invoke(slot, [position, target]);
+
+            object? item = current[position];
+
+            current.RemoveAt(position);
+            current.Insert(target, item);
+        }
+
+        return true;
+    }
+
     /// <summary>Rebuilds what an element holds without disturbing the object it is.</summary>
     /// <remarks>
     /// For a change to an element's content rather than to the element itself. The object stays,
@@ -279,6 +416,18 @@ internal static class XamlObjectReplacement
 
             return false;
         }
+    }
+
+    private static bool FailOrder(XamlElement element, List<MarkupDiagnostic> diagnostics, string reason)
+    {
+        diagnostics.Add(MarkupDiagnostic.Synchronization(
+            XamlLoaderDiagnosticCodes.UpdateNotApplied,
+            $"The children of <{element.Name}> could not be put in the order the document gives them: {reason}.",
+            MarkupDiagnosticSeverity.Error,
+            element.Document.Uri,
+            element.NameSpan));
+
+        return false;
     }
 
     private static bool Fail(XamlElement element, List<MarkupDiagnostic> diagnostics, string reason)

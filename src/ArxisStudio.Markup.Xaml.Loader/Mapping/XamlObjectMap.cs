@@ -171,9 +171,10 @@ public sealed class XamlObjectMap
     /// document.
     /// </summary>
     /// <remarks>
-    /// Elements are paired by position among their siblings, and the walk stops descending where
-    /// the two documents stop agreeing — below that the objects were rebuilt, and the text they
-    /// were rebuilt from is what says where they came from.
+    /// Elements are paired the same way the difference between the two documents was worked out —
+    /// by declared identity, and by position among their siblings where no name decides — and the
+    /// walk stops descending where the two documents stop agreeing. Below that the objects were
+    /// rebuilt, and the text they were rebuilt from is what says where they came from.
     /// </remarks>
     /// <param name="from">The document this map is keyed by.</param>
     /// <param name="to">The document it is being re-keyed to.</param>
@@ -210,6 +211,16 @@ public sealed class XamlObjectMap
 
         if (beforeChildren.Length != afterChildren.Length)
         {
+            return;
+        }
+
+        if (XamlElementIdentity.Pair(beforeChildren, afterChildren) is { } pairs)
+        {
+            foreach ((XamlElement child, XamlElement updated) in pairs)
+            {
+                Pair(child, updated, carried);
+            }
+
             return;
         }
 

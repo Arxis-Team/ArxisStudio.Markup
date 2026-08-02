@@ -212,12 +212,13 @@ ArxisStudio.Markup.Xaml.Loader.XamlUpdateResult.Strategy.init -> void
 ArxisStudio.Markup.Xaml.Loader.XamlUpdateResult.XamlUpdateResult() -> void
 ArxisStudio.Markup.Xaml.Loader.XamlUpdateStrategy
 ArxisStudio.Markup.Xaml.Loader.XamlUpdateStrategy.None = 0 -> ArxisStudio.Markup.Xaml.Loader.XamlUpdateStrategy
-ArxisStudio.Markup.Xaml.Loader.XamlUpdateStrategy.RecreateSession = 8 -> ArxisStudio.Markup.Xaml.Loader.XamlUpdateStrategy
-ArxisStudio.Markup.Xaml.Loader.XamlUpdateStrategy.ReloadStyle = 4 -> ArxisStudio.Markup.Xaml.Loader.XamlUpdateStrategy
-ArxisStudio.Markup.Xaml.Loader.XamlUpdateStrategy.ReloadSubtree = 7 -> ArxisStudio.Markup.Xaml.Loader.XamlUpdateStrategy
-ArxisStudio.Markup.Xaml.Loader.XamlUpdateStrategy.ReloadTemplate = 6 -> ArxisStudio.Markup.Xaml.Loader.XamlUpdateStrategy
-ArxisStudio.Markup.Xaml.Loader.XamlUpdateStrategy.ReloadTheme = 5 -> ArxisStudio.Markup.Xaml.Loader.XamlUpdateStrategy
-ArxisStudio.Markup.Xaml.Loader.XamlUpdateStrategy.ReplaceResource = 3 -> ArxisStudio.Markup.Xaml.Loader.XamlUpdateStrategy
+ArxisStudio.Markup.Xaml.Loader.XamlUpdateStrategy.RecreateSession = 9 -> ArxisStudio.Markup.Xaml.Loader.XamlUpdateStrategy
+ArxisStudio.Markup.Xaml.Loader.XamlUpdateStrategy.ReloadStyle = 5 -> ArxisStudio.Markup.Xaml.Loader.XamlUpdateStrategy
+ArxisStudio.Markup.Xaml.Loader.XamlUpdateStrategy.ReloadSubtree = 8 -> ArxisStudio.Markup.Xaml.Loader.XamlUpdateStrategy
+ArxisStudio.Markup.Xaml.Loader.XamlUpdateStrategy.ReloadTemplate = 7 -> ArxisStudio.Markup.Xaml.Loader.XamlUpdateStrategy
+ArxisStudio.Markup.Xaml.Loader.XamlUpdateStrategy.ReloadTheme = 6 -> ArxisStudio.Markup.Xaml.Loader.XamlUpdateStrategy
+ArxisStudio.Markup.Xaml.Loader.XamlUpdateStrategy.ReorderChildren = 3 -> ArxisStudio.Markup.Xaml.Loader.XamlUpdateStrategy
+ArxisStudio.Markup.Xaml.Loader.XamlUpdateStrategy.ReplaceResource = 4 -> ArxisStudio.Markup.Xaml.Loader.XamlUpdateStrategy
 ArxisStudio.Markup.Xaml.Loader.XamlUpdateStrategy.SetProperty = 1 -> ArxisStudio.Markup.Xaml.Loader.XamlUpdateStrategy
 ArxisStudio.Markup.Xaml.Loader.XamlUpdateStrategy.UpdateDesignValue = 2 -> ArxisStudio.Markup.Xaml.Loader.XamlUpdateStrategy
 ArxisStudio.Markup.Xaml.Loader.XamlValueInfo

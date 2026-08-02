@@ -297,6 +297,7 @@ public sealed partial class XamlLoadSession
     {
         var writes = new List<(object Target, XamlMemberDescriptor Member, object? Value)>();
         var rebuilds = new List<(XamlDocumentChange Change, object Previous, object Fresh, Uri? RuntimeUri)>();
+        var reorders = new List<(XamlElement Parent, IReadOnlyList<XamlElement> Order)>();
 
         // Building every fragment first means a fragment that will not build refuses the update
         // rather than stopping halfway through a tree that is already part-way rebuilt.
@@ -334,6 +335,28 @@ public sealed partial class XamlLoadSession
             {
                 // Design values are reapplied wholesale once the document has advanced, because
                 // that is the same walk a design-mode load does and there is only one of it.
+                continue;
+            }
+
+            if (change.Strategy == XamlUpdateStrategy.ReorderChildren)
+            {
+                if (change.OldElement is not { } parent
+                    || change.NewElement is not { } reordered
+                    || XamlElementIdentity.Pair([.. parent.Elements], [.. reordered.Elements]) is not { } pairs)
+                {
+                    diagnostics.Add(MarkupDiagnostic.Synchronization(
+                        XamlLoaderDiagnosticCodes.UpdateNotApplied,
+                        $"{change} does not say which child went where.",
+                        MarkupDiagnosticSeverity.Error,
+                        Document.Uri));
+
+                    return false;
+                }
+
+                // The elements of the loaded document, in the order the new one gives them: the
+                // map is keyed by the document the objects were built from.
+                reorders.Add((parent, [.. pairs.Select(static pair => pair.Before)]));
+
                 continue;
             }
 
@@ -379,6 +402,16 @@ public sealed partial class XamlLoadSession
             string text = updatedElement.GetAttribute(XamlQualifiedName.Parse(name))?.GetValueText() ?? string.Empty;
 
             writes.Add((target, member, XamlValueConversion.Convert(member.ValueType, text, diagnostics)));
+        }
+
+        // Before anything is rebuilt: a reorder moves the objects that already exist, and a
+        // rebuild that ran first would have taken one of them out of the collection to be moved.
+        foreach ((XamlElement parent, IReadOnlyList<XamlElement> order) in reorders)
+        {
+            if (!XamlObjectReplacement.Reorder(Objects, parent, order, diagnostics))
+            {
+                return false;
+            }
         }
 
         foreach ((XamlDocumentChange change, object previous, object fresh, Uri? runtimeUri) in rebuilds)

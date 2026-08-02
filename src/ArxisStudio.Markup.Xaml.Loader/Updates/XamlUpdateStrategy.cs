@@ -26,6 +26,12 @@ public enum XamlUpdateStrategy
     /// <summary>A design-time value; the design value is updated, and only in design mode.</summary>
     UpdateDesignValue,
 
+    /// <summary>
+    /// Named siblings changed places; the objects that already exist are moved within the
+    /// collection that holds them, and nothing is built again.
+    /// </summary>
+    ReorderChildren,
+
     /// <summary>A value in a resource dictionary; the entry is replaced.</summary>
     ReplaceResource,
 

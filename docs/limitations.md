@@ -49,9 +49,17 @@ the document — see `docs/adr/0005-resource-includes.md` for why. That leaves f
 
 ## Updates
 
-- **Reordering reads as a structural change.** Elements are paired by position among their
-  siblings and nothing is matched across a move. Being cleverer risks giving a control the value
-  of whatever used to sit in its place, which is the one outcome worth being slow to avoid.
+- **Reordering is followed only where something names the elements.** An element that declares an
+  identity — `x:Name`, or `Name` where it means the same — is paired by it across a move, and the
+  objects that already exist are moved within the collection holding them rather than rebuilt.
+  Where no name decides — none declared, one declared twice, a child added or removed — pairing
+  falls back to position, and a move then reads as changed values or a rebuild. Being cleverer
+  than that risks giving a control the value of whatever used to sit in its place, which is the
+  one outcome worth being slow to avoid.
+- **A reorder needs a collection that holds exactly what the document declares.** The objects are
+  moved through the collection's own `Move`, so nothing is detached and a control keeps what it
+  was holding. A collection that also holds something no markup declared is one this cannot place
+  the rest of afterwards, and the update is refused rather than guessed at.
 - **A static resource rebuilds the element that declares the resources**, not the element that
   reads them. A reader built on its own has no dictionary to read, because a static reference is
   resolved against the resources in scope where the markup sits.

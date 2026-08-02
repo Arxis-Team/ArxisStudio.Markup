@@ -16,7 +16,7 @@ The current development scope is limited to the markup libraries described in th
 
 ## Status
 
-This is a greenfield project specification. The repository should be implemented incrementally according to the milestones in this document.
+Milestones 0 to 11 are implemented, and every item under *Definition of done for the first preview release* holds; that state is tagged `v0.1.0-preview`. Development continues from Milestone 12. This document stays the contract: the milestones below are the plan, not a record of what happened.
 
 The initial package family consists of:
 
@@ -1569,6 +1569,28 @@ Exit criteria:
 - Add stress and leak tests.
 - Document known limitations.
 - Prepare preview NuGet packages.
+
+### Milestone 12: Identity, includes at the root, and a fixed API
+
+The first three items are limitations recorded in `docs/limitations.md` during Milestone 11. Each
+is a case where the update path is conservative because it had no way to be sure, rather than
+because being conservative was right.
+
+- Give an element a declared identity — `x:Name`, or `Name` where it means the same — and pair
+  elements across an update by it before falling back to position.
+- Move the objects that already exist when siblings are reordered, instead of rebuilding them.
+- Update a resource that is included straight into the root element, instead of asking for a new
+  session.
+- Carry a rebuilt resource dictionary's merged dictionaries across, not only its entries.
+- Declare the public API of all three packages shipped, so that from then on a breaking change is
+  visible in a reviewable diff.
+
+Exit criteria:
+
+- reordering named siblings preserves object identity and runtime state;
+- a document whose root merges an include updates in place;
+- unnamed or ambiguous siblings still fall back to the conservative behaviour;
+- `PublicAPI.Shipped.txt` is populated for all three packages and the unshipped files are empty.
 
 ## Definition of done for the first preview release
 
