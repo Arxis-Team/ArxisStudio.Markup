@@ -65,6 +65,7 @@ internal sealed partial class InspectorView : UserControl
         ReportList.ItemsSource = _report.Rows;
         FilePath.Text = Path.GetFileName(DocumentPath);
         ToolTip.SetTip(FilePath, DocumentPath);
+        Controls.XamlEditor.Highlight(Markup);
 
         Tree.SelectionChanged += (_, _) =>
         {
@@ -143,7 +144,11 @@ internal sealed partial class InspectorView : UserControl
         ShowTree();
         ShowProperties();
         ShowHistory();
+        ShowMarkup();
     }
+
+    /// <summary>Shows the document as it now reads.</summary>
+    private void ShowMarkup() => Markup.Text = _session?.Document.GetText() ?? string.Empty;
 
     private void OnUndo(object? sender, RoutedEventArgs e) =>
         _ = Step(static workspace => workspace.Undo(), "Отменено");
@@ -281,6 +286,7 @@ internal sealed partial class InspectorView : UserControl
         }
 
         _report.Caption("ДИАГНОСТИКА").Diagnostics(result.Diagnostics, _session.Document.SourceText);
+        ShowMarkup();
 
         if (_session.GetElement(_selected!) is null)
         {
@@ -552,6 +558,7 @@ internal sealed partial class InspectorView : UserControl
 
         _report.Caption("ДИАГНОСТИКА").Diagnostics(result.Diagnostics, _session.Document.SourceText);
         ShowHistory();
+        ShowMarkup();
 
         // Setting a property changed the one attribute that was edited and nothing else, and the
         // row that was edited already shows what was typed in it. Rebuilding the rows here would

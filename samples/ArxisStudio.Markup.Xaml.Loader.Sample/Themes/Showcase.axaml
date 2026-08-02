@@ -262,6 +262,63 @@
     <Setter Property="Foreground" Value="{DynamicResource AppNegativeBrush}" />
   </Style>
 
+  <!--
+    Tabs inside a card. The headers stand in for the caption that used to sit there, so they are
+    written at a caption's weight and size rather than a tab's.
+  -->
+
+  <Style Selector="TabControl.panel">
+    <Setter Property="Template">
+      <ControlTemplate>
+        <DockPanel>
+          <ItemsPresenter Name="PART_ItemsPresenter"
+                          DockPanel.Dock="Top"
+                          ItemsPanel="{TemplateBinding ItemsPanel}"
+                          Margin="0,0,0,8" />
+          <ContentPresenter Name="PART_SelectedContentHost"
+                            Content="{TemplateBinding SelectedContent}"
+                            ContentTemplate="{TemplateBinding SelectedContentTemplate}" />
+        </DockPanel>
+      </ControlTemplate>
+    </Setter>
+    <Setter Property="ItemsPanel">
+      <ItemsPanelTemplate>
+        <StackPanel Orientation="Horizontal" Spacing="16" />
+      </ItemsPanelTemplate>
+    </Setter>
+  </Style>
+
+  <Style Selector="TabItem.tab">
+    <Setter Property="FontSize" Value="11" />
+    <Setter Property="FontWeight" Value="SemiBold" />
+    <Setter Property="LetterSpacing" Value="0.6" />
+    <Setter Property="Foreground" Value="{DynamicResource AppMutedBrush}" />
+    <Setter Property="Template">
+      <ControlTemplate>
+        <Border Name="PART_Underline"
+                Background="Transparent"
+                BorderBrush="Transparent"
+                BorderThickness="0,0,0,2"
+                Padding="0,0,0,5">
+          <ContentPresenter Content="{TemplateBinding Header}"
+                            ContentTemplate="{TemplateBinding HeaderTemplate}" />
+        </Border>
+      </ControlTemplate>
+    </Setter>
+  </Style>
+
+  <Style Selector="TabItem.tab:pointerover">
+    <Setter Property="Foreground" Value="{DynamicResource AppTextBrush}" />
+  </Style>
+
+  <Style Selector="TabItem.tab:selected">
+    <Setter Property="Foreground" Value="{DynamicResource AppAccentBrush}" />
+  </Style>
+
+  <Style Selector="TabItem.tab:selected /template/ Border#PART_Underline">
+    <Setter Property="BorderBrush" Value="{DynamicResource AppAccentBrush}" />
+  </Style>
+
   <!-- The navigation rail, which is a TabControl wearing different clothes. -->
 
   <Style Selector="TabControl.rail">
