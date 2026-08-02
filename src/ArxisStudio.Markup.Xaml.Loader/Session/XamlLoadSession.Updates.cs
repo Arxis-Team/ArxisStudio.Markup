@@ -134,15 +134,44 @@ public sealed partial class XamlLoadSession
         // a property on. What has to be built again is whatever element of the document the
         // include was expanded inside — every one of them, because which include's expansion
         // changed is not a question the projected text answers.
-        ImmutableArray<XamlDocumentChange> changes =
-        [
-            .. Document.GetResourceReferences()
-                .Select(reference => Host(reference.Element))
-                .OfType<XamlElement>()
-                .Distinct()
-                .Select(static host => new XamlDocumentChange(
-                    XamlUpdateStrategy.ReplaceResource, host, host, null) { ReplacesObject = true }),
-        ];
+        var hosts = new List<XamlElement>();
+        bool atRoot = false;
+
+        foreach (XamlResourceReference reference in Document.GetResourceReferences())
+        {
+            if (Host(reference.Element) is { } host)
+            {
+                if (!hosts.Contains(host))
+                {
+                    hosts.Add(host);
+                }
+            }
+            else
+            {
+                atRoot = true;
+            }
+        }
+
+        var builder = ImmutableArray.CreateBuilder<XamlDocumentChange>();
+
+        foreach (XamlElement host in hosts)
+        {
+            builder.Add(new XamlDocumentChange(XamlUpdateStrategy.ReplaceResource, host, host, null)
+            {
+                ReplacesObject = true,
+            });
+        }
+
+        // An include with nothing between it and the root — a theme file is nothing else — has no
+        // smaller element to rebuild. What is rebuilt is then the root's content rather than the
+        // root: the object itself stays, because the session is built around it and the caller
+        // holds it, and only what is inside it is built again.
+        if (atRoot && Document.Root is { } root)
+        {
+            builder.Add(new XamlDocumentChange(XamlUpdateStrategy.ReplaceResource, root, root, null));
+        }
+
+        ImmutableArray<XamlDocumentChange> changes = builder.ToImmutable();
 
         if (changes.IsEmpty)
         {
@@ -152,8 +181,8 @@ public sealed partial class XamlLoadSession
                 [],
                 diagnostics,
                 XamlLoaderDiagnosticCodes.UpdateRequiresNewSession,
-                $"'{XamlUri.ToDisplayString(resourceUri)}' is included straight into the root element, " +
-                "which cannot be rebuilt in place. Create a new session from the same document.");
+                $"'{XamlUri.ToDisplayString(resourceUri)}' is reached by no element of this document " +
+                "that can be rebuilt. Create a new session from the same document.");
         }
 
         return await ApplyAsync(Document, XamlUpdateStrategy.ReplaceResource, changes, diagnostics, cancellationToken)

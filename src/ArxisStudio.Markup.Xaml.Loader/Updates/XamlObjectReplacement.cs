@@ -284,6 +284,22 @@ internal static class XamlObjectReplacement
                     dictionary[key] = rebuilt[key];
                 }
 
+                // Merged dictionaries are not entries. A file that only merges other files has
+                // all of its content there and none of it under a key, so copying the keys alone
+                // would leave the old content in place and call it an update.
+                IResourceProvider[] merged = [.. rebuilt.MergedDictionaries];
+
+                dictionary.MergedDictionaries.Clear();
+
+                // Taken out of the copy first, for the same reason a control is: a provider that
+                // two dictionaries both hold has an owner that is no longer true.
+                rebuilt.MergedDictionaries.Clear();
+
+                foreach (IResourceProvider provider in merged)
+                {
+                    dictionary.MergedDictionaries.Add(provider);
+                }
+
                 return true;
 
             default:

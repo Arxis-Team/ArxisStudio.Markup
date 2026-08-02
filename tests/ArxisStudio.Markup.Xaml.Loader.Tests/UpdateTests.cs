@@ -651,6 +651,61 @@ public sealed class UpdateTests
     }
 
     [AvaloniaFact]
+    public async Task AnIncludeInTheRootElementIsUpdatedInPlace()
+    {
+        var resources = new InMemoryResourceResolver();
+        XamlLoadEnvironment defaults = XamlLoadEnvironment.CreateDefault();
+
+        string Dictionary(string colour) =>
+            $"<ResourceDictionary xmlns=\"{AvaloniaNamespace}\"\n" +
+            "                    xmlns:x=\"http://schemas.microsoft.com/winfx/2006/xaml\">\n" +
+            $"  <SolidColorBrush x:Key=\"Accent\" Color=\"{colour}\" />\n" +
+            "</ResourceDictionary>";
+
+        resources.Update(ColorsUri, Dictionary("Red"));
+
+        var environment = new XamlLoadEnvironment
+        {
+            SourceProvider = defaults.SourceProvider,
+            AssemblyResolver = defaults.AssemblyResolver,
+            TypeResolver = defaults.TypeResolver,
+            ResourceResolver = new CompositeResourceResolver(resources, defaults.ResourceResolver),
+        };
+
+        // A theme file: the document is a dictionary that merges other files, so every include in
+        // it sits straight inside the root and there is no smaller element to rebuild.
+        await using XamlLoadSession session = await XamlLoadSession.CreateAsync(
+            Parse(
+                $"<ResourceDictionary xmlns=\"{AvaloniaNamespace}\"\n" +
+                "                    xmlns:x=\"http://schemas.microsoft.com/winfx/2006/xaml\">\n" +
+                "  <ResourceDictionary.MergedDictionaries>\n" +
+                "    <ResourceInclude Source=\"/Themes/Colors.axaml\" />\n" +
+                "  </ResourceDictionary.MergedDictionaries>\n" +
+                "</ResourceDictionary>"),
+            environment,
+            cancellationToken: TestContext.Current.CancellationToken);
+
+        var dictionary = session.GetRoot<Avalonia.Controls.ResourceDictionary>();
+
+        Assert.True(dictionary.TryGetResource("Accent", null, out object? before));
+        Assert.Equal(Avalonia.Media.Colors.Red, ((Avalonia.Media.SolidColorBrush)before!).Color);
+
+        resources.Update(ColorsUri, Dictionary("Blue"));
+
+        XamlUpdateResult result = await session.ApplySourceUpdateAsync(
+            ColorsUri, TestContext.Current.CancellationToken);
+
+        Assert.True(result.Applied, string.Join(" | ", result.Diagnostics));
+        Assert.Equal(XamlUpdateStrategy.ReplaceResource, result.Strategy);
+
+        // The root object survives: a session is built around it and the caller holds it.
+        Assert.Same(dictionary, session.GetRoot<Avalonia.Controls.ResourceDictionary>());
+
+        Assert.True(dictionary.TryGetResource("Accent", null, out object? after));
+        Assert.Equal(Avalonia.Media.Colors.Blue, ((Avalonia.Media.SolidColorBrush)after!).Color);
+    }
+
+    [AvaloniaFact]
     public async Task AnUpdateThatAddsALineDoesNotBreakTheNextOne()
     {
         await using XamlLoadSession session = await Load(View("Text=\"before\""));

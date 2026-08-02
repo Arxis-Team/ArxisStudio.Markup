@@ -25,9 +25,9 @@ the document — see `docs/adr/0005-resource-includes.md` for why. That leaves f
   other attribute — an image source, say — cannot be found without CLR metadata about what that
   attribute means, and is not rebased. A fragment spliced from another folder can therefore carry
   a relative asset reference that resolves against the host's folder.
-- **An include straight inside the root element.** `ApplySourceUpdateAsync` rebuilds the element
-  the include was expanded inside. When that element is the document root there is no slot to put
-  a rebuilt object into, and `AXM3040` asks for a new session instead.
+- **An include straight inside the root element** — a theme file is nothing else — is rebuilt as
+  the root's *content*, since there is no slot to put a rebuilt root object into. The root object
+  itself survives, so the session and whatever the caller is holding keep working.
 
 ## Design mode
 
