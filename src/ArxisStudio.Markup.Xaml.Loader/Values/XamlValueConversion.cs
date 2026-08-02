@@ -1,5 +1,4 @@
 using System;
-using System.Collections.Generic;
 using System.ComponentModel;
 using System.Globalization;
 using System.Reflection;
@@ -10,22 +9,28 @@ namespace ArxisStudio.Markup.Xaml.Loader;
 /// Turns attribute text into the value a member holds.
 /// </summary>
 /// <remarks>
-/// The same conversion an edit and a design-time value both need, in one place. A converter that
-/// refuses the text is an ordinary user error — a diagnostic and the text unchanged — because
-/// the alternative is losing what the document said over a value the author is still typing.
+/// <para>
+/// The same conversion an edit, an update and a design-time value all need, in one place — and
+/// the same one a tool asks for through <see cref="XamlMemberDescriptor.ConvertFromText"/> before
+/// it writes anything, so that validating a field and writing it cannot disagree.
+/// </para>
+/// <para>
+/// Text the member cannot hold is an ordinary user error, so it comes back as a result. What each
+/// caller does with the refusal — which diagnostic code, which span — is the caller's, because
+/// only it knows where the text was written.
+/// </para>
 /// </remarks>
 internal static class XamlValueConversion
 {
-    /// <summary>Converts attribute text to a type.</summary>
+    /// <summary>Reads attribute text as a value of a type.</summary>
     /// <param name="targetType">The type the value has to end up as.</param>
     /// <param name="text">The text as the document wrote it.</param>
-    /// <param name="diagnostics">Collects a report when the conversion is refused.</param>
-    /// <returns>The converted value, or the text itself when it could not be converted.</returns>
-    internal static object? Convert(Type targetType, string text, List<MarkupDiagnostic> diagnostics)
+    /// <returns>The value, or what was wrong with the text.</returns>
+    internal static XamlValueConversionResult Convert(Type targetType, string text)
     {
         if (targetType == typeof(string) || targetType == typeof(object))
         {
-            return text;
+            return XamlValueConversionResult.FromValue(text);
         }
 
         try
@@ -34,7 +39,7 @@ internal static class XamlValueConversion
 
             if (converter.CanConvertFrom(typeof(string)))
             {
-                return converter.ConvertFromInvariantString(text);
+                return Held(targetType, converter.ConvertFromInvariantString(text), text);
             }
 
             // Not every type Avalonia writes as text declares a converter: Thickness, CornerRadius
@@ -42,17 +47,38 @@ internal static class XamlValueConversion
             // updated at runtime has to reach the same value the same text reached at load.
             if (Parse(targetType, text, out object? parsed))
             {
-                return parsed;
+                return Held(targetType, parsed, text);
             }
         }
         catch (Exception error) when (error is NotSupportedException or FormatException or ArgumentException)
         {
-            diagnostics.Add(MarkupDiagnostic.Load(
-                XamlLoaderDiagnosticCodes.TypeConverterFailure,
-                $"'{text}' could not be converted to {targetType.Name}: {error.Message}"));
+            return XamlValueConversionResult.FromError(
+                $"'{text}' could not be read as {targetType.Name}: {error.Message}");
         }
 
-        return text;
+        return XamlValueConversionResult.FromError(
+            $"{targetType.Name} has no way of being read from text, so '{text}' cannot be one.");
+    }
+
+    /// <summary>Reports a converted value, unless the member could not hold it after all.</summary>
+    /// <remarks>
+    /// A converter is free to answer with something else entirely, and a value of the wrong type
+    /// reaches an Avalonia setter as an exception. Checking here is what keeps that an ordinary
+    /// refusal rather than a throw out of an update.
+    /// </remarks>
+    private static XamlValueConversionResult Held(Type targetType, object? value, string text)
+    {
+        if (value is null)
+        {
+            return targetType.IsValueType && Nullable.GetUnderlyingType(targetType) is null
+                ? XamlValueConversionResult.FromError($"{targetType.Name} cannot be nothing.")
+                : XamlValueConversionResult.FromValue(null);
+        }
+
+        return targetType.IsInstanceOfType(value)
+            ? XamlValueConversionResult.FromValue(value)
+            : XamlValueConversionResult.FromError(
+                $"'{text}' was read as {value.GetType().Name}, which is not a {targetType.Name}.");
     }
 
     /// <summary>Converts through a static <c>Parse</c> the type declares, if it declares one.</summary>

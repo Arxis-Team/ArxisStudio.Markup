@@ -928,7 +928,11 @@ A tool offering a property list must be able to ask which members a type has rat
 ImmutableArray<XamlMemberDescriptor> members = session.GetMembers(target);
 ```
 
-Registered Avalonia properties, attached properties under their written `Owner.Member` names, and public CLR properties. Which of them are worth showing stays the tool's decision. The answer is not cached as a whole, because Avalonia registers an attached property in the static constructor of the type that declares it: `Grid.Row` becomes a member of every control only once something has caused `Grid` to be initialised.
+Avalonia's property system in the three shapes it has — styled and direct properties from `GetRegistered`, attached properties from `GetRegisteredAttached` under their written `Owner.Member` names — plus the public CLR properties around them. A property registered both ways is listed once, under its simple name. Which of them are worth showing stays the tool's decision.
+
+The answer is not cached as a whole, because Avalonia registers an attached property in the static constructor of the type that declares it: `Grid.Row` becomes a member of every control only once something has caused `Grid` to be initialised.
+
+What is cached — the descriptors — belongs to the environment rather than to the process. A tool that rebuilds the user's control library and loads it again builds a new environment, and what was known about the old assemblies goes with the old one; a process-wide cache would hold those types alive against a load context meant to be unloaded. See `docs/adr/0009-member-resolution-belongs-to-the-environment.md`.
 
 #### Controlled property editing
 
@@ -963,6 +967,14 @@ One operation must:
 If any required step fails, the operation must not leave document and object state silently inconsistent.
 
 Text is converted the way loading converts it — the member's `TypeConverter`, or the public static `Parse` that Avalonia types such as `Thickness` and `CornerRadius` are read by instead. Text the member cannot hold is an ordinary user error: a diagnostic with the attribute's span, the objects left as they were, and nothing thrown.
+
+The same conversion must be askable before anything is written, because a tool with a property field has to say whether what has been typed so far is a value at all:
+
+```csharp
+XamlValueConversionResult converted = member.ConvertFromText("6,0,4,0");
+```
+
+One implementation behind both, so that what a field says while it is being typed and what the document will do cannot drift apart. A markup extension is not a value of this kind and is not evaluated: resolving `{Binding Customer.Name}` is what a load does.
 
 #### Runtime values versus source expressions
 

@@ -36,6 +36,10 @@ types such as `Thickness` and `CornerRadius` are read by instead. Text the membe
 ordinary user error: a diagnostic with the attribute's span, `Applied` false, the objects untouched,
 and nothing thrown.
 
+A tool with a property field should ask before it writes — `XamlMemberDescriptor.ConvertFromText`
+is the same conversion with no side effects, so half a value never reaches the undo history. See
+[Loading](loading.md#is-this-text-a-value).
+
 ## Strategies
 
 In increasing order of what each costs and how much it disturbs. An update takes the smallest one

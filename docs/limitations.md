@@ -133,6 +133,15 @@ the document — see `docs/adr/0005-resource-includes.md` for why. That leaves f
   ask for them sees the list grow while it runs — but a list taken at startup is not the whole list.
 - **Which members are worth showing is not answered here.** A control has upwards of two hundred
   settable members. Listing them is the library's job; choosing among them is the tool's.
+- **What is known about a type belongs to the environment that resolved it.** Descriptors are cached
+  by `XamlLoadEnvironment.MemberResolver`, one per environment by default, so a tool that rebuilds
+  the user's assemblies builds a new environment and starts clean. Sharing one resolver between
+  environments shares the cache, including across a rebuild — which is the caller's decision to
+  make, and the reason it is not the default. `XamlMemberResolver.Instance` is process-wide and is
+  there for a caller with no environment.
+- **A property registered both as an ordinary and as an attached property is listed once**, under
+  its simple name. `KeyboardNavigation.IsTabStop` and `IsTabStop` are both valid XAML for the same
+  property; a tool that needs the qualified spelling writes it itself.
 
 ## Everything else
 

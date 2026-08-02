@@ -322,7 +322,7 @@ public sealed partial class XamlLoadSession
                 .InvokeAsync<object?>(
                     () =>
                     {
-                        XamlDesignValues.Apply(updated, Objects, RootObject, diagnostics);
+                        XamlDesignValues.Apply(updated, Objects, RootObject, Environment.MemberResolver, diagnostics);
 
                         return null;
                     },
@@ -459,7 +459,7 @@ public sealed partial class XamlLoadSession
                 return false;
             }
 
-            XamlMemberDescriptor member = XamlMemberResolver.Instance.Resolve(target.GetType(), name);
+            XamlMemberDescriptor member = Environment.MemberResolver.Resolve(target.GetType(), name);
 
             if (!member.IsResolved || member.IsReadOnly || !member.CanWrite)
             {
@@ -473,33 +473,33 @@ public sealed partial class XamlLoadSession
                 return false;
             }
 
-            string text = updatedElement.GetAttribute(XamlQualifiedName.Parse(name))?.GetValueText() ?? string.Empty;
-            object? value = XamlValueConversion.Convert(member.ValueType, text, diagnostics);
+            XamlAttribute? written = updatedElement.GetAttribute(XamlQualifiedName.Parse(name));
+            XamlValueConversionResult value = member.ConvertFromText(written?.GetValueText() ?? string.Empty);
 
-            // Checked here rather than found out by the setter throwing. A value the member cannot
-            // hold is an ordinary user error — half-typed text in an inspector, most of the time —
-            // and refusing before anything is written is what keeps the objects and the document
-            // from disagreeing over it.
-            if (!Holds(member.ValueType, value))
+            // Asked before anything is written rather than found out by the setter throwing. Text
+            // the member cannot hold is an ordinary user error — half a value, typed so far — and
+            // refusing now is what keeps the objects and the document from disagreeing over it.
+            if (!value.Succeeded)
             {
                 diagnostics.Add(MarkupDiagnostic.Synchronization(
                     XamlLoaderDiagnosticCodes.IncompatibleValue,
-                    $"'{text}' is not a {member.ValueType.Name}, which is what {target.GetType().Name}.{name} holds.",
+                    $"{target.GetType().Name}.{name} cannot be set: {value.Error}",
                     MarkupDiagnosticSeverity.Error,
                     Document.Uri,
-                    updatedElement.GetAttribute(XamlQualifiedName.Parse(name))?.Span ?? element.NameSpan));
+                    written?.Span ?? element.NameSpan));
 
                 return false;
             }
 
-            writes.Add((target, member, value));
+            writes.Add((target, member, value.Value));
         }
 
         // Before anything is rebuilt: a reorder moves the objects that already exist, and a
         // rebuild that ran first would have taken one of them out of the collection to be moved.
         foreach ((XamlElement parent, IReadOnlyList<XamlElement> order) in reorders)
         {
-            if (!XamlObjectReplacement.Reorder(Objects, parent, order, diagnostics))
+            if (!XamlObjectReplacement.Reorder(
+                Objects, parent, order, Environment.MemberResolver, diagnostics))
             {
                 return false;
             }
@@ -508,7 +508,8 @@ public sealed partial class XamlLoadSession
         foreach ((XamlDocumentChange change, object previous, object fresh, Uri? runtimeUri) in rebuilds)
         {
             bool replaced = change.ReplacesObject
-                ? XamlObjectReplacement.Replace(Objects, change.OldElement!, previous, fresh, diagnostics)
+                ? XamlObjectReplacement.Replace(
+                    Objects, change.OldElement!, previous, fresh, Environment.MemberResolver, diagnostics)
                 : XamlObjectReplacement.ReplaceContent(previous, fresh, change.OldElement!, diagnostics);
 
             if (!replaced)
@@ -559,17 +560,6 @@ public sealed partial class XamlLoadSession
         }
 
         return true;
-    }
-
-    /// <summary>Reports whether a member of a type can hold a value.</summary>
-    private static bool Holds(Type valueType, object? value)
-    {
-        if (value is null)
-        {
-            return !valueType.IsValueType || Nullable.GetUnderlyingType(valueType) is not null;
-        }
-
-        return valueType.IsInstanceOfType(value);
     }
 
     /// <summary>

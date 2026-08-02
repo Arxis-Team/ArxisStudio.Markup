@@ -144,15 +144,57 @@ To offer a property list, ask what the object has:
 ImmutableArray<XamlMemberDescriptor> members = session.GetMembers(control);
 ```
 
-Every registered Avalonia property the type carries, every attached property registered for it —
-under its written `Owner.Member` name — and its public CLR properties, ordered by name and without
-duplicates. Which of them are worth showing is still yours to decide: a control has upwards of two
+Avalonia's property system in the three shapes it has, plus the CLR properties around it: styled
+and direct properties of the type and its bases, attached properties registered for it — under the
+`Owner.Member` name a document writes them with — and public CLR properties. Ordered by name and
+without duplicates: a property registered both ways, as `KeyboardNavigation.IsTabStop` is, appears
+once under its simple name. Which of them are worth showing is still yours to decide: a control has upwards of two
 hundred settable members, which is a correct answer and a useless panel. What is answered here is
 which exist and what each one is.
 
 The answer can grow while your tool runs, and is deliberately not cached as a whole. Avalonia
 registers an attached property in the static constructor of the type that declares it, so `Grid.Row`
 becomes a member of every control only once something has caused `Grid` to be initialised.
+
+What *is* cached — the descriptors themselves — belongs to the environment:
+
+```csharp
+XamlMemberResolver members = environment.MemberResolver;   // one per environment by default
+
+var shared = new XamlLoadEnvironment
+{
+    SourceProvider = provider,
+    AssemblyResolver = assemblies,
+    TypeResolver = types,
+    ResourceResolver = resources,
+    MemberResolver = cacheSharedWithAnotherEnvironment,
+};
+```
+
+That matters for a tool that rebuilds the user's control library and loads it again: build a new
+environment for the new assemblies and what was known about the old ones goes with the old one. A
+process-wide cache would hold those types alive against a collectible load context and go on
+answering about a build that no longer exists. `XamlMemberResolver.Instance` remains for a caller
+with no environment at all.
+
+### Is this text a value?
+
+```csharp
+XamlValueConversionResult converted = member.ConvertFromText("6,0,4,0");
+
+if (!converted.Succeeded)
+{
+    ShowError(converted.Error);   // "'…' could not be read as Thickness: …"
+}
+```
+
+The conversion an update performs, asked in advance and writing nothing — which is how a property
+field says that what has been typed so far is not a value yet, without creating an undo entry and
+watching the update roll it back. The member's `TypeConverter` first, then the public static
+`Parse` that Avalonia types such as `Thickness` and `CornerRadius` are read by instead.
+
+Markup extensions are not values of this kind: `{Binding Customer.Name}` is resolved by a load, so
+check for one with `XamlValue.Parse` before asking.
 
 ## Values
 

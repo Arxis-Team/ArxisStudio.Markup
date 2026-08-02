@@ -29,6 +29,12 @@ public sealed class XamlMemberResolver
     private readonly ConcurrentDictionary<(Type Target, string Name), XamlMemberDescriptor> _cache = new();
 
     /// <summary>Gets the shared instance.</summary>
+    /// <remarks>
+    /// For a caller with no <see cref="XamlLoadEnvironment"/> to hand. A session uses its
+    /// environment's resolver instead, so that what is cached about an assembly's types is
+    /// discarded with the environment that resolved them rather than held for the life of the
+    /// process — see <see cref="XamlLoadEnvironment.MemberResolver"/>.
+    /// </remarks>
     public static XamlMemberResolver Instance { get; } = new();
 
     /// <summary>
@@ -36,10 +42,39 @@ public sealed class XamlMemberResolver
     /// </summary>
     /// <remarks>
     /// <para>
-    /// Every registered Avalonia property the type carries, plus its public writable CLR
-    /// properties. A tool that offers a property list needs this; working it out from the
-    /// registry and reflection is the same code in every such tool, and getting the attached
-    /// ones right is the part people get wrong.
+    /// Avalonia's property system is what this reads, in the three shapes it has, plus the CLR
+    /// properties around it:
+    /// </para>
+    /// <list type="bullet">
+    /// <item>
+    /// <description>
+    /// <b>Styled and direct properties</b> — everything <c>GetRegistered</c> answers for the type
+    /// and its bases. A direct property is registered like any other and is told apart by
+    /// <see cref="XamlMemberKind.DirectProperty"/>; the difference matters to a tool because a
+    /// direct property has no styling and can be read-only in a way a styled one is not.
+    /// </description>
+    /// </item>
+    /// <item>
+    /// <description>
+    /// <b>Attached properties</b> — <c>GetRegisteredAttached</c>, which answers by the type the
+    /// property attaches <i>to</i>. They are named <c>Owner.Member</c>, because that is how a
+    /// document writes them, and a list built from simple names alone would contain none of them.
+    /// </description>
+    /// </item>
+    /// <item>
+    /// <description>
+    /// <b>Public CLR properties</b> — what a plain object exposes, and what a control adds beyond
+    /// its registered properties. A collection-valued one is <see cref="XamlMemberKind.Collection"/>
+    /// and the one carrying <c>[Content]</c> is <see cref="XamlMemberKind.Content"/>, because both
+    /// change what writing to them means.
+    /// </description>
+    /// </item>
+    /// </list>
+    /// <para>
+    /// A property registered both ways — <c>KeyboardNavigation.IsTabStop</c> is also an ordinary
+    /// property of every control — is listed once, under its simple name. Both spellings are
+    /// valid XAML, but they are one property, and offering it twice invites a panel to show two
+    /// rows that write to the same value.
     /// </para>
     /// <para>
     /// Which of them are worth showing is still the tool's decision — a hundred inherited
@@ -72,7 +107,14 @@ public sealed class XamlMemberResolver
 
         if (typeof(AvaloniaObject).IsAssignableFrom(targetType))
         {
-            foreach (AvaloniaProperty property in AvaloniaPropertyRegistry.Instance.GetRegistered(targetType))
+            // Styled and direct properties of the type and its bases, under the simple name a
+            // document writes them with.
+            IReadOnlyList<AvaloniaProperty> registered =
+                AvaloniaPropertyRegistry.Instance.GetRegistered(targetType);
+
+            var known = new HashSet<AvaloniaProperty>(registered);
+
+            foreach (AvaloniaProperty property in registered)
             {
                 if (names.Add(property.Name))
                 {
@@ -80,10 +122,18 @@ public sealed class XamlMemberResolver
                 }
             }
 
-            // Attached properties are written as Owner.Member and are not registered on the type
-            // that carries them, so the simple name alone would never find them.
+            // Attached properties answer to the type they attach to rather than to the one that
+            // declares them, and are written Owner.Member — so a list built from simple names
+            // alone would contain none of them.
             foreach (AvaloniaProperty property in AvaloniaPropertyRegistry.Instance.GetRegisteredAttached(targetType))
             {
+                // Registered both ways: the same property, already listed under the name a
+                // document is more likely to write it with.
+                if (known.Contains(property))
+                {
+                    continue;
+                }
+
                 string name = $"{property.OwnerType.Name}.{property.Name}";
 
                 if (names.Add(name))

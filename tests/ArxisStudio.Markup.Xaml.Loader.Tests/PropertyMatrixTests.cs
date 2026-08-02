@@ -5,6 +5,7 @@ using System.Threading.Tasks;
 using ArxisStudio.Markup.Xaml.Loader.TestControls;
 using Avalonia;
 using Avalonia.Controls;
+using Avalonia.Input;
 using Avalonia.Layout;
 using Avalonia.Headless.XUnit;
 using Xunit;
@@ -463,6 +464,88 @@ public sealed class PropertyMatrixTests
         Assert.False(result.Applied);
         Assert.Contains(result.Diagnostics, static d => d.Severity == MarkupDiagnosticSeverity.Error);
     }
+    [AvaloniaFact]
+    public async Task AMemberSaysWhetherTextIsAValueBeforeAnythingIsWritten()
+    {
+        await using XamlLoadSession session = await Load($"<Border xmlns=\"{AvaloniaNamespace}\" />");
+
+        var border = session.GetRoot<Border>();
+        XamlMemberDescriptor margin = session.GetMember(border, nameof(Border.Margin));
+
+        XamlValueConversionResult good = margin.ConvertFromText("6,0,4,0");
+
+        Assert.True(good.Succeeded);
+        Assert.Equal(new Thickness(6, 0, 4, 0), good.Value);
+        Assert.Null(good.Error);
+
+        // What an inspector shows under a field it will not let through, without having touched
+        // the document to find out.
+        XamlValueConversionResult bad = margin.ConvertFromText("ерунда");
+
+        Assert.False(bad.Succeeded);
+        Assert.NotNull(bad.Error);
+        Assert.Equal(new Thickness(0), border.Margin);
+        Assert.Equal("<Border xmlns=\"" + AvaloniaNamespace + "\" />", session.Document.GetText());
+    }
+
+    [AvaloniaFact]
+    public async Task ConvertingAnswersForEveryKindOfMemberAndForNoMemberAtAll()
+    {
+        await using XamlLoadSession session = await Load($"<Border xmlns=\"{AvaloniaNamespace}\" />");
+
+        var border = session.GetRoot<Border>();
+
+        // A styled property of a value type, an enum, and a member the type does not have.
+        Assert.Equal(320d, session.GetMember(border, "Width").ConvertFromText("320").Value);
+        Assert.Equal(
+            HorizontalAlignment.Center,
+            session.GetMember(border, "HorizontalAlignment").ConvertFromText("Center").Value);
+        Assert.False(session.GetMember(border, "NotAMemberOfAnything").ConvertFromText("x").Succeeded);
+
+        // The refusal a designer most often shows: right kind of text, wrong kind of value.
+        Assert.False(session.GetMember(border, "Width").ConvertFromText("wide").Succeeded);
+    }
+
+    [AvaloniaFact]
+    public async Task AMemberRegisteredBothWaysIsOfferedOnce()
+    {
+        await using XamlLoadSession session = await Load($"<Border xmlns=\"{AvaloniaNamespace}\" />");
+
+        _ = KeyboardNavigation.IsTabStopProperty;
+
+        ImmutableArray<XamlMemberDescriptor> members = session.GetMembers(session.GetRoot<Border>());
+
+        // IsTabStop is an ordinary property of every control and an attached property of
+        // KeyboardNavigation. Both spellings load; they are one property, and a panel offering
+        // both would show two rows writing to the same value.
+        Assert.Single(members, member => member.Name == "IsTabStop");
+        Assert.DoesNotContain(members, member => member.Name == "KeyboardNavigation.IsTabStop");
+    }
+
+    [AvaloniaFact]
+    public async Task WhatIsKnownAboutATypeBelongsToTheEnvironmentThatResolvedIt()
+    {
+        XamlLoadEnvironment first = Environment();
+        XamlLoadEnvironment second = Environment();
+
+        Assert.NotSame(first.MemberResolver, second.MemberResolver);
+
+        await using XamlLoadSession session = await XamlLoadSession.CreateAsync(
+            XamlDocument.Parse($"<Border xmlns=\"{AvaloniaNamespace}\" />"),
+            first,
+            cancellationToken: TestContext.Current.CancellationToken);
+
+        // The session asks its own environment, so a tool that rebuilds the user's assemblies
+        // and builds a new environment is not answered from what the old one cached.
+        Assert.Same(
+            first.MemberResolver.Resolve(typeof(Border), "Width"),
+            session.GetMember(session.GetRoot<Border>(), "Width"));
+
+        Assert.NotSame(
+            second.MemberResolver.Resolve(typeof(Border), "Width"),
+            session.GetMember(session.GetRoot<Border>(), "Width"));
+    }
+
 
 
 

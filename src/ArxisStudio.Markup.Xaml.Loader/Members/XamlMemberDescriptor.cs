@@ -79,6 +79,35 @@ public sealed class XamlMemberDescriptor
     /// <summary>Gets a value indicating whether the member resolved to anything at all.</summary>
     public bool IsResolved => Kind != XamlMemberKind.Unknown;
 
+    /// <summary>
+    /// Reads attribute text as a value of this member, without writing anything.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// The conversion an update performs, asked in advance. A property field in an inspector uses
+    /// it to say whether what has been typed so far is a value at all — <c>6,0,0,0</c> against a
+    /// <c>Thickness</c>, <c>Bold</c> against a <c>FontWeight</c> — without touching the document,
+    /// creating an undo entry, or waiting for the objects to refuse it.
+    /// </para>
+    /// <para>
+    /// The member's <see cref="System.ComponentModel.TypeConverter"/> first, then the public
+    /// static <c>Parse</c> that Avalonia types such as <c>Thickness</c> and <c>CornerRadius</c>
+    /// are read by instead of declaring a converter. A markup extension — <c>{Binding Name}</c> — is not text of this
+    /// kind and is not evaluated here: that is a question for the load, not for a value.
+    /// </para>
+    /// </remarks>
+    /// <param name="text">The text as a document would write it, between the quotes.</param>
+    /// <returns>The value, or what is wrong with the text.</returns>
+    /// <exception cref="ArgumentNullException"><paramref name="text"/> is <see langword="null"/>.</exception>
+    public XamlValueConversionResult ConvertFromText(string text)
+    {
+        ArgumentNullException.ThrowIfNull(text);
+
+        return IsResolved
+            ? XamlValueConversion.Convert(ValueType, text)
+            : XamlValueConversionResult.FromError($"'{Name}' is not a member of {TargetType.Name}.");
+    }
+
     /// <summary>Returns the member's kind, name and value type.</summary>
     /// <returns>A readable description of the member.</returns>
     public override string ToString() => $"{Kind} {DeclaringType.Name}.{Name} : {ValueType.Name}";

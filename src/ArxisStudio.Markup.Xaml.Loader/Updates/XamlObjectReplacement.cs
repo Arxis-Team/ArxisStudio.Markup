@@ -28,6 +28,7 @@ internal static class XamlObjectReplacement
     /// <param name="element">The element whose object is being replaced.</param>
     /// <param name="previous">The object to replace.</param>
     /// <param name="fresh">The object to put in its place.</param>
+    /// <param name="members">What decides which member of the holder the element sits in.</param>
     /// <param name="diagnostics">Collects a report when there is nowhere to put it.</param>
     /// <returns><see langword="true"/> if the object was replaced.</returns>
     internal static bool Replace(
@@ -35,6 +36,7 @@ internal static class XamlObjectReplacement
         XamlElement element,
         object previous,
         object fresh,
+        XamlMemberResolver members,
         List<MarkupDiagnostic> diagnostics)
     {
         if (Owner(objects, element) is not var (owner, memberName))
@@ -47,7 +49,7 @@ internal static class XamlObjectReplacement
             return Fail(element, diagnostics, "the element that holds it produced no object");
         }
 
-        object? slot = memberName is null ? owner : Read(owner, memberName);
+        object? slot = memberName is null ? owner : Read(owner, memberName, members);
 
         if (slot is IResourceDictionary dictionary && ReplaceInDictionary(dictionary, previous, fresh))
         {
@@ -62,7 +64,7 @@ internal static class XamlObjectReplacement
         // A single-valued slot: a Template, a Content, a Child. Setting it is the replacement.
         if (memberName is not null)
         {
-            return Write(owner, memberName, fresh, diagnostics)
+            return Write(owner, memberName, fresh, members, diagnostics)
                 || Fail(element, diagnostics, $"{memberName} could not be written");
         }
 
@@ -105,15 +107,17 @@ internal static class XamlObjectReplacement
     /// <param name="objects">Which element each object came from.</param>
     /// <param name="parent">The element whose children changed places.</param>
     /// <param name="order">Its children as they were, in the order the new document gives them.</param>
+    /// <param name="members">What decides which member holds the children.</param>
     /// <param name="diagnostics">Collects a report when the order cannot be applied.</param>
     /// <returns><see langword="true"/> if the children were reordered.</returns>
     internal static bool Reorder(
         XamlObjectMap objects,
         XamlElement parent,
         IReadOnlyList<XamlElement> order,
+        XamlMemberResolver members,
         List<MarkupDiagnostic> diagnostics)
     {
-        if (Children(objects, parent) is not { } slot)
+        if (Children(objects, parent, members) is not { } slot)
         {
             return FailOrder(parent, diagnostics, "nothing in this document holds them");
         }
@@ -135,7 +139,7 @@ internal static class XamlObjectReplacement
     }
 
     /// <summary>Finds the collection an element's children live in.</summary>
-    private static object? Children(XamlObjectMap objects, XamlElement parent)
+    private static object? Children(XamlObjectMap objects, XamlElement parent, XamlMemberResolver members)
     {
         // A property element names the member the children belong to; the object that has that
         // member is its own parent.
@@ -144,7 +148,7 @@ internal static class XamlObjectReplacement
             return parent.Parent is XamlElement owner
                 && parent.MemberName is { } memberName
                 && objects.GetObject(owner) is { } target
-                    ? Read(target, memberName)
+                    ? Read(target, memberName, members)
                     : null;
         }
 
@@ -395,9 +399,9 @@ internal static class XamlObjectReplacement
         return true;
     }
 
-    private static object? Read(object owner, string memberName)
+    private static object? Read(object owner, string memberName, XamlMemberResolver members)
     {
-        XamlMemberDescriptor member = XamlMemberResolver.Instance.Resolve(owner.GetType(), memberName);
+        XamlMemberDescriptor member = members.Resolve(owner.GetType(), memberName);
 
         return member switch
         {
@@ -408,9 +412,14 @@ internal static class XamlObjectReplacement
         };
     }
 
-    private static bool Write(object owner, string memberName, object? value, List<MarkupDiagnostic> diagnostics)
+    private static bool Write(
+        object owner,
+        string memberName,
+        object? value,
+        XamlMemberResolver members,
+        List<MarkupDiagnostic> diagnostics)
     {
-        XamlMemberDescriptor member = XamlMemberResolver.Instance.Resolve(owner.GetType(), memberName);
+        XamlMemberDescriptor member = members.Resolve(owner.GetType(), memberName);
 
         if (!member.IsResolved || member.IsReadOnly || !member.CanWrite)
         {

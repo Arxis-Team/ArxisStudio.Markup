@@ -543,6 +543,20 @@ internal sealed partial class InspectorView : UserControl
             return;
         }
 
+        // Asked before the document is touched at all. Writing text the member cannot hold would
+        // create an undo entry, fail on the objects, and roll itself back — three events for a
+        // half-typed value. The library answers the same question the update would ask.
+        if (Selection is { } selected
+            && XamlValue.Parse(text) is not XamlMarkupExtensionValue
+            && _session.GetMember(selected, name).ConvertFromText(text) is { Succeeded: false } refused)
+        {
+            _report.Clear()
+                .Field("не записано", $"{element.Name.LocalName}.{name}")
+                .Note(refused.Error ?? string.Empty);
+
+            return;
+        }
+
         string action = $"{element.Name.LocalName}.{name}";
 
         XamlDocument edited = _workspace.Apply(

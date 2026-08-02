@@ -74,11 +74,13 @@ internal static class XamlDesignValues
     /// <param name="document">The document that was loaded.</param>
     /// <param name="objects">Which element each object came from.</param>
     /// <param name="root">The object the document produced.</param>
+    /// <param name="members">What decides which member a design-time name shadows.</param>
     /// <param name="diagnostics">Collects everything noticed on the way.</param>
     internal static void Apply(
         XamlDocument document,
         XamlObjectMap objects,
         object root,
+        XamlMemberResolver members,
         List<MarkupDiagnostic> diagnostics)
     {
         ApplyDesignSurface(root);
@@ -96,7 +98,7 @@ internal static class XamlDesignValues
 
                 if (!IsUnderstood(attribute.Name.LocalName))
                 {
-                    ApplyShadowValue(document, objects, element, attribute, diagnostics);
+                    ApplyShadowValue(document, objects, element, attribute, members, diagnostics);
                 }
                 else if (isRoot)
                 {
@@ -176,6 +178,7 @@ internal static class XamlDesignValues
         XamlObjectMap objects,
         XamlElement element,
         XamlAttribute attribute,
+        XamlMemberResolver members,
         List<MarkupDiagnostic> diagnostics)
     {
         string name = attribute.Name.LocalName;
@@ -208,7 +211,7 @@ internal static class XamlDesignValues
             return;
         }
 
-        XamlMemberDescriptor member = XamlMemberResolver.Instance.Resolve(target.GetType(), name);
+        XamlMemberDescriptor member = members.Resolve(target.GetType(), name);
 
         if (!member.IsResolved || member.IsReadOnly || !member.CanWrite)
         {
@@ -224,11 +227,23 @@ internal static class XamlDesignValues
             return;
         }
 
-        object? value = XamlValueConversion.Convert(member.ValueType, literal.Text, diagnostics);
+        XamlValueConversionResult value = member.ConvertFromText(literal.Text);
+
+        if (!value.Succeeded)
+        {
+            diagnostics.Add(MarkupDiagnostic.Load(
+                XamlLoaderDiagnosticCodes.TypeConverterFailure,
+                $"'{attribute.Name}' could not be applied: {value.Error}",
+                MarkupDiagnosticSeverity.Warning,
+                document.Uri,
+                attribute.Span));
+
+            return;
+        }
 
         try
         {
-            Write(target, member, value);
+            Write(target, member, value.Value);
         }
         catch (Exception error) when (error is InvalidCastException or ArgumentException or InvalidOperationException)
         {

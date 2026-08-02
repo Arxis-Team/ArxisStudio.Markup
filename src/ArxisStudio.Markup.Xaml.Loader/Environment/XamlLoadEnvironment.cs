@@ -47,6 +47,25 @@ public sealed class XamlLoadEnvironment
     /// <summary>Gets services made available to markup extensions and type converters.</summary>
     public IServiceProvider? Services { get; init; }
 
+    /// <summary>Gets what decides which member of which kind a name on a type is.</summary>
+    /// <remarks>
+    /// <para>
+    /// One per environment, because what it caches is CLR metadata about the assemblies this
+    /// environment resolves. A tool that rebuilds the user's control library and loads it again —
+    /// which is what a designer does all day — builds a new environment for the new assemblies,
+    /// and the answers about the old ones go with the old one. A cache that outlived the
+    /// environment would hand out descriptors of types nobody can load any more, and hold those
+    /// types alive against a collectible load context that was meant to be unloaded.
+    /// </para>
+    /// <para>
+    /// Set it when building an environment by hand to share the cache between environments that
+    /// resolve the same assemblies — which is a decision worth making on purpose, because a shared
+    /// cache survives the rebuild the separate environments existed to isolate.
+    /// <see cref="XamlMemberResolver.Instance"/> remains for a caller with no environment at all.
+    /// </para>
+    /// </remarks>
+    public XamlMemberResolver MemberResolver { get; init; } = new();
+
     /// <summary>
     /// Builds an environment over the assemblies the caller supplies plus those already loaded.
     /// </summary>

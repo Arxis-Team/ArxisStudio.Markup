@@ -191,7 +191,8 @@ public sealed partial class XamlLoadSession : IAsyncDisposable
                 .InvokeAsync<object?>(
                     () =>
                     {
-                        XamlDesignValues.Apply(document, session.Objects, root, diagnostics);
+                        XamlDesignValues.Apply(
+                            document, session.Objects, root, environment.MemberResolver, diagnostics);
 
                         return null;
                     },

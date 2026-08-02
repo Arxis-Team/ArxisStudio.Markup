@@ -81,7 +81,7 @@ public sealed partial class XamlLoadSession
         ArgumentNullException.ThrowIfNull(name);
         VerifyAccess();
 
-        return XamlMemberResolver.Instance.Resolve(target.GetType(), name);
+        return Environment.MemberResolver.Resolve(target.GetType(), name);
     }
 
     /// <summary>
@@ -127,7 +127,7 @@ public sealed partial class XamlLoadSession
         ArgumentNullException.ThrowIfNull(target);
         ObjectDisposedException.ThrowIf(_disposed, this);
 
-        return XamlMemberResolver.Instance.Enumerate(target.GetType());
+        return Environment.MemberResolver.Enumerate(target.GetType());
     }
 
     /// <summary>
@@ -166,7 +166,7 @@ public sealed partial class XamlLoadSession
         ArgumentNullException.ThrowIfNull(property);
         VerifyAccess();
 
-        XamlMemberDescriptor member = XamlMemberResolver.Instance.Resolve(target.GetType(), property);
+        XamlMemberDescriptor member = Environment.MemberResolver.Resolve(target.GetType(), property);
 
         if (Reject(member, property, out XamlEditResult? rejected))
         {
@@ -231,7 +231,7 @@ public sealed partial class XamlLoadSession
         ArgumentNullException.ThrowIfNull(value);
         VerifyAccess();
 
-        XamlMemberDescriptor member = XamlMemberResolver.Instance.Resolve(target.GetType(), property);
+        XamlMemberDescriptor member = Environment.MemberResolver.Resolve(target.GetType(), property);
 
         if (Reject(member, property, out XamlEditResult? rejected))
         {
@@ -244,7 +244,18 @@ public sealed partial class XamlLoadSession
 
         if (value is XamlLiteralValue literal)
         {
-            return SetValue(target, property, Convert(property, literal.Text, diagnostics));
+            XamlValueConversionResult converted = member.ConvertFromText(literal.Text);
+
+            if (!converted.Succeeded)
+            {
+                // The same refusal an update would report, said before either side is touched.
+                return Failure(
+                    diagnostics,
+                    XamlLoaderDiagnosticCodes.IncompatibleValue,
+                    $"{target.GetType().Name}.{property.Name} cannot be set: {converted.Error}");
+            }
+
+            return SetValue(target, property, converted.Value);
         }
 
         // An expression cannot be evaluated here — resolving it is what a load does. The
@@ -345,10 +356,6 @@ public sealed partial class XamlLoadSession
 
         return element?.GetAttribute(property.Name)?.GetValue() ?? XamlValue.Unset;
     }
-
-    /// <summary>Converts attribute text to the type a property holds.</summary>
-    private static object? Convert(AvaloniaProperty property, string text, List<MarkupDiagnostic> diagnostics) =>
-        XamlValueConversion.Convert(property.PropertyType, text, diagnostics);
 
     /// <summary>Renders a value as the document would write it.</summary>
     private static string Format(object? value) => value switch

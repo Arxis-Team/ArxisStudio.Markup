@@ -103,7 +103,7 @@ internal static class XamlAttributeChecks
             return;
         }
 
-        if (XamlMemberResolver.Instance.Resolve(type, attribute.Name.LocalName).Kind != XamlMemberKind.Event)
+        if (environment.MemberResolver.Resolve(type, attribute.Name.LocalName).Kind != XamlMemberKind.Event)
         {
             return;
         }
