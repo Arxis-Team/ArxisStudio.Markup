@@ -21,7 +21,7 @@
         <Setter Property="Template">
           <ControlTemplate>
             <Border Background="#FFFAFAFA"
-                    BorderBrush="#FFD9DDE3"
+                    BorderBrush="#FFCBD2DC"
                     BorderThickness="1"
                     CornerRadius="6"
                     Padding="{TemplateBinding Padding}">

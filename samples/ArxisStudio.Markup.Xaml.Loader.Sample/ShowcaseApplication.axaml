@@ -2,31 +2,34 @@
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:reporting="using:ArxisStudio.Markup.Xaml.Loader.Sample.Reporting"
              x:Class="ArxisStudio.Markup.Xaml.Loader.Sample.ShowcaseApplication"
-             RequestedThemeVariant="Dark">
+             RequestedThemeVariant="Light">
 
   <!--
     One palette, named once. Not a pair of theme dictionaries: what the showcase is made of is
     class styles, and a DynamicResource inside a style setter is not resolved against the control
     asking for it, so it never sees the variant that control is wearing. Two sets would look like
-    a choice the window does not actually offer. The Fluent theme above is told which variant to
-    wear, and the surface a previewed document is drawn on holds a light scope of its own whatever
-    this window wears — which is the only variant boundary here that means anything.
+    a choice the window does not actually offer. The variant above is what the Fluent theme wears,
+    and these colours are chosen to match it.
+
+    The surface a previewed document is drawn on holds a light scope of its own regardless. It
+    reads as no difference now, and that is the point: it is the document's variant rather than
+    the window's, and it would stay light if this palette went dark tomorrow.
   -->
   <Application.Resources>
     <ResourceDictionary>
 
-      <SolidColorBrush x:Key="AppBackgroundBrush" Color="#12141A" />
-      <SolidColorBrush x:Key="AppPanelBrush" Color="#191C23" />
-      <SolidColorBrush x:Key="AppElevatedBrush" Color="#20242D" />
-      <SolidColorBrush x:Key="AppBorderBrush" Color="#2B303A" />
-      <SolidColorBrush x:Key="AppTextBrush" Color="#E7EAF0" />
-      <SolidColorBrush x:Key="AppMutedBrush" Color="#98A1B0" />
-      <SolidColorBrush x:Key="AppAccentBrush" Color="#6BA1FF" />
-      <SolidColorBrush x:Key="AppAccentSoftBrush" Color="#1E2A45" />
-      <SolidColorBrush x:Key="AppPositiveBrush" Color="#56C08A" />
-      <SolidColorBrush x:Key="AppNegativeBrush" Color="#E4707A" />
-      <SolidColorBrush x:Key="AppWarningBrush" Color="#D8A657" />
-      <SolidColorBrush x:Key="AppCodeBrush" Color="#0E1015" />
+      <SolidColorBrush x:Key="AppBackgroundBrush" Color="#EEF0F4" />
+      <SolidColorBrush x:Key="AppPanelBrush" Color="#FFFFFF" />
+      <SolidColorBrush x:Key="AppElevatedBrush" Color="#F2F4F8" />
+      <SolidColorBrush x:Key="AppBorderBrush" Color="#DCE0E7" />
+      <SolidColorBrush x:Key="AppTextBrush" Color="#16191F" />
+      <SolidColorBrush x:Key="AppMutedBrush" Color="#5A6472" />
+      <SolidColorBrush x:Key="AppAccentBrush" Color="#2A63CC" />
+      <SolidColorBrush x:Key="AppAccentSoftBrush" Color="#E4EDFC" />
+      <SolidColorBrush x:Key="AppPositiveBrush" Color="#17805A" />
+      <SolidColorBrush x:Key="AppNegativeBrush" Color="#C0392F" />
+      <SolidColorBrush x:Key="AppWarningBrush" Color="#8A6209" />
+      <SolidColorBrush x:Key="AppCodeBrush" Color="#F1F3F7" />
 
       <FontFamily x:Key="AppMonoFont">Cascadia Mono,Consolas,DejaVu Sans Mono,monospace</FontFamily>
 
