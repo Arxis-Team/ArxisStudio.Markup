@@ -1614,7 +1614,7 @@ The first preview release is ready when all of the following are true:
 
 ## Out of scope
 
-The following are explicitly outside the current repository scope:
+The following are explicitly outside the scope of the three packages. A sample may demonstrate what a host builds on top of them, provided it is built on the published API and adds nothing to `src/` — see `docs/adr/0006-inspector-in-the-sample.md`.
 
 - visual designer or form designer;
 - selection adorners;

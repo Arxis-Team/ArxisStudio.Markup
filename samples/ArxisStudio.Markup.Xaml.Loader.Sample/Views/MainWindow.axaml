@@ -56,6 +56,16 @@
       <TabItem Classes="nav">
         <TabItem.Header>
           <StackPanel>
+            <TextBlock Classes="nav-title" Text="Инспектор" />
+            <TextBlock Classes="nav-sub" Text="правьте свойства — они уходят в файл и в дерево" />
+          </StackPanel>
+        </TabItem.Header>
+        <views:InspectorView />
+      </TabItem>
+
+      <TabItem Classes="nav">
+        <TabItem.Header>
+          <StackPanel>
             <TextBlock Classes="nav-title" Text="Документ" />
             <TextBlock Classes="nav-sub" Text="обратная запись, восстановление и одна аккуратная правка" />
           </StackPanel>

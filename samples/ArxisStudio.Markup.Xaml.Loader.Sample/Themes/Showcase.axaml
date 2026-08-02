@@ -186,6 +186,40 @@
     <Setter Property="BorderBrush" Value="{DynamicResource AppAccentBrush}" />
   </Style>
 
+  <!-- Inspector rows. -->
+
+  <Style Selector="ListBox.tree">
+    <Setter Property="Background" Value="Transparent" />
+    <Setter Property="BorderThickness" Value="0" />
+    <Setter Property="Padding" Value="0" />
+  </Style>
+
+  <Style Selector="ListBox.tree ListBoxItem">
+    <Setter Property="Padding" Value="8,5" />
+    <Setter Property="MinHeight" Value="0" />
+    <Setter Property="CornerRadius" Value="5" />
+  </Style>
+
+  <Style Selector="TextBox.field">
+    <Setter Property="FontSize" Value="12" />
+    <Setter Property="Padding" Value="7,3" />
+    <Setter Property="MinHeight" Value="0" />
+    <Setter Property="CornerRadius" Value="4" />
+  </Style>
+
+  <!-- A value the document states as an expression: shown, and deliberately not editable. -->
+  <Style Selector="Border.expression">
+    <Setter Property="Background" Value="{DynamicResource AppCodeBrush}" />
+    <Setter Property="BorderBrush" Value="{DynamicResource AppBorderBrush}" />
+    <Setter Property="BorderThickness" Value="1" />
+    <Setter Property="CornerRadius" Value="4" />
+    <Setter Property="Padding" Value="7,4" />
+  </Style>
+
+  <Style Selector="Border.expression > TextBlock">
+    <Setter Property="Foreground" Value="{DynamicResource AppAccentBrush}" />
+  </Style>
+
   <!-- Report rows. -->
 
   <Style Selector="TextBlock.verdict-mark">

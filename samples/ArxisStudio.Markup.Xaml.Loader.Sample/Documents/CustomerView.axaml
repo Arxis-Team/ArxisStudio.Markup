@@ -1,0 +1,27 @@
+<Border xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Padding="18"
+        Background="#FFF6F7F9">
+
+  <!-- Настоящий файл на диске. Инспектор справа правит именно его. -->
+  <Border.Resources>
+    <SolidColorBrush x:Key="Accent" Color="#FF2A63CC" />
+  </Border.Resources>
+
+  <StackPanel x:Name="Root" Orientation="Vertical" Spacing="10">
+    <TextBlock x:Name="Title"
+               Text="{Binding Customer.Name}"
+               FontSize="20"
+               FontWeight="SemiBold"
+               Foreground="{StaticResource Accent}" />
+    <TextBlock x:Name="Subtitle" Text="Постоянный клиент" Opacity="0.6" />
+    <Border x:Name="Card"
+            Background="#FFFFFFFF"
+            BorderBrush="#FFDCE0E7"
+            BorderThickness="1"
+            CornerRadius="6"
+            Padding="12">
+      <Button x:Name="Save" Content="Сохранить" Width="160" />
+    </Border>
+  </StackPanel>
+</Border>

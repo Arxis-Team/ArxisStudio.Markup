@@ -20,4 +20,19 @@
     <PackageReference Include="Avalonia.Themes.Fluent" />
   </ItemGroup>
 
+  <!--
+    Documents/ is data, not markup this application is built from: the showcase reads those files
+    at run time through the three packages, which is the whole thing being demonstrated. Compiling
+    them would make them part of the assembly and leave nothing to load.
+  -->
+  <ItemGroup>
+    <AvaloniaXaml Remove="Documents/**/*.axaml" />
+    <AvaloniaResource Remove="Documents/**/*.axaml" />
+    <!--
+      Included explicitly: taking them out of Avalonia's globs leaves them in no item group at
+      all, and a file in no group is a file that does not reach the output.
+    -->
+    <Content Include="Documents/**/*.axaml" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+
 </Project>

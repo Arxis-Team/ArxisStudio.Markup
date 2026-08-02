@@ -1,6 +1,7 @@
 <Application xmlns="https://github.com/avaloniaui"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:reporting="using:ArxisStudio.Markup.Xaml.Loader.Sample.Reporting"
+             xmlns:inspector="using:ArxisStudio.Markup.Xaml.Loader.Sample.Inspector"
              x:Class="ArxisStudio.Markup.Xaml.Loader.Sample.ShowcaseApplication"
              RequestedThemeVariant="Light">
 
@@ -108,6 +109,77 @@
         <TextBlock Grid.Column="2" Classes="mono muted" Text="{Binding Source}" />
         <TextBlock Grid.Column="3" Classes="mono" Text="{Binding Detail}" TextWrapping="Wrap" />
       </Grid>
+    </DataTemplate>
+
+    <!--
+      The inspector's rows. Editing one writes an attribute into the document; nothing here sets
+      anything on an object, which is why an expression has no editor at all.
+    -->
+
+    <DataTemplate DataType="inspector:TextPropertyRow">
+      <Grid ColumnDefinitions="132,*" Margin="0,0,0,5">
+        <TextBlock Grid.Column="0"
+                   Classes="muted"
+                   Text="{Binding Name}"
+                   ToolTip.Tip="{Binding Origin}"
+                   VerticalAlignment="Center"
+                   TextTrimming="CharacterEllipsis"
+                   Margin="0,0,10,0" />
+        <TextBox Grid.Column="1"
+                 Classes="field"
+                 Text="{Binding Text, Mode=TwoWay, UpdateSourceTrigger=LostFocus}" />
+      </Grid>
+    </DataTemplate>
+
+    <DataTemplate DataType="inspector:TogglePropertyRow">
+      <Grid ColumnDefinitions="132,*" Margin="0,0,0,5">
+        <TextBlock Grid.Column="0"
+                   Classes="muted"
+                   Text="{Binding Name}"
+                   ToolTip.Tip="{Binding Origin}"
+                   VerticalAlignment="Center"
+                   Margin="0,0,10,0" />
+        <CheckBox Grid.Column="1" IsChecked="{Binding IsChecked, Mode=TwoWay}" />
+      </Grid>
+    </DataTemplate>
+
+    <DataTemplate DataType="inspector:ChoicePropertyRow">
+      <Grid ColumnDefinitions="132,*" Margin="0,0,0,5">
+        <TextBlock Grid.Column="0"
+                   Classes="muted"
+                   Text="{Binding Name}"
+                   ToolTip.Tip="{Binding Origin}"
+                   VerticalAlignment="Center"
+                   Margin="0,0,10,0" />
+        <ComboBox Grid.Column="1"
+                  HorizontalAlignment="Stretch"
+                  ItemsSource="{Binding Options}"
+                  SelectedItem="{Binding Selected, Mode=TwoWay}" />
+      </Grid>
+    </DataTemplate>
+
+    <DataTemplate DataType="inspector:ExpressionPropertyRow">
+      <Grid ColumnDefinitions="132,*" Margin="0,0,0,5">
+        <TextBlock Grid.Column="0"
+                   Classes="muted"
+                   Text="{Binding Name}"
+                   ToolTip.Tip="{Binding Origin}"
+                   VerticalAlignment="Center"
+                   Margin="0,0,10,0" />
+        <Border Grid.Column="1" Classes="expression">
+          <TextBlock Classes="mono"
+                     Text="{Binding Text}"
+                     TextTrimming="CharacterEllipsis"
+                     ToolTip.Tip="{Binding Text}" />
+        </Border>
+      </Grid>
+    </DataTemplate>
+
+    <DataTemplate DataType="inspector:ObjectNode">
+      <StackPanel Orientation="Horizontal" Spacing="8" Margin="{Binding Indent}">
+        <TextBlock Text="{Binding Label}" />
+        <TextBlock Classes="mono muted" Text="{Binding Detail}" VerticalAlignment="Center" />
+      </StackPanel>
     </DataTemplate>
 
   </Application.DataTemplates>

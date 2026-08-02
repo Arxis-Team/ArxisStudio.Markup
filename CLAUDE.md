@@ -65,7 +65,7 @@ Parsing and text editing are UI-thread independent. Avalonia object creation and
 
 ## Hard boundaries
 
-Never add to these packages: MSBuild evaluation, `.sln`/`.csproj`/`project.assets.json` reading, NuGet search or restore, C# compilation, Roslyn analysis, IDE integration, a visual designer, selection adorners, property-inspector UI, drag and drop, pointer/keyboard interception, or a sandbox for untrusted XAML. External environments enter only through the resolver/provider interfaces (`IXamlSourceProvider`, `IXamlAssemblyResolver`, `IXamlTypeResolver`, `IXamlResourceResolver`, `IXamlRootInstanceFactory`). Do not create placeholder implementations for out-of-scope features.
+Never add to these packages: MSBuild evaluation, `.sln`/`.csproj`/`project.assets.json` reading, NuGet search or restore, C# compilation, Roslyn analysis, IDE integration, a visual designer, selection adorners, property-inspector UI, drag and drop, pointer/keyboard interception, or a sandbox for untrusted XAML. This governs `src/`; a sample may demonstrate what a host builds on the published API — the showcase has a property inspector for exactly that reason, recorded in `docs/adr/0006-inspector-in-the-sample.md`. External environments enter only through the resolver/provider interfaces (`IXamlSourceProvider`, `IXamlAssemblyResolver`, `IXamlTypeResolver`, `IXamlResourceResolver`, `IXamlRootInstanceFactory`). Do not create placeholder implementations for out-of-scope features.
 
 Use public Avalonia APIs only. Do not copy, fork, or depend on Avalonia/XamlX internal compiler details without a recorded ADR.
 

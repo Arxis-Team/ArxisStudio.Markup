@@ -1,0 +1,66 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:controls="using:ArxisStudio.Markup.Xaml.Loader.Sample.Controls"
+             x:Class="ArxisStudio.Markup.Xaml.Loader.Sample.Views.InspectorView">
+
+  <Grid RowDefinitions="Auto,*" Margin="24">
+
+    <StackPanel Grid.Row="0" Margin="0,0,0,18">
+      <TextBlock Classes="h1" Text="Инспектор" />
+      <TextBlock Classes="lede"
+                 Text="Слева — объекты, которые описывает файл; в центре — они же, живые; справа — свойства выбранного. Правка в инспекторе не ставится на объект: она пишется атрибутом в документ, а объекты приводятся к нему тем же обновлением, что и на вкладке «Живой документ». Поэтому «применилось в превью» и «сохранилось в .axaml» — это одно действие, а не два, которые надо держать в согласии." />
+    </StackPanel>
+
+    <Grid Grid.Row="1" ColumnDefinitions="248,14,*,14,352">
+
+      <Border Grid.Column="0" Classes="card">
+        <DockPanel>
+          <TextBlock DockPanel.Dock="Top" Classes="caption" Text="ОБЪЕКТЫ ДОКУМЕНТА" Margin="0,0,0,10" />
+          <ListBox x:Name="Tree" Classes="tree" />
+        </DockPanel>
+      </Border>
+
+      <Border Grid.Column="2" Classes="card">
+        <DockPanel>
+          <Grid DockPanel.Dock="Top" ColumnDefinitions="*,Auto" Margin="0,0,0,10">
+            <TextBlock Classes="caption" Text="ЖИВОЕ ПРЕВЬЮ" />
+            <TextBlock x:Name="FilePath"
+                       Grid.Column="1"
+                       Classes="mono muted"
+                       FontSize="11"
+                       TextTrimming="CharacterEllipsis"
+                       MaxWidth="420" />
+          </Grid>
+          <ScrollViewer>
+            <controls:PreviewSurface x:Name="Preview" />
+          </ScrollViewer>
+        </DockPanel>
+      </Border>
+
+      <Border Grid.Column="4" Classes="card">
+        <DockPanel>
+
+          <StackPanel DockPanel.Dock="Top" Margin="0,0,0,10">
+            <TextBlock Classes="caption" Text="СВОЙСТВА" />
+            <TextBlock x:Name="Selected" Classes="mono" Margin="0,6,0,0" />
+          </StackPanel>
+
+          <Border DockPanel.Dock="Bottom" Classes="divider" Margin="0,10,0,10" />
+
+          <StackPanel DockPanel.Dock="Bottom">
+            <TextBlock Classes="caption" Text="ЧТО СДЕЛАЛА ПОСЛЕДНЯЯ ПРАВКА" Margin="0,0,0,8" />
+            <ItemsControl x:Name="ReportList" />
+          </StackPanel>
+
+          <ScrollViewer>
+            <ItemsControl x:Name="Properties" />
+          </ScrollViewer>
+
+        </DockPanel>
+      </Border>
+
+    </Grid>
+
+  </Grid>
+
+</UserControl>
