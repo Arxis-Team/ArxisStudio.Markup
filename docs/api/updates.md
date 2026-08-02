@@ -75,6 +75,11 @@ holding one, or a selection pointing at one, is still valid afterwards — and a
 objects that already exist rather than building new ones, so a control keeps its focus, its scroll
 offset and whatever it was animating.
 
+Where an element's objects live is read from the member the type marks `[Content]` — see
+[Loading](loading.md#where-do-unnamed-children-go). A control library's own content member is
+therefore replaced and reordered exactly as `Panel.Children` is, with nothing to register and no
+base class to derive from.
+
 ## What a changed file costs
 
 A document that includes other files is built from all of them, so a change to one of them is a

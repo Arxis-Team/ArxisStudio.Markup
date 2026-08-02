@@ -148,9 +148,11 @@ Avalonia's property system in the three shapes it has, plus the CLR properties a
 and direct properties of the type and its bases, attached properties registered for it — under the
 `Owner.Member` name a document writes them with — and public CLR properties. Ordered by name and
 without duplicates: a property registered both ways, as `KeyboardNavigation.IsTabStop` is, appears
-once under its simple name. Which of them are worth showing is still yours to decide: a control has upwards of two
-hundred settable members, which is a correct answer and a useless panel. What is answered here is
-which exist and what each one is.
+once under its simple name.
+
+Which of them are worth showing is still yours to decide: a control has upwards of two hundred
+settable members, which is a correct answer and a useless panel. What is answered here is which
+exist and what each one is.
 
 The answer can grow while your tool runs, and is deliberately not cached as a whole. Avalonia
 registers an attached property in the static constructor of the type that declares it, so `Grid.Row`
@@ -161,13 +163,16 @@ What *is* cached — the descriptors themselves — belongs to the environment:
 ```csharp
 XamlMemberResolver members = environment.MemberResolver;   // one per environment by default
 
-var shared = new XamlLoadEnvironment
+// Sharing the cache between environments, when they resolve the same assemblies:
+var shared = new XamlMemberResolver();
+
+var environment = new XamlLoadEnvironment
 {
     SourceProvider = provider,
-    AssemblyResolver = assemblies,
-    TypeResolver = types,
-    ResourceResolver = resources,
-    MemberResolver = cacheSharedWithAnotherEnvironment,
+    AssemblyResolver = assemblyResolver,
+    TypeResolver = typeResolver,
+    ResourceResolver = resourceResolver,
+    MemberResolver = shared,
 };
 ```
 

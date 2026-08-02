@@ -881,6 +881,8 @@ public enum XamlObjectOrigin
 
 Do not falsely map template-generated objects to the control instance declaration.
 
+Objects are reached through the logical tree plus the member the type marks `[Content]`, because a control that holds its content in a property — a `ContentControl` before its template has run, or any control library's own host — puts nothing in the logical tree until something else does. Reaching for a fixed list of framework base types answers for the framework and loses everybody else's controls.
+
 #### Member classification
 
 Resolve XAML members as:
