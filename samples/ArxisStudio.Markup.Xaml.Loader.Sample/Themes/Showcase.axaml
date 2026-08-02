@@ -200,6 +200,12 @@
 
   <!-- Inspector rows. -->
 
+  <Style Selector="Button.tool">
+    <Setter Property="FontSize" Value="12" />
+    <Setter Property="Padding" Value="10,5" />
+    <Setter Property="Margin" Value="0,0,6,6" />
+  </Style>
+
   <Style Selector="ListBox.tree">
     <Setter Property="Background" Value="Transparent" />
     <Setter Property="BorderThickness" Value="0" />

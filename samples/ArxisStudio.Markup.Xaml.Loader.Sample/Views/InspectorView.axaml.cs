@@ -49,6 +49,8 @@ internal sealed partial class InspectorView : UserControl
     private readonly ObservableCollection<PropertyRow> _properties = [];
     private readonly Report _report = new();
 
+    private XamlWorkspace? _workspace;
+    private MarkupDocumentId _documentId;
     private XamlLoadSession? _session;
     private object? _selected;
     private bool _filling;
@@ -101,11 +103,14 @@ internal sealed partial class InspectorView : UserControl
 
     private async Task LoadAsync()
     {
-        string text;
+        // Through a workspace, so that every edit below lands in a history the packages keep
+        // rather than one this sample would otherwise have had to invent.
+        var workspace = new XamlWorkspace(new MarkupWorkspace(new FileMarkupSourceProvider()));
+        XamlDocument document;
 
         try
         {
-            text = await File.ReadAllTextAsync(DocumentPath, CancellationToken.None).ConfigureAwait(true);
+            document = await workspace.OpenAsync(new Uri(DocumentPath), CancellationToken.None);
         }
         catch (IOException error)
         {
@@ -117,7 +122,7 @@ internal sealed partial class InspectorView : UserControl
         (XamlLoadEnvironment environment, _) = ShowcaseEnvironment.Create();
 
         (XamlLoadSession? session, XamlLoadResult result) = await XamlLoadSession.TryCreateAsync(
-            XamlDocument.Parse(text, new XamlParseOptions { DocumentUri = new Uri(DocumentPath) }),
+            document,
             environment,
             new XamlLoadOptions { Mode = XamlLoadMode.Runtime });
 
@@ -128,12 +133,173 @@ internal sealed partial class InspectorView : UserControl
             return;
         }
 
+        _workspace = workspace;
+        _documentId = workspace.Workspace.Documents.Single(open => open.Uri == document.Uri).Id;
         _session = session;
+
         Preview.Content = SampleData.Attach(session.RootObject);
         _selected = session.RootObject;
 
         ShowTree();
         ShowProperties();
+        ShowHistory();
+    }
+
+    private void OnUndo(object? sender, RoutedEventArgs e) =>
+        _ = Step(static workspace => workspace.Undo(), "Отменено");
+
+    private void OnRedo(object? sender, RoutedEventArgs e) =>
+        _ = Step(static workspace => workspace.Redo(), "Повторено");
+
+    private void OnDelete(object? sender, RoutedEventArgs e) =>
+        _ = EditAsync(
+            static (editor, element) => editor.RemoveElement(element),
+            element => $"Удалить <{element.Name}>");
+
+    private void OnDuplicate(object? sender, RoutedEventArgs e) =>
+        _ = EditAsync(Duplicate, element => $"Дублировать <{element.Name}>");
+
+    private void OnWrap(object? sender, RoutedEventArgs e) =>
+        _ = EditAsync(
+            static (editor, element) => editor.WrapElement(element, "<Border Padding=\"8\"></Border>"),
+            element => $"Обернуть <{element.Name}> в Border");
+
+    /// <summary>Puts a copy of an element straight after it, among the same siblings.</summary>
+    /// <remarks>
+    /// The copy loses every name in it. Avalonia registers a name once per scope and refuses a
+    /// second, so a copy that kept them would not load — which is a decision about what
+    /// duplicating means, and therefore this tool's to make rather than the library's.
+    /// </remarks>
+    private static XamlDocumentEditor Duplicate(XamlDocumentEditor editor, XamlElement element)
+    {
+        if (element.Parent is not XamlElement parent)
+        {
+            return editor;
+        }
+
+        XamlElement[] siblings = [.. parent.Elements];
+
+        return editor.InsertElement(parent, Array.IndexOf(siblings, element) + 1, Anonymous(element));
+    }
+
+    /// <summary>Renders an element's text with every name taken out of it.</summary>
+    /// <remarks>
+    /// Parsed inside a wrapper that declares the XAML namespace, because a fragment lifted out of
+    /// its document does not carry the prefix its own <c>x:Name</c> is written with — and an
+    /// attribute whose prefix is bound to nothing is not the directive it looks like.
+    /// </remarks>
+    private static string Anonymous(XamlElement element)
+    {
+        var copy = XamlDocument.Parse(
+            $"<Fragment xmlns:x=\"{XamlNamespaces.Xaml}\">{element.GetText()}</Fragment>");
+
+        XamlDocumentEditor editor = copy.Edit();
+
+        foreach (XamlElement node in copy.DescendantElements())
+        {
+            if (node.GetDirectiveAttribute(XamlDirectives.Name) is { } directive)
+            {
+                editor.RemoveAttribute(node, directive.Name);
+            }
+
+            if (node.GetAttribute("Name") is { } attribute)
+            {
+                editor.RemoveAttribute(node, attribute.Name);
+            }
+        }
+
+        return editor.Apply().Root!.Elements.First().GetText();
+    }
+
+    /// <summary>Records one structural edit, applies it, and lets everything follow.</summary>
+    private async Task EditAsync(
+        Func<XamlDocumentEditor, XamlElement, XamlDocumentEditor> record,
+        Func<XamlElement, string> describe)
+    {
+        if (_workspace is null
+            || _session is null
+            || _selected is not { } target
+            || _session.GetElement(target) is not { } element
+            || ReferenceEquals(element, _session.Document.Root))
+        {
+            return;
+        }
+
+        XamlDocument document = _workspace.GetDocument(_documentId);
+
+        // The session's element belongs to the session's document; the editor must be opened on
+        // the workspace's. Both are the same text, so the same element is at the same span.
+        if (Find(document, element) is not { } subject)
+        {
+            return;
+        }
+
+        await SyncAsync(
+            _workspace.Apply(record(document.Edit(), subject), describe(element)),
+            describe(element));
+    }
+
+    /// <summary>Finds the element that stands where another one stands, in another parse.</summary>
+    private static XamlElement? Find(XamlDocument document, XamlElement element) =>
+        document.DescendantElements().FirstOrDefault(candidate => candidate.Span == element.Span);
+
+    /// <summary>Moves the history and brings everything else along.</summary>
+    private async Task Step(Func<XamlWorkspace, bool> move, string what)
+    {
+        if (_workspace is null || !move(_workspace))
+        {
+            return;
+        }
+
+        await SyncAsync(_workspace.GetDocument(_documentId), what);
+    }
+
+    /// <summary>
+    /// Brings the objects, the file and the panels in line with a document the workspace produced.
+    /// </summary>
+    /// <remarks>
+    /// An update the objects refuse is undone in the workspace as well. The document and the
+    /// objects disagreeing is the one state this library exists to prevent, and a history holding
+    /// an edit the tree never took would be exactly that.
+    /// </remarks>
+    private async Task SyncAsync(XamlDocument document, string what)
+    {
+        XamlUpdateResult result = await _session!.ApplyDocumentUpdateAsync(document, CancellationToken.None);
+
+        _report.Clear()
+            .Field("действие", what)
+            .Field("стратегия", result.Strategy.ToString())
+            .Verdict("применено к работающим объектам", result.Applied);
+
+        if (result.Applied)
+        {
+            await SaveAsync();
+        }
+        else
+        {
+            _workspace!.Undo();
+        }
+
+        _report.Caption("ДИАГНОСТИКА").Diagnostics(result.Diagnostics, _session.Document.SourceText);
+
+        if (_session.GetElement(_selected!) is null)
+        {
+            _selected = _session.RootObject;
+        }
+
+        ShowTree();
+        ShowProperties();
+        ShowHistory();
+    }
+
+    /// <summary>Says what undoing and redoing would do, and whether they can.</summary>
+    private void ShowHistory()
+    {
+        UndoButton.IsEnabled = _workspace?.CanUndo == true;
+        RedoButton.IsEnabled = _workspace?.CanRedo == true;
+
+        ToolTip.SetTip(UndoButton, _workspace?.UndoDescription);
+        ToolTip.SetTip(RedoButton, _workspace?.RedoDescription);
     }
 
     /// <summary>Lists what the document describes, in the order it describes it.</summary>
@@ -213,6 +379,14 @@ internal sealed partial class InspectorView : UserControl
         }
 
         Selected.Text = $"{target.GetType().Name}  <{element.Name}>";
+
+        // The root has no siblings to be duplicated among and no slot to be wrapped into: those
+        // need a new session rather than an update, which is a different thing to demonstrate.
+        bool structural = !ReferenceEquals(element, _session.Document.Root);
+
+        DeleteButton.IsEnabled = structural;
+        DuplicateButton.IsEnabled = structural;
+        WrapButton.IsEnabled = structural;
 
         // What the document already says about this element first, then the rest of what it could
         // say. Which names are worth offering is the host's business; what each one means is the
@@ -328,7 +502,8 @@ internal sealed partial class InspectorView : UserControl
     /// <summary>Writes one property into the document, and lets the objects follow.</summary>
     private async Task CommitAsync(string name, string text)
     {
-        if (_session is null
+        if (_workspace is null
+            || _session is null
             || _selected is not { } target
             || _session.GetElement(target) is not { } element)
         {
@@ -347,12 +522,22 @@ internal sealed partial class InspectorView : UserControl
             return;
         }
 
-        XamlDocument edited = _session.Document.SetAttribute(element, qualified, text);
+        XamlDocument document = _workspace.GetDocument(_documentId);
+
+        if (Find(document, element) is not { } subject)
+        {
+            return;
+        }
+
+        string action = $"{element.Name.LocalName}.{name}";
+
+        XamlDocument edited = _workspace.Apply(
+            document.Edit().SetAttribute(subject, qualified, text), action);
 
         XamlUpdateResult result = await _session.ApplyDocumentUpdateAsync(edited, CancellationToken.None);
 
         _report.Clear()
-            .Field("свойство", $"{element.Name.LocalName}.{name}")
+            .Field("действие", action)
             .Field("стратегия", result.Strategy.ToString())
             .Verdict("применено к работающим объектам", result.Applied);
 
@@ -360,8 +545,13 @@ internal sealed partial class InspectorView : UserControl
         {
             await SaveAsync();
         }
+        else
+        {
+            _workspace.Undo();
+        }
 
         _report.Caption("ДИАГНОСТИКА").Diagnostics(result.Diagnostics, _session.Document.SourceText);
+        ShowHistory();
 
         // Setting a property changed the one attribute that was edited and nothing else, and the
         // row that was edited already shows what was typed in it. Rebuilding the rows here would

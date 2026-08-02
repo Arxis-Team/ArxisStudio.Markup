@@ -82,11 +82,18 @@
 
   <Grid RowDefinitions="Auto,*" Margin="20">
 
-    <StackPanel Grid.Row="0" Margin="0,0,0,18">
-      <TextBlock Classes="h1" Text="Инспектор" />
-      <TextBlock Classes="lede"
-                 Text="Слева — объекты, которые описывает файл; в центре — они же, живые; справа — свойства выбранного. Правка в инспекторе не ставится на объект: она пишется атрибутом в документ, а объекты приводятся к нему тем же обновлением, что и на вкладке «Живой документ». Поэтому «применилось в превью» и «сохранилось в .axaml» — это одно действие, а не два, которые надо держать в согласии." />
-    </StackPanel>
+    <Grid Grid.Row="0" ColumnDefinitions="*,Auto" Margin="0,0,0,18">
+      <StackPanel>
+        <TextBlock Classes="h1" Text="Инспектор" />
+        <TextBlock Classes="lede"
+                   Text="Слева — объекты, которые описывает файл; в центре — они же, живые; справа — свойства выбранного. Правка не ставится на объект: она пишется в документ через воркспейс, оттуда попадает в историю, и уже обновление приводит объекты в соответствие. Поэтому «применилось в превью», «сохранилось в .axaml» и «отменяется одной командой» — это одно действие, а не три, которые надо держать в согласии." />
+      </StackPanel>
+
+      <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="8" VerticalAlignment="Top">
+        <Button x:Name="UndoButton" Content="Отменить" Click="OnUndo" />
+        <Button x:Name="RedoButton" Content="Повторить" Click="OnRedo" />
+      </StackPanel>
+    </Grid>
 
     <Grid Grid.Row="1">
 
@@ -105,6 +112,17 @@
       <Border Grid.Column="0" Classes="card">
         <DockPanel>
           <TextBlock DockPanel.Dock="Top" Classes="caption" Text="ОБЪЕКТЫ ДОКУМЕНТА" Margin="0,0,0,10" />
+          <!-- Wrapping, because the panel beside it is resizable and three buttons are wider
+               than its narrowest useful width. -->
+          <WrapPanel DockPanel.Dock="Bottom" Margin="0,10,-6,-6">
+            <Button x:Name="DeleteButton" Classes="tool" Content="Удалить" Click="OnDelete" />
+            <Button x:Name="DuplicateButton" Classes="tool" Content="Дублировать" Click="OnDuplicate" />
+            <Button x:Name="WrapButton"
+                    Classes="tool"
+                    Content="В Border"
+                    Click="OnWrap"
+                    ToolTip.Tip="Обернуть выбранный элемент в Border" />
+          </WrapPanel>
           <ListBox x:Name="Tree" Classes="tree" />
         </DockPanel>
       </Border>

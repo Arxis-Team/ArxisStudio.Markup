@@ -87,6 +87,18 @@ the document — see `docs/adr/0005-resource-includes.md` for why. That leaves f
   question about markup, and whether the member it sat in accepts more than one child is a question
   about what the member means, which the syntax package deliberately cannot answer. Unwrapping
   several children into a single-valued slot produces markup the loader reports when it builds it.
+- **Wrapping an element the parent positions is not an in-place update.** A new parent written
+  around an element reads to the difference as the same element with different attributes and a
+  different child, which is the conservative reading and the correct one for everything else. Where
+  the element carried attached properties — `Grid.Column`, `DockPanel.Dock` — the rebuilt object
+  no longer has them and cannot be put back where it was, and the update is refused with `AXM3041`.
+  Wrapping an element whose parent stacks or docks it works. A tool that needs the other case
+  creates a new session from the edited document.
+- **A refused rebuild can leave the objects part-way.** Every fragment is built before any object
+  is touched, so a fragment that will not build refuses the update cleanly; but the replacements
+  themselves are applied one after another, and one that fails after another has succeeded stops
+  there. The document is left alone, so the two disagree until the caller reloads. Recreating the
+  session is the only thing that certainly restores agreement.
 - **Wrapping and replacing do not reformat what they are given.** A multi-line wrapper or
   replacement arrives written as the caller wrote it; only the wrapped element is re-indented, by
   the step the document already uses. This matches insertion, which has always behaved this way.
