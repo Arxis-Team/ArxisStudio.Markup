@@ -1,6 +1,7 @@
 <Styles xmlns="https://github.com/avaloniaui"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:controls="using:ArxisStudio.Markup.Xaml.Loader.Sample.Controls"
+        xmlns:inspector="using:ArxisStudio.Markup.Xaml.Loader.Sample.Inspector"
         xmlns:edit="using:AvaloniaEdit">
 
   <!--
@@ -206,16 +207,136 @@
     <Setter Property="Margin" Value="0,0,6,6" />
   </Style>
 
-  <Style Selector="ListBox.tree">
+  <!--
+    The document's objects, shown the way a file tree is: a row per element, opened and closed by
+    the arrow at its head, with an icon saying what kind of thing the row stands for. Indentation
+    belongs to the row's content and the highlight to the row, so selection runs the full width of
+    the panel rather than starting where the name does.
+  -->
+
+  <Style Selector="TreeView.tree">
     <Setter Property="Background" Value="Transparent" />
     <Setter Property="BorderThickness" Value="0" />
     <Setter Property="Padding" Value="0" />
   </Style>
 
-  <Style Selector="ListBox.tree ListBoxItem">
-    <Setter Property="Padding" Value="8,5" />
+  <!-- The node carries the state, not the tree: both survive the rebuild an edit causes. -->
+  <Style Selector="TreeView.tree TreeViewItem" x:DataType="inspector:ObjectNode">
     <Setter Property="MinHeight" Value="0" />
-    <Setter Property="CornerRadius" Value="5" />
+    <Setter Property="Padding" Value="0" />
+    <Setter Property="IsExpanded" Value="{Binding IsExpanded, Mode=TwoWay}" />
+    <Setter Property="IsSelected" Value="{Binding IsSelected, Mode=TwoWay}" />
+    <Setter Property="Template">
+      <ControlTemplate>
+        <StackPanel>
+          <Border Name="PART_Header"
+                  Background="Transparent"
+                  CornerRadius="5"
+                  Padding="6,4"
+                  Margin="0,0,0,1">
+            <ContentPresenter Name="PART_HeaderPresenter"
+                              Content="{TemplateBinding Header}"
+                              ContentTemplate="{TemplateBinding HeaderTemplate}" />
+          </Border>
+          <ItemsPresenter Name="PART_ItemsPresenter"
+                          IsVisible="{TemplateBinding IsExpanded}"
+                          ItemsPanel="{TemplateBinding ItemsPanel}" />
+        </StackPanel>
+      </ControlTemplate>
+    </Setter>
+  </Style>
+
+  <Style Selector="TreeView.tree TreeViewItem:pointerover /template/ Border#PART_Header">
+    <Setter Property="Background" Value="{DynamicResource AppElevatedBrush}" />
+  </Style>
+
+  <Style Selector="TreeView.tree TreeViewItem:selected /template/ Border#PART_Header">
+    <Setter Property="Background" Value="{DynamicResource AppSelectionBrush}" />
+  </Style>
+
+  <!-- The disclosure arrow, and the same width of nothing where a row has no children. -->
+
+  <Style Selector="ToggleButton.chevron">
+    <Setter Property="Background" Value="Transparent" />
+    <Setter Property="BorderThickness" Value="0" />
+    <Setter Property="Padding" Value="0" />
+    <Setter Property="Width" Value="14" />
+    <Setter Property="Height" Value="14" />
+    <Setter Property="MinWidth" Value="0" />
+    <Setter Property="MinHeight" Value="0" />
+    <Setter Property="VerticalAlignment" Value="Center" />
+    <Setter Property="Margin" Value="0,0,2,0" />
+  </Style>
+
+  <Style Selector="ToggleButton.chevron:pointerover /template/ ContentPresenter">
+    <Setter Property="Background" Value="Transparent" />
+  </Style>
+
+  <Style Selector="ToggleButton.chevron:checked /template/ ContentPresenter">
+    <Setter Property="Background" Value="Transparent" />
+  </Style>
+
+  <Style Selector="Border.chevron-space">
+    <Setter Property="Width" Value="14" />
+    <Setter Property="Margin" Value="0,0,2,0" />
+  </Style>
+
+  <Style Selector="Path.chevron-glyph">
+    <Setter Property="Stroke" Value="{DynamicResource AppMutedBrush}" />
+    <Setter Property="StrokeThickness" Value="1.4" />
+    <Setter Property="StrokeLineCap" Value="Round" />
+    <Setter Property="StrokeJoin" Value="Round" />
+    <Setter Property="Width" Value="5" />
+    <Setter Property="Height" Value="9" />
+    <Setter Property="HorizontalAlignment" Value="Center" />
+    <Setter Property="VerticalAlignment" Value="Center" />
+    <Setter Property="RenderTransformOrigin" Value="50%,50%" />
+  </Style>
+
+  <!-- Pointing down at what it has opened, the way every tree does it. -->
+  <Style Selector="ToggleButton.chevron:checked Path.chevron-glyph">
+    <Setter Property="RenderTransform" Value="rotate(90deg)" />
+  </Style>
+
+  <!-- What kind of thing the row stands for: something holding others, a control of its own, or
+       something a member declares. -->
+
+  <Style Selector="Panel.node-icon">
+    <Setter Property="Width" Value="14" />
+    <Setter Property="Height" Value="14" />
+    <Setter Property="VerticalAlignment" Value="Center" />
+    <Setter Property="Margin" Value="0,0,7,0" />
+  </Style>
+
+  <Style Selector="Path.icon">
+    <Setter Property="Width" Value="14" />
+    <Setter Property="Height" Value="14" />
+    <Setter Property="Stretch" Value="None" />
+    <Setter Property="StrokeThickness" Value="1.2" />
+    <Setter Property="StrokeJoin" Value="Round" />
+  </Style>
+
+  <Style Selector="Path.icon.container">
+    <Setter Property="Fill" Value="{DynamicResource AppAccentSoftBrush}" />
+    <Setter Property="Stroke" Value="{DynamicResource AppAccentBrush}" />
+  </Style>
+
+  <Style Selector="Path.icon.control">
+    <Setter Property="Stroke" Value="{DynamicResource AppMutedBrush}" />
+  </Style>
+
+  <Style Selector="Path.icon.resource">
+    <Setter Property="Fill" Value="{DynamicResource AppPositiveBrush}" />
+    <Setter Property="Opacity" Value="0.65" />
+  </Style>
+
+  <Style Selector="TextBlock.node-label">
+    <Setter Property="VerticalAlignment" Value="Center" />
+  </Style>
+
+  <Style Selector="TextBlock.node-detail">
+    <Setter Property="Margin" Value="8,0,0,0" />
+    <Setter Property="VerticalAlignment" Value="Center" />
   </Style>
 
   <Style Selector="TextBox.field">

@@ -37,6 +37,10 @@ internal sealed partial class InspectorView : UserControl
     private const string Inherited = "унаследовано: стиль, тема или значение по умолчанию";
 
     private readonly ObservableCollection<ObjectNode> _nodes = [];
+
+    /// <summary>The nodes the user has closed, by path, so that a rebuild does not reopen them.</summary>
+    private readonly HashSet<XamlElementPath> _closed = [];
+
     private readonly ObservableCollection<PropertyRow> _properties = [];
     private readonly Report _report = new();
 
@@ -300,22 +304,23 @@ internal sealed partial class InspectorView : UserControl
         _filling = true;
 
         _nodes.Clear();
-        Add(root, 0);
+        Add(root, _nodes, 0, insideMember: false);
 
         // Selection is a path, so it means the same element after an edit as before it — including
         // after an undo, where nothing the tree held on to the last time still exists.
         _filling = false;
-        Tree.SelectedItem = _nodes.FirstOrDefault(node => node.Path.Equals(_selected));
 
-        void Add(XamlElement element, int depth)
+        void Add(XamlElement element, ObservableCollection<ObjectNode> into, int depth, bool insideMember)
         {
+            ObservableCollection<ObjectNode> below = into;
             int next = depth;
 
             if (_session!.GetObject(element) is { } target)
             {
-                _nodes.Add(new ObjectNode(
-                    XamlElementPath.Of(element), target.GetType().Name, Detail(element), depth));
+                ObjectNode node = Node(element, target, depth, insideMember);
 
+                into.Add(node);
+                below = node.Children;
                 next = depth + 1;
             }
 
@@ -324,7 +329,7 @@ internal sealed partial class InspectorView : UserControl
             // the controls above the resources, in the order someone building a screen thinks in.
             foreach (XamlElement child in element.ContentElements)
             {
-                Add(child, next);
+                Add(child, below, next, insideMember);
             }
 
             // What a member holds is part of the document too — the brushes under
@@ -333,11 +338,55 @@ internal sealed partial class InspectorView : UserControl
             {
                 foreach (XamlElement child in member.ContentElements)
                 {
-                    Add(child, next);
+                    Add(child, below, next, insideMember: true);
                 }
             }
         }
     }
+
+    /// <summary>Builds the line an element gets, with the state the last one had.</summary>
+    private ObjectNode Node(XamlElement element, object target, int depth, bool insideMember)
+    {
+        XamlElementPath path = XamlElementPath.Of(element);
+
+        ObjectNodeKind kind = insideMember
+            ? ObjectNodeKind.Resource
+            : element.ContentElements.Any() || element.MemberElements.Any()
+                ? ObjectNodeKind.Container
+                : ObjectNodeKind.Control;
+
+        var node = new ObjectNode(path, target.GetType().Name, Detail(element), kind, depth)
+        {
+            // Open unless the user closed this one — and open regardless on the way down to what
+            // is selected, so that an edit cannot leave the selection inside a closed branch.
+            IsExpanded = !_closed.Contains(path) || Leads(path, _selected),
+            IsSelected = path.Equals(_selected),
+        };
+
+        node.PropertyChanged += (sender, e) =>
+        {
+            if (e.PropertyName != nameof(ObjectNode.IsExpanded) || sender is not ObjectNode line)
+            {
+                return;
+            }
+
+            if (line.IsExpanded)
+            {
+                _closed.Remove(line.Path);
+            }
+            else
+            {
+                _closed.Add(line.Path);
+            }
+        };
+
+        return node;
+    }
+
+    /// <summary>Reports whether one path is on the way to another.</summary>
+    private static bool Leads(XamlElementPath path, XamlElementPath target) =>
+        path.Steps.Length < target.Steps.Length
+        && target.Steps[..path.Steps.Length].SequenceEqual(path.Steps);
 
     /// <summary>
     /// Says which one this is, when the type name does not already.

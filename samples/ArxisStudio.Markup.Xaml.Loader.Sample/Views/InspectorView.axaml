@@ -72,12 +72,47 @@
       </Grid>
     </DataTemplate>
 
-    <DataTemplate DataType="inspector:ObjectNode">
-      <StackPanel Orientation="Horizontal" Spacing="8" Margin="{Binding Indent}">
-        <TextBlock Text="{Binding Label}" />
-        <TextBlock Classes="mono muted" Text="{Binding Detail}" VerticalAlignment="Center" />
-      </StackPanel>
-    </DataTemplate>
+    <!--
+      One line of the tree: the room its depth earns it, a disclosure arrow where there is
+      something under it, an icon saying what kind of thing it is, and the name the document gives
+      it after the type name. The indentation is on the content rather than on the row, so the
+      selection behind it runs the full width of the panel.
+    -->
+    <TreeDataTemplate DataType="inspector:ObjectNode" ItemsSource="{Binding Children}">
+      <Grid ColumnDefinitions="Auto,Auto,Auto,*" Margin="{Binding Indent}">
+
+        <ToggleButton Grid.Column="0"
+                      Classes="chevron"
+                      IsChecked="{Binding IsExpanded, Mode=TwoWay}"
+                      IsVisible="{Binding HasChildren}"
+                      Focusable="False">
+          <Path Classes="chevron-glyph" Data="M 0,0 L 4,4 L 0,8" />
+        </ToggleButton>
+
+        <!-- Kept where the arrow would be, so names down a branch line up whether or not the
+             element has children of its own. -->
+        <Border Grid.Column="0" Classes="chevron-space" IsVisible="{Binding !HasChildren}" />
+
+        <Panel Grid.Column="1" Classes="node-icon">
+          <Path Classes="icon container"
+                IsVisible="{Binding IsContainer}"
+                Data="M 1,2.5 H 6 L 7.5,4.5 H 13 V 11.5 H 1 Z" />
+          <Path Classes="icon control"
+                IsVisible="{Binding IsControl}"
+                Data="M 1.5,3 H 12.5 V 11 H 1.5 Z M 1.5,5.5 H 12.5" />
+          <Path Classes="icon resource"
+                IsVisible="{Binding IsResource}"
+                Data="M 7,2 L 12,7 L 7,12 L 2,7 Z" />
+        </Panel>
+
+        <TextBlock Grid.Column="2" Classes="node-label" Text="{Binding Label}" />
+        <TextBlock Grid.Column="3"
+                   Classes="mono muted node-detail"
+                   Text="{Binding Detail}"
+                   TextTrimming="CharacterEllipsis"
+                   VerticalAlignment="Center" />
+      </Grid>
+    </TreeDataTemplate>
 
   </UserControl.DataTemplates>
 
@@ -103,7 +138,7 @@
         the splitters between them move. Minimums so that neither can be dragged shut.
       -->
       <Grid.ColumnDefinitions>
-        <ColumnDefinition Width="214" MinWidth="150" MaxWidth="440" />
+        <ColumnDefinition Width="248" MinWidth="150" MaxWidth="480" />
         <ColumnDefinition Width="12" />
         <ColumnDefinition Width="*" MinWidth="220" />
         <ColumnDefinition Width="12" />
@@ -124,7 +159,11 @@
                     Click="OnWrap"
                     ToolTip.Tip="Обернуть выбранный элемент в Border" />
           </WrapPanel>
-          <ListBox x:Name="Tree" Classes="tree" />
+          <!-- Scrolls sideways rather than trimming: a name down a deep branch is worth reading
+               in full, and the panel beside it is meant to be the wide one. -->
+          <TreeView x:Name="Tree"
+                    Classes="tree"
+                    ScrollViewer.HorizontalScrollBarVisibility="Auto" />
         </DockPanel>
       </Border>
 
