@@ -37,3 +37,17 @@ public class ShellHost : Control
         set => SetValue(BodyProperty, value);
     }
 }
+
+/// <summary>
+/// A control whose content collection implements only the generic list interface.
+/// </summary>
+/// <remarks>
+/// <c>Avalonia.Styling.Styles</c> is such a collection, and a control library is free to use one:
+/// testing for the non-generic <see cref="System.Collections.IList"/> alone finds none of them.
+/// </remarks>
+public class SheetHost : Control
+{
+    /// <summary>Gets the styles the host carries.</summary>
+    [Content]
+    public Avalonia.Styling.Styles Sheet { get; } = [];
+}

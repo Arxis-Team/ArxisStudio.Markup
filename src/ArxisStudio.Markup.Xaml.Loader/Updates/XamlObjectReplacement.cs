@@ -4,6 +4,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Reflection;
 using Avalonia.Controls;
+using Avalonia.LogicalTree;
 
 namespace ArxisStudio.Markup.Xaml.Loader;
 
@@ -315,33 +316,111 @@ internal static class XamlObjectReplacement
         object? held = Read(target, content.Name, members);
         object? rebuilt = Read(fresh, content.Name, members);
 
-        if (held is IList current && rebuilt is IList replacement)
+        try
         {
-            object?[] items = [.. replacement.Cast<object?>()];
-
-            replacement.Clear();
-            current.Clear();
-
-            foreach (object? item in items)
+            if (held is IEnumerable && rebuilt is IEnumerable)
             {
-                current.Add(item);
+                return MoveItems(held!, rebuilt!)
+                    || Fail(element, diagnostics, $"{content.Name} would not take its content back");
             }
+
+            if (!content.CanWrite)
+            {
+                return Fail(
+                    element,
+                    diagnostics,
+                    $"{content.Name} is neither a list nor writable, so its content cannot be moved");
+            }
+
+            // Taken out of the copy first, and only where that matters: something in the logical
+            // world belongs to one parent, and writing it onto the original while the copy still
+            // holds it is how Avalonia is made to throw. A value that is nobody's child — a
+            // string, a number — has no such rule, and a member that refuses null must not fail
+            // the update over one.
+            if (rebuilt is ILogical
+                && !Write(fresh, content.Name, null, members, Quiet))
+            {
+                return Fail(
+                    element, diagnostics, $"{content.Name} could not be cleared on the rebuilt copy");
+            }
+
+            return Write(target, content.Name, rebuilt, members, diagnostics)
+                || Fail(element, diagnostics, $"{content.Name} could not be written");
+        }
+        catch (Exception error) when (error is InvalidOperationException
+            or NotSupportedException
+            or ArgumentException
+            or InvalidCastException)
+        {
+            // A collection that refuses to be written through — an ItemsControl whose items come
+            // from ItemsSource says exactly this — is an ordinary answer to an ordinary edit, and
+            // the caller is told rather than shown an exception out of an update.
+            return Fail(element, diagnostics, $"{content.Name} refused the content: {error.Message}");
+        }
+    }
+
+    /// <summary>Diagnostics nobody reads, for a step whose failure is reported by its caller.</summary>
+    private static List<MarkupDiagnostic> Quiet => [];
+
+    /// <summary>Moves the items of one collection into another, whichever list interface it has.</summary>
+    /// <remarks>
+    /// Avalonia's own collections implement <c>IList&lt;T&gt;</c> and not always the non-generic
+    /// <see cref="IList"/> — <c>Styles</c> is one — so the two are tried in turn rather than the
+    /// easy one alone.
+    /// </remarks>
+    private static bool MoveItems(object into, object from)
+    {
+        object?[] items = [.. ((IEnumerable)from).Cast<object?>()];
+
+        // Emptied before anything is added: an item that belongs to one parent cannot be handed
+        // to a second while the first still holds it.
+        return Empty(from) && Empty(into) && items.All(item => Append(into, item));
+    }
+
+    /// <summary>Empties a collection through whichever list interface it has.</summary>
+    private static bool Empty(object collection)
+    {
+        if (collection is IList list)
+        {
+            list.Clear();
 
             return true;
         }
 
-        if (!content.CanWrite)
+        MethodInfo? clear = collection.GetType().GetMethod("Clear", BindingFlags.Public | BindingFlags.Instance, []);
+
+        if (clear is null)
         {
-            return Fail(
-                element,
-                diagnostics,
-                $"{content.Name} is neither a list nor writable, so its content cannot be moved");
+            return false;
         }
 
-        Write(fresh, content.Name, null, members, diagnostics);
+        clear.Invoke(collection, []);
 
-        return Write(target, content.Name, rebuilt, members, diagnostics)
-            || Fail(element, diagnostics, $"{content.Name} could not be written");
+        return true;
+    }
+
+    /// <summary>Adds to a collection through whichever list interface it has.</summary>
+    private static bool Append(object collection, object? item)
+    {
+        if (collection is IList list)
+        {
+            list.Add(item);
+
+            return true;
+        }
+
+        MethodInfo? add = collection.GetType()
+            .GetMethods(BindingFlags.Public | BindingFlags.Instance)
+            .FirstOrDefault(method => method.Name == "Add" && method.GetParameters().Length == 1);
+
+        if (add is null)
+        {
+            return false;
+        }
+
+        add.Invoke(collection, [item]);
+
+        return true;
     }
 
     /// <summary>

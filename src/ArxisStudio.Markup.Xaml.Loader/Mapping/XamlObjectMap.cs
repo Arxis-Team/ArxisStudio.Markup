@@ -3,6 +3,7 @@ using System.Collections;
 using System.Collections.Generic;
 using System.Collections.Immutable;
 using System.Linq;
+using System.Reflection;
 using System.Runtime.CompilerServices;
 using Avalonia;
 using Avalonia.Controls;
@@ -351,6 +352,32 @@ public sealed class XamlObjectMap
         }
     }
 
+    /// <summary>Reads what an object holds in its content member, without letting it throw.</summary>
+    /// <remarks>
+    /// The getter belongs to whoever wrote the control, and a map being built is no place for
+    /// their exception to arrive: an object whose content cannot be read simply has none as far
+    /// as this walk is concerned.
+    /// </remarks>
+    private static object? ContentOf(object current, XamlMemberDescriptor content)
+    {
+        try
+        {
+            return content switch
+            {
+                { AvaloniaProperty: { } property } when current is AvaloniaObject styled =>
+                    styled.GetValue(property),
+                { ClrProperty.CanRead: true } => content.ClrProperty!.GetValue(current),
+                _ => null,
+            };
+        }
+        catch (Exception error) when (error is InvalidOperationException
+            or NotSupportedException
+            or TargetInvocationException)
+        {
+            return null;
+        }
+    }
+
     /// <summary>Decides where an object came from, from what Avalonia can be asked about it.</summary>
     private static XamlObjectOrigin DetermineOrigin(object current, XamlObjectOrigin inherited)
     {
@@ -479,36 +506,27 @@ public sealed class XamlObjectMap
         // ContentControl before its template has run keeps its content in a property and nowhere
         // else, and so does any control library's own control that says [Content] on one. Asking
         // the attribute covers both; naming ContentControl covers only the framework's.
-        if (_members.FindContent(current.GetType()) is { CanRead: true } content)
+        if (_members.FindContent(current.GetType()) is { CanRead: true } content
+            && ContentOf(current, content) is { } held and not string)
         {
-            object? held = content switch
-            {
-                { AvaloniaProperty: { } property } when current is AvaloniaObject styled =>
-                    styled.GetValue(property),
-                { ClrProperty.CanRead: true } => content.ClrProperty!.GetValue(current),
-                _ => null,
-            };
+            // The collection itself, because markup can declare one — and its items, because a
+            // control that keeps its children in a collection of its own puts nothing in the
+            // logical tree until something parents them.
+            yield return held;
 
-            switch (held)
+            if (held is IEnumerable many and not IResourceProvider)
             {
-                case null or string:
-                    break;
-
-                case IEnumerable many when held is not IResourceProvider:
-                    foreach (object? item in many)
+                foreach (object? item in many)
+                {
+                    // Only what could have been declared. An items control's Items reflects
+                    // whatever ItemsSource is bound to, and walking a view model's rows would
+                    // record origins for objects no markup describes and hold them for the life
+                    // of the session.
+                    if (item is ILogical)
                     {
-                        if (item is not null)
-                        {
-                            yield return item;
-                        }
+                        yield return item;
                     }
-
-                    break;
-
-                default:
-                    yield return held;
-
-                    break;
+                }
             }
         }
 

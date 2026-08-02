@@ -629,6 +629,72 @@ public sealed class PropertyMatrixTests
         Assert.NotEmpty(members.Enumerate(typeof(Window)));
         Assert.Contains(members.Enumerate(typeof(Window)), member => member.Name == "Title");
     }
+    [AvaloniaFact]
+    public async Task AContentCollectionThatRefusesToBeWrittenIsReportedRatherThanThrown()
+    {
+        await using XamlLoadSession session = await Load(
+            $"<ListBox xmlns=\"{AvaloniaNamespace}\"></ListBox>");
+
+        var list = session.GetRoot<ListBox>();
+
+        // Items reflects ItemsSource once one is bound, and refuses to be cleared. Adding a child
+        // in the document asks for exactly that, and the answer is a diagnostic.
+        list.ItemsSource = new[] { "from the view model" };
+
+        XamlDocument updated = session.Document.InsertElement(
+            session.Document.Root!, 0, "<ListBoxItem Content=\"two\" />");
+
+        XamlUpdateResult result = await session.ApplyDocumentUpdateAsync(
+            updated, TestContext.Current.CancellationToken);
+
+        Assert.False(result.Applied);
+        Assert.Contains(result.Diagnostics, static d => d.Severity == MarkupDiagnosticSeverity.Error);
+    }
+
+    [AvaloniaFact]
+    public async Task WhatABindingPutInACollectionIsNotMistakenForTheDocumentsOwn()
+    {
+        await using XamlLoadSession session = await Load(
+            $"<ListBox xmlns=\"{AvaloniaNamespace}\" Width=\"100\" />");
+
+        var list = session.GetRoot<ListBox>();
+
+        list.ItemsSource = new[] { new Customer(), new Customer() };
+
+        // Any update rebuilds the map. The rows came from a view model, no markup describes them,
+        // and holding them in the map would pin a bound collection for the life of the session.
+        XamlUpdateResult result = await session.ApplyDocumentUpdateAsync(
+            session.Document.SetAttribute(
+                session.Document.Root!, XamlQualifiedName.Parse("Width"), "120"),
+            TestContext.Current.CancellationToken);
+
+        Assert.True(result.Applied);
+        Assert.DoesNotContain(session.Objects.Objects, item => item is Customer);
+    }
+
+    [AvaloniaFact]
+    public async Task AContentCollectionThatIsOnlyAGenericListIsMovedToo()
+    {
+        await using XamlLoadSession session = await Load(
+            $"<local:SheetHost xmlns=\"{AvaloniaNamespace}\" xmlns:local=\"{TestControlsNamespace}\">\n" +
+            "  <Style Selector=\"Button\" />\n" +
+            "</local:SheetHost>");
+
+        var host = session.GetRoot<SheetHost>();
+
+        Assert.Single(host.Sheet);
+
+        XamlUpdateResult result = await session.ApplyDocumentUpdateAsync(
+            session.Document.InsertElement(session.Document.Root!, 1, "<Style Selector=\"TextBlock\" />"),
+            TestContext.Current.CancellationToken);
+
+        Assert.True(result.Applied);
+        Assert.Equal(2, host.Sheet.Count);
+    }
+
+    /// <summary>Something a binding could put in a collection, which no markup declares.</summary>
+    private sealed class Customer;
+
 
 
 

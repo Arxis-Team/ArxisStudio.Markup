@@ -38,7 +38,16 @@ internal sealed partial class InspectorView : UserControl
 
     private readonly ObservableCollection<ObjectNode> _nodes = [];
 
-    /// <summary>The nodes the user has closed, by path, so that a rebuild does not reopen them.</summary>
+    /// <summary>
+    /// The nodes the user has closed, by path, so that a rebuild does not reopen them.
+    /// </summary>
+    /// <remarks>
+    /// A path is a position, so this remembers a position rather than an element: delete a node
+    /// above a closed one and the node that moves into its place comes back closed. That is the
+    /// trade a positional key makes, and for a fold in a tree it is the cheap side of it. What is
+    /// not acceptable is the set growing for the life of the view, so paths that no longer lead
+    /// anywhere are dropped whenever the tree is rebuilt.
+    /// </remarks>
     private readonly HashSet<XamlElementPath> _closed = [];
 
     private readonly ObservableCollection<PropertyRow> _properties = [];
@@ -303,6 +312,7 @@ internal sealed partial class InspectorView : UserControl
 
         _filling = true;
 
+        _closed.RemoveWhere(path => path.Resolve(_session.Document) is null);
         _nodes.Clear();
         Add(root, _nodes, 0, insideMember: false);
 

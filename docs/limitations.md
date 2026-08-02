@@ -131,6 +131,14 @@ the document — see `docs/adr/0005-resource-includes.md` for why. That leaves f
   type that declares it. Before anything has caused `Grid` to be initialised, `Grid.Row` is not a
   member of anything. The answer is therefore not cached, so a tool that resolves types as documents
   ask for them sees the list grow while it runs — but a list taken at startup is not the whole list.
+- **A content collection that refuses to be written through is reported, not forced.** An items
+  control whose items come from `ItemsSource` says exactly that when asked to take a child the
+  document declares, and a rebuild of such an element is refused with a diagnostic rather than an
+  exception. The document is left alone; what the objects show comes from the binding.
+- **Only what a document could have declared is mapped.** A collection reached through the content
+  member contributes its items to the map when they are part of the logical world; rows a binding
+  put there are not, because no markup describes them and holding them would pin a bound
+  collection for the life of the session.
 - **Content is whatever `[Content]` says, and nothing else is.** Where unnamed children go is read
   from Avalonia's own attribute, so a control library's own content member works exactly as the
   framework's do. Types that take children another way — `Style`, `ControlTheme` and the rest of
