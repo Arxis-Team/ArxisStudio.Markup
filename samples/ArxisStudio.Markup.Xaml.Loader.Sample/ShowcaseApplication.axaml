@@ -11,16 +11,18 @@
     a choice the window does not actually offer. The variant above is what the Fluent theme wears,
     and these colours are chosen to match it.
 
-    The surface a previewed document is drawn on holds a light scope of its own regardless. It
-    reads as no difference now, and that is the point: it is the document's variant rather than
-    the window's, and it would stay light if this palette went dark tomorrow.
+    The surface a previewed document is drawn on holds a light scope of its own regardless. That
+    scope reaches what a control wears through its control theme — every Fluent control in a
+    previewed document — but not a plain TextBlock, whose colour is set by the class style below
+    and so follows this palette rather than the scope, for the same reason. Keeping the palette
+    light is what makes the two agree; the scope alone would not.
   -->
   <Application.Resources>
     <ResourceDictionary>
 
       <SolidColorBrush x:Key="AppBackgroundBrush" Color="#EEF0F4" />
       <SolidColorBrush x:Key="AppPanelBrush" Color="#FFFFFF" />
-      <SolidColorBrush x:Key="AppElevatedBrush" Color="#F2F4F8" />
+      <SolidColorBrush x:Key="AppElevatedBrush" Color="#E7ECF3" />
       <SolidColorBrush x:Key="AppBorderBrush" Color="#DCE0E7" />
       <SolidColorBrush x:Key="AppTextBrush" Color="#16191F" />
       <SolidColorBrush x:Key="AppMutedBrush" Color="#5A6472" />
@@ -30,6 +32,13 @@
       <SolidColorBrush x:Key="AppNegativeBrush" Color="#C0392F" />
       <SolidColorBrush x:Key="AppWarningBrush" Color="#8A6209" />
       <SolidColorBrush x:Key="AppCodeBrush" Color="#F1F3F7" />
+
+      <!--
+        Selection needs its own tone rather than the soft accent. That one is made to sit under
+        dark text on white, and over a code panel a shade below white it is the same colour twice:
+        the highlight would be the only sign of what is selected, and there would be none.
+      -->
+      <SolidColorBrush x:Key="AppSelectionBrush" Color="#ADD6FF" />
 
       <FontFamily x:Key="AppMonoFont">Cascadia Mono,Consolas,DejaVu Sans Mono,monospace</FontFamily>
 

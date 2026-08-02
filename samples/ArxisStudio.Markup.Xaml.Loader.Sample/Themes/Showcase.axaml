@@ -10,10 +10,13 @@
     <ResourceDictionary>
 
       <!--
-        The surface a loaded document is drawn on. Its own theme variant, because a document
-        written against a light theme rendered inside a dark window produces grey on near-white
-        and reads as a rendering fault rather than as the control it is. A backdrop and nothing
-        else: nothing is drawn over the content and nothing in it is selected.
+        The surface a loaded document is drawn on. It declares a light variant so the controls in
+        a previewed document wear the control themes the document was written against, whatever
+        the window around them wears. That covers the controls; it does not cover text coloured by
+        one of the class styles below, which is why the window's palette is light too.
+
+        A backdrop and nothing else: nothing is drawn over the content and nothing in it is
+        selected.
       -->
       <ControlTheme x:Key="{x:Type controls:PreviewSurface}" TargetType="controls:PreviewSurface">
         <Setter Property="MinHeight" Value="140" />
@@ -165,7 +168,7 @@
     <Setter Property="BorderThickness" Value="1" />
     <Setter Property="CornerRadius" Value="6" />
     <Setter Property="Padding" Value="10,8" />
-    <Setter Property="SelectionBrush" Value="{DynamicResource AppAccentSoftBrush}" />
+    <Setter Property="SelectionBrush" Value="{DynamicResource AppSelectionBrush}" />
   </Style>
 
   <Style Selector="TextBox.code /template/ Border#PART_BorderElement">

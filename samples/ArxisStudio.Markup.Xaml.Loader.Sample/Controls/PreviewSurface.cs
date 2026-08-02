@@ -8,8 +8,9 @@ namespace ArxisStudio.Markup.Xaml.Loader.Sample.Controls;
 /// <remarks>
 /// <para>
 /// A previewed control belongs to the application it was written for, not to this window, and it
-/// has to look like it. Its own surface and its own theme variant are what make that true, and
-/// both live in the control theme in <c>Themes/Showcase.axaml</c> rather than here.
+/// has to look like it. Its own surface and the theme variant its controls are themed against are
+/// what make that true, and both live in the control theme in <c>Themes/Showcase.axaml</c> rather
+/// than here.
 /// </para>
 /// <para>
 /// A backdrop and nothing else. Nothing is drawn over the content, nothing in it is selected, and
