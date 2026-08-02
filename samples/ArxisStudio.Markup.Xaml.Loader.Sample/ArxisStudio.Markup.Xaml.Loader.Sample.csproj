@@ -1,7 +1,9 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
+    <OutputType>WinExe</OutputType>
     <RootNamespace>ArxisStudio.Markup.Xaml.Loader.Sample</RootNamespace>
+    <AvaloniaUseCompiledBindingsByDefault>true</AvaloniaUseCompiledBindingsByDefault>
   </PropertyGroup>
 
   <ItemGroup>
@@ -9,9 +11,9 @@
   </ItemGroup>
 
   <!--
-    Building Avalonia objects needs Avalonia set up, and this sample has no window to set it up
-    with. The headless platform establishes Dispatcher.UIThread and nothing else, which is
-    exactly what a showcase that prints its results rather than drawing them needs.
+    A desktop backend and a theme: the showcase is a window, and the documents it loads are drawn
+    rather than described. Everything the window itself is made of is XAML, compiled by Avalonia's
+    own build task from the .axaml files in this project.
   -->
   <ItemGroup>
     <PackageReference Include="Avalonia.Desktop" />

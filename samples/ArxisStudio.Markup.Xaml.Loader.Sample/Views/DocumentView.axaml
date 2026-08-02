@@ -1,0 +1,53 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             x:Class="ArxisStudio.Markup.Xaml.Loader.Sample.Views.DocumentView">
+
+  <ScrollViewer>
+    <StackPanel Margin="24" Spacing="16">
+
+      <StackPanel>
+        <TextBlock Classes="h1" Text="The document is the source of truth" />
+        <TextBlock Classes="lede"
+                   Text="A document keeps the exact snapshot it was parsed from, and every node points into it. Writing an unchanged one back is a copy rather than a reformat, and an edit is expressed as changes against its own spans, so nothing it did not name is rewritten. None of this needs Avalonia to be present: it is the half of the library a tool can use without ever building an object." />
+      </StackPanel>
+
+      <Border Classes="card">
+        <StackPanel>
+          <TextBlock Classes="caption" Text="WHAT PARSING PRODUCED" Margin="0,0,0,10" />
+          <ItemsControl x:Name="Facts" />
+        </StackPanel>
+      </Border>
+
+      <Grid ColumnDefinitions="1*,16,1*">
+
+        <Border Grid.Column="0" Classes="card">
+          <StackPanel>
+            <TextBlock Classes="caption" Text="TWO EDITS, BATCHED, APPLIED TOGETHER" Margin="0,0,0,10" />
+            <TextBox x:Name="EditedRegion" Classes="code" IsReadOnly="True" Height="196" />
+            <ItemsControl x:Name="EditFacts" Margin="0,12,0,0" />
+          </StackPanel>
+        </Border>
+
+        <Border Grid.Column="2" Classes="card">
+          <StackPanel>
+            <TextBlock Classes="caption" Text="A DOCUMENT CAUGHT MID-KEYSTROKE" Margin="0,0,0,10" />
+            <TextBox x:Name="MalformedText" Classes="code" IsReadOnly="True" Height="196" />
+            <ItemsControl x:Name="RecoveryFacts" Margin="0,12,0,0" />
+          </StackPanel>
+        </Border>
+
+      </Grid>
+
+      <Border Classes="card">
+        <StackPanel>
+          <TextBlock Classes="caption"
+                     Text="WHAT THE SYNTAX MODEL CAN SAY ABOUT A VALUE, WITH NO CLR TYPE IN SIGHT"
+                     Margin="0,0,0,10" />
+          <ItemsControl x:Name="Extensions" />
+        </StackPanel>
+      </Border>
+
+    </StackPanel>
+  </ScrollViewer>
+
+</UserControl>

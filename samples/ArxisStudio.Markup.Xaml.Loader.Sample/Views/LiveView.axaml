@@ -1,0 +1,61 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:controls="using:ArxisStudio.Markup.Xaml.Loader.Sample.Controls"
+             x:Class="ArxisStudio.Markup.Xaml.Loader.Sample.Views.LiveView">
+
+  <Grid RowDefinitions="Auto,*" Margin="24">
+
+    <StackPanel Grid.Row="0" Margin="0,0,0,18">
+      <TextBlock Classes="h1" Text="Live document" />
+      <TextBlock Classes="lede"
+                 Text="Type in the document on the left. Nothing is compiled and no application is restarted: the objects already running are brought in line with what you wrote, by the smallest strategy that is certainly enough — and which one that was is written down, so the choice is visible rather than magical." />
+    </StackPanel>
+
+    <Grid Grid.Row="1" ColumnDefinitions="1.1*,16,1*">
+
+      <Border Grid.Column="0" Classes="card">
+        <DockPanel>
+          <Grid DockPanel.Dock="Top" ColumnDefinitions="*,Auto" Margin="0,0,0,10">
+            <TextBlock Classes="caption" Text="THE DOCUMENT" />
+            <TextBlock Grid.Column="1"
+                       Classes="mono muted"
+                       FontSize="11"
+                       Text="file:///Views/CustomerView.axaml" />
+          </Grid>
+          <TextBox x:Name="Editor" Classes="code" />
+        </DockPanel>
+      </Border>
+
+      <Grid Grid.Column="2" RowDefinitions="1.05*,14,1*">
+
+        <Border Grid.Row="0" Classes="card">
+          <DockPanel>
+            <TextBlock DockPanel.Dock="Top"
+                       Classes="caption"
+                       Text="THE OBJECTS THE DOCUMENT DESCRIBES"
+                       Margin="0,0,0,10" />
+            <ScrollViewer>
+              <controls:PreviewSurface x:Name="Preview" />
+            </ScrollViewer>
+          </DockPanel>
+        </Border>
+
+        <Border Grid.Row="2" Classes="card">
+          <DockPanel>
+            <TextBlock DockPanel.Dock="Top"
+                       Classes="caption"
+                       Text="WHAT THE UPDATE DID"
+                       Margin="0,0,0,8" />
+            <ScrollViewer>
+              <ItemsControl x:Name="ReportList" />
+            </ScrollViewer>
+          </DockPanel>
+        </Border>
+
+      </Grid>
+
+    </Grid>
+
+  </Grid>
+
+</UserControl>

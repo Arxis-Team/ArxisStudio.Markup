@@ -1,0 +1,41 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             x:Class="ArxisStudio.Markup.Xaml.Loader.Sample.Views.ObjectsView">
+
+  <Grid RowDefinitions="Auto,*" Margin="24">
+
+    <StackPanel Grid.Row="0" Margin="0,0,0,18">
+      <TextBlock Classes="h1" Text="Which markup each object came from" />
+      <TextBlock Classes="lede"
+                 Text="Built from the source information Avalonia records, read back through the projection the includes were spliced into. That is what keeps an object declared in an included file attributed to that file rather than to whichever line of this one sits at the same number — and what stops a template's output being passed off as the control's own declaration. A read-only report: nothing here edits anything, and no object is selected in or drawn over a preview." />
+    </StackPanel>
+
+    <Border Grid.Row="1" Classes="card">
+      <DockPanel>
+
+        <StackPanel DockPanel.Dock="Top">
+          <TextBlock x:Name="Summary" Classes="caption" Margin="0,0,0,10" />
+          <Grid ColumnDefinitions="176,104,150,*" Margin="0,0,0,6">
+            <TextBlock Grid.Column="0" Classes="caption" Text="OBJECT" />
+            <TextBlock Grid.Column="1" Classes="caption" Text="ORIGIN" />
+            <TextBlock Grid.Column="2" Classes="caption" Text="DECLARED IN" />
+            <TextBlock Grid.Column="3" Classes="caption" Text="WHERE" />
+          </Grid>
+          <Border Classes="divider" Margin="0,0,0,10" />
+        </StackPanel>
+
+        <ScrollViewer>
+          <StackPanel>
+            <ItemsControl x:Name="Objects" />
+            <TextBlock x:Name="Footnote" Classes="note" />
+            <TextBlock Classes="caption" Text="DIAGNOSTICS" Margin="0,16,0,6" />
+            <ItemsControl x:Name="DiagnosticList" />
+          </StackPanel>
+        </ScrollViewer>
+
+      </DockPanel>
+    </Border>
+
+  </Grid>
+
+</UserControl>

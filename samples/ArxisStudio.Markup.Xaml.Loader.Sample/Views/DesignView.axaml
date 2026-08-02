@@ -1,0 +1,57 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:controls="using:ArxisStudio.Markup.Xaml.Loader.Sample.Controls"
+             x:Class="ArxisStudio.Markup.Xaml.Loader.Sample.Views.DesignView">
+
+  <Grid RowDefinitions="Auto,Auto,*" Margin="24">
+
+    <StackPanel Grid.Row="0" Margin="0,0,0,18">
+      <TextBlock Classes="h1" Text="The same text, loaded two ways" />
+      <TextBlock Classes="lede"
+                 Text="Avalonia's loader understands four names in the design namespace and fails the whole document on any other, so a d:Text is taken out of the text it is given and applied afterwards. In run mode it is taken out and not applied, which is what ignoring a design-only value means. The document keeps every one of them either way, which is why both panes below are loaded from the same characters." />
+    </StackPanel>
+
+    <Grid Grid.Row="1" ColumnDefinitions="1*,16,1*" Margin="0,0,0,16">
+
+      <Border Grid.Column="0" Classes="card">
+        <StackPanel>
+          <TextBlock Classes="caption" Text="DESIGN — NO DATA, SO THE DESIGN VALUE SHOWS" Margin="0,0,0,10" />
+          <!-- The design size is honoured, so the pane scrolls rather than cropping the control. -->
+          <ScrollViewer HorizontalScrollBarVisibility="Auto">
+            <controls:PreviewSurface x:Name="DesignPreview" />
+          </ScrollViewer>
+          <ItemsControl x:Name="DesignFacts" Margin="0,12,0,0" />
+        </StackPanel>
+      </Border>
+
+      <Border Grid.Column="2" Classes="card">
+        <StackPanel>
+          <TextBlock Classes="caption" Text="RUNTIME — A DATA CONTEXT, SO THE BINDING SHOWS" Margin="0,0,0,10" />
+          <ScrollViewer HorizontalScrollBarVisibility="Auto">
+            <controls:PreviewSurface x:Name="RuntimePreview" />
+          </ScrollViewer>
+          <ItemsControl x:Name="RuntimeFacts" Margin="0,12,0,0" />
+        </StackPanel>
+      </Border>
+
+    </Grid>
+
+    <Border Grid.Row="2" Classes="card">
+      <Grid ColumnDefinitions="1*,16,1*" RowDefinitions="Auto,*">
+
+        <TextBlock Grid.Row="0" Grid.Column="0" Classes="caption" Text="THE DOCUMENT" Margin="0,0,0,8" />
+        <TextBlock Grid.Row="0"
+                   Grid.Column="2"
+                   Classes="caption"
+                   Text="WHAT AVALONIA WAS HANDED, IN DESIGN MODE"
+                   Margin="0,0,0,8" />
+
+        <TextBox Grid.Row="1" Grid.Column="0" x:Name="DocumentText" Classes="code" IsReadOnly="True" />
+        <TextBox Grid.Row="1" Grid.Column="2" x:Name="ProjectedText" Classes="code" IsReadOnly="True" />
+
+      </Grid>
+    </Border>
+
+  </Grid>
+
+</UserControl>

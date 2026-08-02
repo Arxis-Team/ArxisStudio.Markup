@@ -1,22 +1,22 @@
+using ArxisStudio.Markup.Xaml.Loader.Sample.Views;
 using Avalonia;
 using Avalonia.Controls.ApplicationLifetimes;
 using Avalonia.Markup.Xaml;
-using Avalonia.Themes.Fluent;
 
 namespace ArxisStudio.Markup.Xaml.Loader.Sample;
 
 /// <summary>The showcase application.</summary>
-internal sealed class ShowcaseApplication : Application
+internal sealed partial class ShowcaseApplication : Application
 {
     /// <inheritdoc />
-    public override void Initialize() => Styles.Add(new FluentTheme());
+    public override void Initialize() => AvaloniaXamlLoader.Load(this);
 
     /// <inheritdoc />
     public override void OnFrameworkInitializationCompleted()
     {
         if (ApplicationLifetime is IClassicDesktopStyleApplicationLifetime desktop)
         {
-            desktop.MainWindow = new ShowcaseWindow();
+            desktop.MainWindow = new MainWindow();
         }
 
         base.OnFrameworkInitializationCompleted();

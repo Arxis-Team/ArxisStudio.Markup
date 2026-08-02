@@ -1,0 +1,291 @@
+<Styles xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:controls="using:ArxisStudio.Markup.Xaml.Loader.Sample.Controls">
+
+  <!--
+    The showcase's own look. The colours it names live in the application's resources; this file
+    says what is made of them.
+  -->
+  <Styles.Resources>
+    <ResourceDictionary>
+
+      <!--
+        The surface a loaded document is drawn on. Its own theme variant, because a document
+        written against a light theme rendered inside a dark window produces grey on near-white
+        and reads as a rendering fault rather than as the control it is. A backdrop and nothing
+        else: nothing is drawn over the content and nothing in it is selected.
+      -->
+      <ControlTheme x:Key="{x:Type controls:PreviewSurface}" TargetType="controls:PreviewSurface">
+        <Setter Property="MinHeight" Value="140" />
+        <Setter Property="Padding" Value="14" />
+        <Setter Property="Template">
+          <ControlTemplate>
+            <Border Background="#FFFAFAFA"
+                    BorderBrush="#FFD9DDE3"
+                    BorderThickness="1"
+                    CornerRadius="6"
+                    Padding="{TemplateBinding Padding}">
+              <ThemeVariantScope RequestedThemeVariant="Light">
+                <ContentPresenter Content="{TemplateBinding Content}"
+                                  HorizontalAlignment="Left"
+                                  VerticalAlignment="Top" />
+              </ThemeVariantScope>
+            </Border>
+          </ControlTemplate>
+        </Setter>
+      </ControlTheme>
+
+    </ResourceDictionary>
+  </Styles.Resources>
+
+  <!-- Typography. -->
+
+  <Style Selector="TextBlock">
+    <Setter Property="Foreground" Value="{DynamicResource AppTextBrush}" />
+    <Setter Property="FontSize" Value="13" />
+  </Style>
+
+  <Style Selector="TextBlock.h1">
+    <Setter Property="FontSize" Value="21" />
+    <Setter Property="FontWeight" Value="SemiBold" />
+    <Setter Property="Margin" Value="0,0,0,6" />
+  </Style>
+
+  <Style Selector="TextBlock.lede">
+    <Setter Property="Foreground" Value="{DynamicResource AppMutedBrush}" />
+    <Setter Property="TextWrapping" Value="Wrap" />
+    <Setter Property="LineHeight" Value="21" />
+    <Setter Property="MaxWidth" Value="860" />
+    <Setter Property="HorizontalAlignment" Value="Left" />
+  </Style>
+
+  <Style Selector="TextBlock.caption">
+    <Setter Property="FontSize" Value="11" />
+    <Setter Property="FontWeight" Value="SemiBold" />
+    <Setter Property="LetterSpacing" Value="0.6" />
+    <Setter Property="Foreground" Value="{DynamicResource AppMutedBrush}" />
+  </Style>
+
+  <Style Selector="TextBlock.muted">
+    <Setter Property="Foreground" Value="{DynamicResource AppMutedBrush}" />
+  </Style>
+
+  <Style Selector="TextBlock.mono">
+    <Setter Property="FontFamily" Value="{DynamicResource AppMonoFont}" />
+    <Setter Property="FontSize" Value="12" />
+  </Style>
+
+  <Style Selector="TextBlock.note">
+    <Setter Property="FontSize" Value="11" />
+    <Setter Property="Foreground" Value="{DynamicResource AppMutedBrush}" />
+    <Setter Property="TextWrapping" Value="Wrap" />
+    <Setter Property="LineHeight" Value="17" />
+    <Setter Property="Margin" Value="0,6,0,0" />
+  </Style>
+
+  <!-- Surfaces. -->
+
+  <Style Selector="Border.card">
+    <Setter Property="Background" Value="{DynamicResource AppPanelBrush}" />
+    <Setter Property="BorderBrush" Value="{DynamicResource AppBorderBrush}" />
+    <Setter Property="BorderThickness" Value="1" />
+    <Setter Property="CornerRadius" Value="10" />
+    <Setter Property="Padding" Value="16" />
+  </Style>
+
+  <Style Selector="Border.appbar">
+    <Setter Property="Background" Value="{DynamicResource AppPanelBrush}" />
+    <Setter Property="BorderBrush" Value="{DynamicResource AppBorderBrush}" />
+    <Setter Property="BorderThickness" Value="0,0,0,1" />
+    <Setter Property="Padding" Value="20,12" />
+  </Style>
+
+  <Style Selector="Border.rail">
+    <Setter Property="Background" Value="{DynamicResource AppPanelBrush}" />
+    <Setter Property="BorderBrush" Value="{DynamicResource AppBorderBrush}" />
+    <Setter Property="BorderThickness" Value="0,0,1,0" />
+  </Style>
+
+  <Style Selector="Border.mark">
+    <Setter Property="Background" Value="{DynamicResource AppAccentSoftBrush}" />
+    <Setter Property="CornerRadius" Value="8" />
+    <Setter Property="Width" Value="34" />
+    <Setter Property="Height" Value="34" />
+  </Style>
+
+  <Style Selector="Border.mark > TextBlock">
+    <Setter Property="Foreground" Value="{DynamicResource AppAccentBrush}" />
+    <Setter Property="FontFamily" Value="{DynamicResource AppMonoFont}" />
+    <Setter Property="FontSize" Value="15" />
+    <Setter Property="FontWeight" Value="Bold" />
+    <Setter Property="HorizontalAlignment" Value="Center" />
+    <Setter Property="VerticalAlignment" Value="Center" />
+  </Style>
+
+  <Style Selector="Border.chip">
+    <Setter Property="Background" Value="{DynamicResource AppAccentSoftBrush}" />
+    <Setter Property="CornerRadius" Value="11" />
+    <Setter Property="Padding" Value="10,3" />
+  </Style>
+
+  <Style Selector="Border.chip > TextBlock">
+    <Setter Property="Foreground" Value="{DynamicResource AppAccentBrush}" />
+    <Setter Property="FontSize" Value="11" />
+    <Setter Property="FontWeight" Value="SemiBold" />
+  </Style>
+
+  <Style Selector="Border.chip.quiet">
+    <Setter Property="Background" Value="Transparent" />
+    <Setter Property="BorderBrush" Value="{DynamicResource AppBorderBrush}" />
+    <Setter Property="BorderThickness" Value="1" />
+  </Style>
+
+  <Style Selector="Border.chip.quiet > TextBlock">
+    <Setter Property="Foreground" Value="{DynamicResource AppMutedBrush}" />
+    <Setter Property="FontWeight" Value="Normal" />
+  </Style>
+
+  <Style Selector="Border.divider">
+    <Setter Property="Background" Value="{DynamicResource AppBorderBrush}" />
+    <Setter Property="Height" Value="1" />
+    <Setter Property="Margin" Value="0,10" />
+  </Style>
+
+  <!-- Text shown as text: monospaced, selectable, and never interpreted. -->
+
+  <Style Selector="TextBox.code">
+    <Setter Property="FontFamily" Value="{DynamicResource AppMonoFont}" />
+    <Setter Property="FontSize" Value="12" />
+    <Setter Property="AcceptsReturn" Value="True" />
+    <Setter Property="TextWrapping" Value="NoWrap" />
+    <Setter Property="VerticalContentAlignment" Value="Top" />
+    <Setter Property="Background" Value="{DynamicResource AppCodeBrush}" />
+    <Setter Property="Foreground" Value="{DynamicResource AppTextBrush}" />
+    <Setter Property="BorderBrush" Value="{DynamicResource AppBorderBrush}" />
+    <Setter Property="BorderThickness" Value="1" />
+    <Setter Property="CornerRadius" Value="6" />
+    <Setter Property="Padding" Value="10,8" />
+    <Setter Property="SelectionBrush" Value="{DynamicResource AppAccentSoftBrush}" />
+  </Style>
+
+  <Style Selector="TextBox.code /template/ Border#PART_BorderElement">
+    <Setter Property="Background" Value="{DynamicResource AppCodeBrush}" />
+    <Setter Property="BorderBrush" Value="{DynamicResource AppBorderBrush}" />
+  </Style>
+
+  <Style Selector="TextBox.code:pointerover /template/ Border#PART_BorderElement">
+    <Setter Property="Background" Value="{DynamicResource AppCodeBrush}" />
+    <Setter Property="BorderBrush" Value="{DynamicResource AppBorderBrush}" />
+  </Style>
+
+  <Style Selector="TextBox.code:focus /template/ Border#PART_BorderElement">
+    <Setter Property="Background" Value="{DynamicResource AppCodeBrush}" />
+    <Setter Property="BorderBrush" Value="{DynamicResource AppAccentBrush}" />
+  </Style>
+
+  <!-- Report rows. -->
+
+  <Style Selector="TextBlock.verdict-mark">
+    <Setter Property="FontWeight" Value="Bold" />
+    <Setter Property="Width" Value="16" />
+    <Setter Property="Foreground" Value="{DynamicResource AppNegativeBrush}" />
+  </Style>
+
+  <Style Selector="TextBlock.verdict-mark.held">
+    <Setter Property="Foreground" Value="{DynamicResource AppPositiveBrush}" />
+  </Style>
+
+  <Style Selector="TextBlock.severity">
+    <Setter Property="Foreground" Value="{DynamicResource AppAccentBrush}" />
+  </Style>
+
+  <Style Selector="TextBlock.severity.warning">
+    <Setter Property="Foreground" Value="{DynamicResource AppWarningBrush}" />
+  </Style>
+
+  <Style Selector="TextBlock.severity.error">
+    <Setter Property="Foreground" Value="{DynamicResource AppNegativeBrush}" />
+  </Style>
+
+  <!-- The navigation rail, which is a TabControl wearing different clothes. -->
+
+  <Style Selector="TabControl.rail">
+    <Setter Property="ItemsPanel">
+      <ItemsPanelTemplate>
+        <StackPanel Spacing="2" />
+      </ItemsPanelTemplate>
+    </Setter>
+    <Setter Property="Template">
+      <ControlTemplate>
+        <Grid ColumnDefinitions="264,*">
+          <Border Grid.Column="0" Classes="rail">
+            <ScrollViewer HorizontalScrollBarVisibility="Disabled">
+              <ItemsPresenter Name="PART_ItemsPresenter"
+                              ItemsPanel="{TemplateBinding ItemsPanel}"
+                              Margin="10,14" />
+            </ScrollViewer>
+          </Border>
+          <ContentPresenter Grid.Column="1"
+                            Name="PART_SelectedContentHost"
+                            Content="{TemplateBinding SelectedContent}"
+                            ContentTemplate="{TemplateBinding SelectedContentTemplate}" />
+        </Grid>
+      </ControlTemplate>
+    </Setter>
+  </Style>
+
+  <Style Selector="TabItem.nav">
+    <Setter Property="Padding" Value="0" />
+    <Setter Property="MinHeight" Value="0" />
+    <Setter Property="Template">
+      <ControlTemplate>
+        <Border Name="PART_Surface"
+                Background="Transparent"
+                CornerRadius="8"
+                Padding="12,9">
+          <Grid ColumnDefinitions="3,*">
+            <Border Name="PART_Marker"
+                    Grid.Column="0"
+                    Width="3"
+                    CornerRadius="2"
+                    Margin="0,2,10,2"
+                    Background="Transparent" />
+            <ContentPresenter Grid.Column="1"
+                              Content="{TemplateBinding Header}"
+                              ContentTemplate="{TemplateBinding HeaderTemplate}" />
+          </Grid>
+        </Border>
+      </ControlTemplate>
+    </Setter>
+  </Style>
+
+  <Style Selector="TabItem.nav:pointerover /template/ Border#PART_Surface">
+    <Setter Property="Background" Value="{DynamicResource AppElevatedBrush}" />
+  </Style>
+
+  <Style Selector="TabItem.nav:selected /template/ Border#PART_Surface">
+    <Setter Property="Background" Value="{DynamicResource AppAccentSoftBrush}" />
+  </Style>
+
+  <Style Selector="TabItem.nav:selected /template/ Border#PART_Marker">
+    <Setter Property="Background" Value="{DynamicResource AppAccentBrush}" />
+  </Style>
+
+  <Style Selector="TextBlock.nav-title">
+    <Setter Property="FontSize" Value="13" />
+    <Setter Property="FontWeight" Value="SemiBold" />
+  </Style>
+
+  <Style Selector="TextBlock.nav-sub">
+    <Setter Property="FontSize" Value="11" />
+    <Setter Property="Foreground" Value="{DynamicResource AppMutedBrush}" />
+    <Setter Property="TextWrapping" Value="Wrap" />
+    <Setter Property="Margin" Value="0,2,0,0" />
+  </Style>
+
+  <Style Selector="TabItem.nav:selected TextBlock.nav-title">
+    <Setter Property="Foreground" Value="{DynamicResource AppAccentBrush}" />
+  </Style>
+
+
+</Styles>

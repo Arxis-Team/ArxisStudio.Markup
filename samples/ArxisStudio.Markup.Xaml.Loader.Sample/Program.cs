@@ -15,9 +15,10 @@ namespace ArxisStudio.Markup.Xaml.Loader.Sample;
 /// the objects the library builds from it, and show what it says about both.
 /// </para>
 /// <para>
-/// The window's own interface is written in C# rather than XAML on purpose. Every piece of
-/// markup on screen is then the library's subject rather than the application's own chrome,
-/// which removes any question about which XAML is being demonstrated and which is scaffolding.
+/// The window is itself an Avalonia application written in XAML: the shell, every view, the
+/// theme, and the templates each report row is drawn with are <c>.axaml</c> files compiled by
+/// Avalonia's build task. The documents the showcase loads are never compiled — they are parsed
+/// and loaded at runtime by the three packages, which is the difference being demonstrated.
 /// </para>
 /// </remarks>
 internal static class Program

@@ -1,0 +1,76 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:controls="using:ArxisStudio.Markup.Xaml.Loader.Sample.Controls"
+             xmlns:system="using:System"
+             x:Class="ArxisStudio.Markup.Xaml.Loader.Sample.Views.ResourcesView">
+
+  <Grid RowDefinitions="Auto,*" Margin="24">
+
+    <StackPanel Grid.Row="0" Margin="0,0,0,18">
+      <TextBlock Classes="h1" Text="Files the document only includes" />
+      <TextBlock Classes="lede"
+                 Text="The palette and the brand file exist only in memory. The includes resolve through the environment's own resolver, which is what lets an unsaved edit be what the objects are built from. Change the accent and the loaded tree follows it — the document itself does not change at all." />
+    </StackPanel>
+
+    <Grid Grid.Row="1" ColumnDefinitions="1*,16,1.05*">
+
+      <Border Grid.Column="0" Classes="card">
+        <DockPanel>
+
+          <StackPanel DockPanel.Dock="Top">
+            <TextBlock Classes="caption" Text="THE ACCENT THE PALETTE DECLARES" Margin="0,0,0,8" />
+            <ComboBox x:Name="Accent" Width="200" HorizontalAlignment="Left">
+              <ComboBox.ItemTemplate>
+                <DataTemplate DataType="system:String">
+                  <StackPanel Orientation="Horizontal" Spacing="10">
+                    <Border Width="14"
+                            Height="14"
+                            CornerRadius="3"
+                            Background="{Binding}"
+                            BorderBrush="#55000000"
+                            BorderThickness="1"
+                            VerticalAlignment="Center" />
+                    <TextBlock Classes="mono" Text="{Binding}" VerticalAlignment="Center" />
+                  </StackPanel>
+                </DataTemplate>
+              </ComboBox.ItemTemplate>
+            </ComboBox>
+            <TextBlock Classes="caption" Text="THEMES/PALETTE.AXAML, IN MEMORY" Margin="0,16,0,8" />
+            <TextBox x:Name="PaletteText" Classes="code" IsReadOnly="True" Height="150" />
+            <TextBlock Classes="caption" Text="THE DEPENDENCY GRAPH THE INCLUDES FORM" Margin="0,16,0,8" />
+          </StackPanel>
+
+          <ScrollViewer>
+            <ItemsControl x:Name="GraphList" />
+          </ScrollViewer>
+
+        </DockPanel>
+      </Border>
+
+      <Border Grid.Column="2" Classes="card">
+        <DockPanel>
+
+          <TextBlock DockPanel.Dock="Top"
+                     Classes="caption"
+                     Text="THE OBJECTS THE DOCUMENT DESCRIBES"
+                     Margin="0,0,0,10" />
+
+          <controls:PreviewSurface x:Name="Preview" DockPanel.Dock="Top" />
+
+          <TextBlock DockPanel.Dock="Top"
+                     Classes="caption"
+                     Text="WHAT CHANGING THE FILE DID"
+                     Margin="0,16,0,8" />
+
+          <ScrollViewer>
+            <ItemsControl x:Name="UpdateList" />
+          </ScrollViewer>
+
+        </DockPanel>
+      </Border>
+
+    </Grid>
+
+  </Grid>
+
+</UserControl>
