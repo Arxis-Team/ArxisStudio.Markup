@@ -1,5 +1,6 @@
 <UserControl xmlns="https://github.com/avaloniaui"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:edit="using:AvaloniaEdit"
              x:Class="ArxisStudio.Markup.Xaml.Loader.Sample.Views.DocumentView">
 
   <ScrollViewer>
@@ -23,7 +24,7 @@
         <Border Grid.Column="0" Classes="card">
           <StackPanel>
             <TextBlock Classes="caption" Text="ДВЕ ПРАВКИ, ОДНОЙ ПАЧКОЙ" Margin="0,0,0,10" />
-            <TextBox x:Name="EditedRegion" Classes="code" IsReadOnly="True" Height="196" />
+            <edit:TextEditor x:Name="EditedRegion" Classes="code" IsReadOnly="True" Height="196" />
             <ItemsControl x:Name="EditFacts" Margin="0,12,0,0" />
           </StackPanel>
         </Border>
@@ -31,7 +32,7 @@
         <Border Grid.Column="2" Classes="card">
           <StackPanel>
             <TextBlock Classes="caption" Text="ДОКУМЕНТ, ПОЙМАННЫЙ НА ПОЛУСЛОВЕ" Margin="0,0,0,10" />
-            <TextBox x:Name="MalformedText" Classes="code" IsReadOnly="True" Height="196" />
+            <edit:TextEditor x:Name="MalformedText" Classes="code" IsReadOnly="True" Height="196" />
             <ItemsControl x:Name="RecoveryFacts" Margin="0,12,0,0" />
           </StackPanel>
         </Border>

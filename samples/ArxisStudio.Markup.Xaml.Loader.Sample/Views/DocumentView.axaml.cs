@@ -1,6 +1,7 @@
 using System;
 using System.Globalization;
 using System.Linq;
+using ArxisStudio.Markup.Xaml.Loader.Sample.Controls;
 using ArxisStudio.Markup.Xaml.Loader.Sample.Reporting;
 using Avalonia.Controls;
 
@@ -14,6 +15,7 @@ internal sealed partial class DocumentView : UserControl
     public DocumentView()
     {
         InitializeComponent();
+        XamlEditor.Highlight(EditedRegion, MalformedText);
 
         var document = XamlDocument.Parse(
             Fixtures.View, new XamlParseOptions { DocumentUri = Fixtures.ViewUri });

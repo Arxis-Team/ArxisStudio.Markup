@@ -1,6 +1,7 @@
 <UserControl xmlns="https://github.com/avaloniaui"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:controls="using:ArxisStudio.Markup.Xaml.Loader.Sample.Controls"
+             xmlns:edit="using:AvaloniaEdit"
              x:Class="ArxisStudio.Markup.Xaml.Loader.Sample.Views.DesignView">
 
   <Grid RowDefinitions="Auto,Auto,*" Margin="24">
@@ -46,8 +47,8 @@
                    Text="ЧТО ПОЛУЧИЛА AVALONIA В РЕЖИМЕ ДИЗАЙНА"
                    Margin="0,0,0,8" />
 
-        <TextBox Grid.Row="1" Grid.Column="0" x:Name="DocumentText" Classes="code" IsReadOnly="True" />
-        <TextBox Grid.Row="1" Grid.Column="2" x:Name="ProjectedText" Classes="code" IsReadOnly="True" />
+        <edit:TextEditor Grid.Row="1" Grid.Column="0" x:Name="DocumentText" Classes="code" IsReadOnly="True" />
+        <edit:TextEditor Grid.Row="1" Grid.Column="2" x:Name="ProjectedText" Classes="code" IsReadOnly="True" />
 
       </Grid>
     </Border>

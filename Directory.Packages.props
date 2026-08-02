@@ -18,6 +18,12 @@
     <!-- The sample is a windowed showcase, so it needs a real backend and a theme. -->
     <PackageVersion Include="Avalonia.Desktop" Version="12.1.1" />
     <PackageVersion Include="Avalonia.Themes.Fluent" Version="12.1.1" />
+    <!--
+      Syntax highlighting for the XAML the showcase displays. The sample only: no package in src/
+      references it, and none may. Its own Avalonia dependency is 12.0.0, which transitive pinning
+      lifts to the 12.1.1 above.
+    -->
+    <PackageVersion Include="Avalonia.AvaloniaEdit" Version="12.0.0" />
   </ItemGroup>
 
   <!-- Test stack. Avalonia.Headless.XUnit 12.1.1 depends on xunit.v3 3.2.2. -->

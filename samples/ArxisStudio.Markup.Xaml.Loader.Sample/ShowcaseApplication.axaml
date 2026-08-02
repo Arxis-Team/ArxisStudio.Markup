@@ -47,6 +47,8 @@
 
   <Application.Styles>
     <FluentTheme />
+    <!-- The editor's own theme, before this showcase's, so that this one has the last word. -->
+    <StyleInclude Source="avares://AvaloniaEdit/Themes/Fluent/AvaloniaEdit.xaml" />
     <StyleInclude Source="avares://ArxisStudio.Markup.Xaml.Loader.Sample/Themes/Showcase.axaml" />
   </Application.Styles>
 

@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
+using ArxisStudio.Markup.Xaml.Loader.Sample.Controls;
 using ArxisStudio.Markup.Xaml.Loader.Sample.Reporting;
 using Avalonia.Controls;
 using Avalonia.Interactivity;
@@ -39,6 +40,7 @@ internal sealed partial class LiveView : UserControl
     public LiveView()
     {
         InitializeComponent();
+        XamlEditor.Highlight(Editor);
 
         (_environment, _) = ShowcaseEnvironment.Create();
 
@@ -88,7 +90,7 @@ internal sealed partial class LiveView : UserControl
             return;
         }
 
-        string text = Editor.Text ?? string.Empty;
+        string text = Editor.Text;
 
         // Nothing was typed after all — the box announced a change that left the text as the
         // session already has it. Reporting a strategy for that would say the library did work it
@@ -117,8 +119,7 @@ internal sealed partial class LiveView : UserControl
     /// <summary>Builds a new session, which is what a changed root leaves no choice about.</summary>
     private async Task ReloadAsync()
     {
-        var document = XamlDocument.Parse(
-            Editor.Text ?? string.Empty, new XamlParseOptions { DocumentUri = Fixtures.ViewUri });
+        var document = XamlDocument.Parse(Editor.Text, new XamlParseOptions { DocumentUri = Fixtures.ViewUri });
 
         (XamlLoadSession? session, XamlLoadResult result) = await XamlLoadSession.TryCreateAsync(
             document, _environment, new XamlLoadOptions { Mode = XamlLoadMode.Runtime });
@@ -157,7 +158,7 @@ internal sealed partial class LiveView : UserControl
         {
             _report.Verdict(
                 "документ по-прежнему записывается ровно так, как набран",
-                _session.Document.GetText() == (Editor.Text ?? string.Empty) || !applied);
+                _session.Document.GetText() == Editor.Text || !applied);
         }
 
         foreach (XamlDocumentChange change in changes.Take(6))

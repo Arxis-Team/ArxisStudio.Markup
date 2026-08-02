@@ -1,6 +1,7 @@
 using System;
 using System.Globalization;
 using System.Threading.Tasks;
+using ArxisStudio.Markup.Xaml.Loader.Sample.Controls;
 using ArxisStudio.Markup.Xaml.Loader.Sample.Reporting;
 using Avalonia.Controls;
 using Avalonia.Interactivity;
@@ -24,6 +25,7 @@ internal sealed partial class DesignView : UserControl
     public DesignView()
     {
         InitializeComponent();
+        XamlEditor.Highlight(DocumentText, ProjectedText);
 
         DesignFacts.ItemsSource = _design.Rows;
         RuntimeFacts.ItemsSource = _runtime.Rows;

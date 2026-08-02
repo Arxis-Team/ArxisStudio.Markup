@@ -4,6 +4,7 @@ using System.Globalization;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
+using ArxisStudio.Markup.Xaml.Loader.Sample.Controls;
 using ArxisStudio.Markup.Xaml.Loader.Sample.Reporting;
 using Avalonia.Controls;
 using Avalonia.Interactivity;
@@ -29,6 +30,7 @@ internal sealed partial class ResourcesView : UserControl
     public ResourcesView()
     {
         InitializeComponent();
+        XamlEditor.Highlight(PaletteText);
 
         (_environment, _resources) = ShowcaseEnvironment.Create();
 
@@ -106,7 +108,7 @@ internal sealed partial class ResourcesView : UserControl
         var provider = new InMemoryMarkupSourceProvider();
 
         provider.Update(Fixtures.ViewUri, Fixtures.View);
-        provider.Update(Fixtures.PaletteUri, PaletteText.Text ?? Fixtures.Palette(Accents[0]));
+        provider.Update(Fixtures.PaletteUri, PaletteText.Text);
         provider.Update(Fixtures.BrandUri, Fixtures.Brand);
 
         var graph = new XamlResourceGraph(provider);

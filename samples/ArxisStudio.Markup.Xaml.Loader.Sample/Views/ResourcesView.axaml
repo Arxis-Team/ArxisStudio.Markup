@@ -2,6 +2,7 @@
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:controls="using:ArxisStudio.Markup.Xaml.Loader.Sample.Controls"
              xmlns:system="using:System"
+             xmlns:edit="using:AvaloniaEdit"
              x:Class="ArxisStudio.Markup.Xaml.Loader.Sample.Views.ResourcesView">
 
   <Grid RowDefinitions="Auto,*" Margin="24">
@@ -36,7 +37,7 @@
               </ComboBox.ItemTemplate>
             </ComboBox>
             <TextBlock Classes="caption" Text="THEMES/PALETTE.AXAML, В ПАМЯТИ" Margin="0,16,0,8" />
-            <TextBox x:Name="PaletteText" Classes="code" IsReadOnly="True" Height="150" />
+            <edit:TextEditor x:Name="PaletteText" Classes="code" IsReadOnly="True" Height="150" />
             <TextBlock Classes="caption" Text="ГРАФ ЗАВИСИМОСТЕЙ, КОТОРЫЙ ОБРАЗУЮТ ВКЛЮЧЕНИЯ" Margin="0,16,0,8" />
           </StackPanel>
 

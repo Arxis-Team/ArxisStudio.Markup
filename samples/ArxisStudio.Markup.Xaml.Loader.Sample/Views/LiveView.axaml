@@ -1,6 +1,7 @@
 <UserControl xmlns="https://github.com/avaloniaui"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:controls="using:ArxisStudio.Markup.Xaml.Loader.Sample.Controls"
+             xmlns:edit="using:AvaloniaEdit"
              x:Class="ArxisStudio.Markup.Xaml.Loader.Sample.Views.LiveView">
 
   <Grid RowDefinitions="Auto,*" Margin="24">
@@ -22,7 +23,7 @@
                        FontSize="11"
                        Text="file:///Views/CustomerView.axaml" />
           </Grid>
-          <TextBox x:Name="Editor" Classes="code" />
+          <edit:TextEditor x:Name="Editor" Classes="code" />
         </DockPanel>
       </Border>
 
