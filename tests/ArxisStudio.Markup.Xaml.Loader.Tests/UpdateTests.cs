@@ -930,6 +930,84 @@ public sealed class UpdateTests
     }
 
     [AvaloniaFact]
+    public async Task EverySurvivingElementStillMapsToAnObjectAfterARemoval()
+    {
+        await using XamlLoadSession session = await Load(Panel(
+            "  <Button x:Name=\"Cancel\" Content=\"Cancel\" />\n" +
+            "  <Button x:Name=\"Save\" Content=\"Save\" />"));
+
+        XamlUpdateResult result = await Update(session, Panel(
+            "  <Button x:Name=\"Cancel\" Content=\"Cancel\" />"));
+
+        Assert.True(result.Applied, string.Join(" | ", result.Diagnostics));
+
+        // What the document still describes, the map still has to answer for. A tool draws its
+        // tree from this, and an element that produced an object but cannot be asked about it
+        // simply vanishes from the tree.
+        XamlElement[] unmapped =
+        [
+            .. session.Document.DescendantElements()
+                .Where(static element => !element.IsPropertyElementSyntax)
+                .Where(element => session.GetObject(element) is null),
+        ];
+
+        Assert.True(
+            unmapped.Length == 0,
+            "Elements with no object: " + string.Join(", ", unmapped.Select(static element => $"<{element.Name}>")));
+    }
+
+    [AvaloniaFact]
+    public async Task EverySurvivingElementStillMapsToAnObjectDeeperInTheTree()
+    {
+        string Footer(string buttons) => Panel(
+            "  <TextBlock x:Name=\"Title\" Text=\"Title\" />\n" +
+            "  <Border x:Name=\"Footer\">\n" +
+            "    <StackPanel Orientation=\"Horizontal\">\n" +
+            buttons +
+            "\n    </StackPanel>\n" +
+            "  </Border>");
+
+        await using XamlLoadSession session = await Load(Footer(
+            "      <Button x:Name=\"Cancel\" Content=\"Cancel\" />\n" +
+            "      <Button x:Name=\"Save\" Content=\"Save\" />"));
+
+        XamlUpdateResult result = await Update(session, Footer(
+            "      <Button x:Name=\"Cancel\" Content=\"Cancel\" />"));
+
+        Assert.True(result.Applied, string.Join(" | ", result.Diagnostics));
+
+        XamlElement[] unmapped =
+        [
+            .. session.Document.DescendantElements()
+                .Where(static element => !element.IsPropertyElementSyntax)
+                .Where(element => session.GetObject(element) is null),
+        ];
+
+        Assert.True(
+            unmapped.Length == 0,
+            "Elements with no object: " + string.Join(", ", unmapped.Select(static element => $"<{element.Name}>")));
+    }
+
+    [AvaloniaFact]
+    public async Task ASurvivingObjectIsTheOneTheTreeNowHolds()
+    {
+        await using XamlLoadSession session = await Load(Panel(
+            "  <Button x:Name=\"Cancel\" Content=\"Cancel\" />\n" +
+            "  <Button x:Name=\"Save\" Content=\"Save\" />"));
+
+        var panel = session.GetRoot<StackPanel>();
+
+        await Update(session, Panel("  <Button x:Name=\"Cancel\" Content=\"Cancel\" />"));
+
+        XamlElement cancel = session.Document.DescendantElements()
+            .Single(static element => element.Name.LocalName == "Button");
+
+        // Not merely non-null: the object the map hands back has to be the one actually on
+        // screen, or every edit made through it lands on something detached.
+        Assert.Same(panel.Children[0], session.GetObject(cancel));
+    }
+
+    [AvaloniaFact]
     public async Task AnUpdateOnADisposedSessionThrows()
     {
         XamlLoadSession session = await Load(View("Text=\"x\""));

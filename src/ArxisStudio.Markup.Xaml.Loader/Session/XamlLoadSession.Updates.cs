@@ -4,6 +4,7 @@ using System.Collections.Immutable;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
+using Avalonia.LogicalTree;
 using Avalonia.Markup.Xaml;
 using Avalonia.Markup.Xaml.Diagnostics;
 
@@ -30,6 +31,22 @@ namespace ArxisStudio.Markup.Xaml.Loader;
 public sealed partial class XamlLoadSession
 {
     private readonly Dictionary<Uri, TextProjection> _fragments = new(XamlUri.Comparer);
+
+    /// <summary>How many fragments this session has built, so each gets a name of its own.</summary>
+    private int _fragmentNumber;
+
+    /// <summary>
+    /// What each element of a rebuilt fragment produced, worked out while rebuilding it.
+    /// </summary>
+    /// <remarks>
+    /// Avalonia records where it built the root of a separately loaded text and nothing below it,
+    /// so the objects inside a rebuilt fragment have no recorded position of their own. Reading
+    /// them as positions in the document is how a surviving control ends up attributed to
+    /// whatever element sits at that line — and how its own element ends up with no object. What
+    /// is known instead is the shape: the fragment was built from this element, so its children
+    /// are that element's children, in order.
+    /// </remarks>
+    private readonly Dictionary<XamlElement, object> _rebuilt = [];
 
     /// <summary>
     /// Gets the most recent document that was offered and not applied, if there is one.
@@ -272,7 +289,16 @@ public sealed partial class XamlLoadSession
         // What survives the change keeps the object it already had, paired by where it sits.
         // Rebuilding that from Avalonia's recorded positions would read them against a document
         // they predate, and an update that added a line would break every one after it.
-        IReadOnlyDictionary<XamlElement, object> carried = Objects.Carry(Document, updated);
+        var carried = new Dictionary<XamlElement, object>(Objects.Carry(Document, updated));
+
+        // What a rebuild worked out wins over what the pairing carried: the carried object is the
+        // one that used to stand there, and a rebuild has just replaced it.
+        foreach ((XamlElement element, object target) in _rebuilt)
+        {
+            carried[element] = target;
+        }
+
+        _rebuilt.Clear();
 
         Document = updated;
         Projection = projection;
@@ -458,6 +484,13 @@ public sealed partial class XamlLoadSession
             {
                 _fragments[runtimeUri] = fragments.First(entry => entry.Change == change).Projection;
             }
+
+            // What is now in the tree is the fresh object when it replaced the old one, and the
+            // old one carrying the fresh one's content when only the content was rebuilt.
+            if (change.NewElement is { } rebuilt)
+            {
+                Pair(rebuilt, change.ReplacesObject ? fresh : previous, _rebuilt);
+            }
         }
 
         foreach ((object target, XamlMemberDescriptor member, object? value) in writes)
@@ -468,6 +501,29 @@ public sealed partial class XamlLoadSession
         return true;
     }
 
+    /// <summary>
+    /// Names a fragment so that the objects built from it can be told from every other object.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// A name of its own, and a different one each time. Handing a fragment the document's own
+    /// base URI made its objects report the same name as the document's, and the map then read
+    /// positions recorded against a few lines of fragment as positions in the whole document —
+    /// which silently attributed a surviving control to whatever element happened to sit at that
+    /// line, and left its own element with no object at all.
+    /// </para>
+    /// <para>
+    /// Expressed as a query on the document's own URI, so that a relative include inside the
+    /// fragment still resolves against the folder the document lives in.
+    /// </para>
+    /// </remarks>
+    private Uri FragmentUri()
+    {
+        Uri anchor = Document.BaseUri ?? Document.Uri ?? new Uri("markup:///document");
+
+        return new Uri(anchor, $"?fragment={++_fragmentNumber}");
+    }
+
     /// <summary>Builds the objects a projected fragment describes.</summary>
     /// <remarks>
     /// Through Avalonia's own runtime loader, like any other load. It names the text it is given,
@@ -476,6 +532,8 @@ public sealed partial class XamlLoadSession
     /// </remarks>
     private (object? Fresh, Uri? RuntimeUri) Build(TextProjection fragment, List<MarkupDiagnostic> diagnostics)
     {
+        Uri name = FragmentUri();
+
         var configuration = new RuntimeXamlLoaderConfiguration
         {
             LocalAssembly = Options.LocalAssembly,
@@ -493,9 +551,12 @@ public sealed partial class XamlLoadSession
         try
         {
             object fresh = AvaloniaRuntimeXamlLoader.Load(
-                new RuntimeXamlLoaderDocument(Document.BaseUri, fragment.Text.ToString()), configuration);
+                new RuntimeXamlLoaderDocument(name, fragment.Text.ToString()), configuration);
 
-            return (fresh, XamlSourceInfo.GetXamlSourceInfo(fresh)?.SourceUri);
+            // What Avalonia recorded, when it recorded anything: the name given above is the
+            // fallback, so a fragment is never keyed by nothing and never keyed by the
+            // document's own name.
+            return (fresh, XamlSourceInfo.GetXamlSourceInfo(fresh)?.SourceUri ?? name);
         }
         catch (Exception error)
         {
@@ -506,6 +567,35 @@ public sealed partial class XamlLoadSession
                 Document.Uri));
 
             return (null, null);
+        }
+    }
+
+    /// <summary>
+    /// Pairs an element with the object it produced, and its children with that object's, by
+    /// position.
+    /// </summary>
+    /// <remarks>
+    /// The same conservative rule the rest of the update path uses: where the two sides stop
+    /// having the same shape, the walk stops descending rather than guessing which child is
+    /// which. A property element contributes what is inside it — a resource dictionary, a
+    /// template — and those are not logical children, so a mismatch there simply ends the
+    /// descent, and what is below keeps whatever the map can work out for itself.
+    /// </remarks>
+    private static void Pair(XamlElement element, object target, Dictionary<XamlElement, object> into)
+    {
+        into[element] = target;
+
+        XamlElement[] children = [.. element.Elements.Where(static child => !child.IsPropertyElementSyntax)];
+        object[] objects = target is ILogical logical ? [.. logical.LogicalChildren] : [];
+
+        if (children.Length != objects.Length)
+        {
+            return;
+        }
+
+        for (int index = 0; index < children.Length; index++)
+        {
+            Pair(children[index], objects[index], into);
         }
     }
 

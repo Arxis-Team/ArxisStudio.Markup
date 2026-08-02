@@ -66,12 +66,15 @@ the document — see `docs/adr/0005-resource-includes.md` for why. That leaves f
 - **A structural change at the root rebuilds the root's content in place.** The root object
   itself survives, because a session is built around it and the caller holds it. A change to the
   root element's own type or `x:Class` needs a new session.
-- **An object rebuilt below a structural change is mapped from the fragment it was built from,
-  and everything that survived the change carries its element across by position.** Avalonia
-  records where it built an object once, and nothing re-records it, so a document that has moved
-  on cannot be re-read for it. What that leaves unmapped is an object under a subtree the pairing
-  stopped descending into and which no fragment rebuilt — a case an update does not produce, but
-  one a caller reaching past `ApplyDocumentUpdateAsync` could.
+- **An object rebuilt below a structural change is paired with its element by shape, and
+  everything that survived the change carries its element across by position.** Avalonia records
+  where it built the root of a separately loaded text and nothing below it, so the objects inside
+  a rebuilt fragment have no recorded position to read — and reading them as positions in the
+  document attributed them to whatever element sat at that line. What is known instead is that
+  the fragment was built from a particular element, so its children are that element's children
+  in order, and that is what the pairing uses. Where the two sides stop having the same shape —
+  a property element contributing a dictionary or a template rather than a logical child — the
+  pairing stops descending, and what is below keeps whatever the map can work out for itself.
 
 ## Editing and history
 
