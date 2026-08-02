@@ -922,6 +922,14 @@ Every resolved member descriptor must report:
 - whether it is read-only;
 - underlying Avalonia property, CLR property, or event metadata.
 
+Where unnamed children go is read from Avalonia's `[Content]` attribute rather than from a list of the framework's own base types, because a control library declares its own content member and a list of `Panel`, `ContentControl` and `Decorator` answers for nobody else's controls:
+
+```csharp
+XamlMemberDescriptor? content = members.FindContent(targetType);
+```
+
+The same answer is what an update uses to replace or reorder an element's content, and what the object map uses to find an object that a property holds rather than the logical tree.
+
 A tool offering a property list must be able to ask which members a type has rather than keeping a table of names:
 
 ```csharp

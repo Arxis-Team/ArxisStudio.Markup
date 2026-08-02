@@ -303,7 +303,8 @@ public sealed partial class XamlLoadSession
 
         Document = updated;
         Projection = projection;
-        Objects = XamlObjectMap.Build(updated, RootObject, projection, _fragments, carried);
+        Objects = XamlObjectMap.Build(
+            updated, RootObject, projection, _fragments, carried, Environment.MemberResolver);
         PendingDocument = null;
 
         // A fragment whose objects the walk never reached has been replaced by a later one, and
@@ -510,7 +511,8 @@ public sealed partial class XamlLoadSession
             bool replaced = change.ReplacesObject
                 ? XamlObjectReplacement.Replace(
                     Objects, change.OldElement!, previous, fresh, Environment.MemberResolver, diagnostics)
-                : XamlObjectReplacement.ReplaceContent(previous, fresh, change.OldElement!, diagnostics);
+                : XamlObjectReplacement.ReplaceContent(
+                    previous, fresh, change.OldElement!, Environment.MemberResolver, diagnostics);
 
             if (!replaced)
             {

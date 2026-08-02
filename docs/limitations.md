@@ -131,6 +131,15 @@ the document — see `docs/adr/0005-resource-includes.md` for why. That leaves f
   type that declares it. Before anything has caused `Grid` to be initialised, `Grid.Row` is not a
   member of anything. The answer is therefore not cached, so a tool that resolves types as documents
   ask for them sees the list grow while it runs — but a list taken at startup is not the whole list.
+- **Content is whatever `[Content]` says, and nothing else is.** Where unnamed children go is read
+  from Avalonia's own attribute, so a control library's own content member works exactly as the
+  framework's do. Types that take children another way — `Style`, `ControlTheme` and the rest of
+  the `IAddChild` family — declare no content member, and `FindContent` says so rather than
+  guessing. Updating a style is a reload of the style rather than a replacement inside it.
+- **`TextBlock.Inlines` is a whitespace-significant collection.** Avalonia marks it, and it means
+  the spaces between inline elements are part of what is rendered. Editing never reformats, so
+  nothing here disturbs them; writing a document back with `XamlWriteMode.Format` would, and that
+  mode exists for a caller who asked for it.
 - **Which members are worth showing is not answered here.** A control has upwards of two hundred
   settable members. Listing them is the library's job; choosing among them is the tool's.
 - **What is known about a type belongs to the environment that resolved it.** Descriptors are cached

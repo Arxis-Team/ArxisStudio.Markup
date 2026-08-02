@@ -27,6 +27,7 @@ namespace ArxisStudio.Markup.Xaml.Loader;
 public sealed class XamlMemberResolver
 {
     private readonly ConcurrentDictionary<(Type Target, string Name), XamlMemberDescriptor> _cache = new();
+    private readonly ConcurrentDictionary<Type, XamlMemberDescriptor?> _content = new();
 
     /// <summary>Gets the shared instance.</summary>
     /// <remarks>
@@ -143,15 +144,69 @@ public sealed class XamlMemberResolver
             }
         }
 
-        foreach (PropertyInfo property in targetType.GetProperties(BindingFlags.Public | BindingFlags.Instance))
+        // Walked from the type down to object rather than asked of the type as a whole, because
+        // GetProperties answers with both declarations where one shadows another and the derived
+        // one is the one a document means.
+        for (Type? declaring = targetType; declaring is not null; declaring = declaring.BaseType)
         {
-            if (property.GetIndexParameters().Length == 0 && names.Add(property.Name))
+            const BindingFlags Declared =
+                BindingFlags.Public | BindingFlags.Instance | BindingFlags.DeclaredOnly;
+
+            foreach (PropertyInfo property in declaring.GetProperties(Declared))
             {
-                members.Add(Resolve(targetType, property.Name));
+                if (property.GetIndexParameters().Length == 0 && names.Add(property.Name))
+                {
+                    members.Add(Resolve(targetType, property.Name));
+                }
             }
         }
 
         return [.. members.OrderBy(static member => member.Name, StringComparer.Ordinal)];
+    }
+
+    /// <summary>
+    /// Finds the member that unnamed children of a type belong to.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// Avalonia says which member that is with <c>[Content]</c>: <c>Panel.Children</c>,
+    /// <c>ContentControl.Content</c>, <c>Decorator.Child</c>, <c>ItemsControl.Items</c>,
+    /// <c>TextBlock.Inlines</c>, and whatever a control library marks in its own controls. Asking
+    /// the attribute is the only answer that covers the last of those; a list of the framework's
+    /// own types answers for the framework and silently fails everyone else's controls.
+    /// </para>
+    /// <para>
+    /// Cached unconditionally, including the absence of one, because unlike an attached property
+    /// a content member is a fact about the type that cannot appear later.
+    /// </para>
+    /// </remarks>
+    /// <param name="targetType">The type to ask.</param>
+    /// <returns>The member, or <see langword="null"/> when the type declares none.</returns>
+    /// <exception cref="ArgumentNullException"><paramref name="targetType"/> is <see langword="null"/>.</exception>
+    public XamlMemberDescriptor? FindContent(Type targetType)
+    {
+        ArgumentNullException.ThrowIfNull(targetType);
+
+        return _content.GetOrAdd(targetType, DiscoverContent);
+    }
+
+    private XamlMemberDescriptor? DiscoverContent(Type targetType)
+    {
+        const BindingFlags Declared =
+            BindingFlags.Public | BindingFlags.Instance | BindingFlags.DeclaredOnly;
+
+        for (Type? declaring = targetType; declaring is not null; declaring = declaring.BaseType)
+        {
+            foreach (PropertyInfo property in declaring.GetProperties(Declared))
+            {
+                if (property.GetCustomAttribute<ContentAttribute>(inherit: true) is not null)
+                {
+                    return Resolve(targetType, property.Name);
+                }
+            }
+        }
+
+        return null;
     }
 
     /// <summary>Resolves a member name against a type.</summary>
@@ -207,7 +262,7 @@ public sealed class XamlMemberResolver
             return Describe(targetType, avaloniaProperty, name);
         }
 
-        if (targetType.GetEvent(name, BindingFlags.Public | BindingFlags.Instance) is { } clrEvent)
+        if (FindEvent(targetType, name) is { } clrEvent)
         {
             return new XamlMemberDescriptor(
                 name, XamlMemberKind.Event, clrEvent.DeclaringType ?? targetType, targetType,
@@ -218,7 +273,7 @@ public sealed class XamlMemberResolver
             };
         }
 
-        if (targetType.GetProperty(name, BindingFlags.Public | BindingFlags.Instance) is { } clrProperty)
+        if (FindProperty(targetType, name) is { } clrProperty)
         {
             return DescribeClr(targetType, clrProperty, name);
         }
@@ -300,8 +355,7 @@ public sealed class XamlMemberResolver
 
     /// <summary>Determines whether a name is the type's content property.</summary>
     private static bool IsContentProperty(Type targetType, string name) =>
-        targetType.GetProperty(name, BindingFlags.Public | BindingFlags.Instance)
-            ?.GetCustomAttribute<ContentAttribute>(inherit: true) is not null;
+        FindProperty(targetType, name)?.GetCustomAttribute<ContentAttribute>(inherit: true) is not null;
 
     private static XamlMemberDescriptor DescribeClr(Type targetType, PropertyInfo property, string name)
     {
@@ -325,6 +379,48 @@ public sealed class XamlMemberResolver
         {
             ClrProperty = property,
         };
+    }
+
+    /// <summary>Finds a property by name, taking the most derived declaration of it.</summary>
+    /// <remarks>
+    /// <c>Type.GetProperty</c> throws <see cref="AmbiguousMatchException"/> where a type shadows a
+    /// base property with <c>new</c> and a different type — <c>Window.PlatformImpl</c> does, and
+    /// asking a window about any of its members used to end in that exception rather than an
+    /// answer. Walking the hierarchy asks each type about what it declares itself, and the first
+    /// answer is the one the document means.
+    /// </remarks>
+    private static PropertyInfo? FindProperty(Type targetType, string name)
+    {
+        const BindingFlags Declared =
+            BindingFlags.Public | BindingFlags.Instance | BindingFlags.DeclaredOnly;
+
+        for (Type? declaring = targetType; declaring is not null; declaring = declaring.BaseType)
+        {
+            if (declaring.GetProperty(name, Declared) is { } property)
+            {
+                return property;
+            }
+        }
+
+        return null;
+    }
+
+    /// <summary>Finds an event by name, taking the most derived declaration of it.</summary>
+    /// <remarks>Shadowed the same way properties are, and ambiguous in the same way.</remarks>
+    private static EventInfo? FindEvent(Type targetType, string name)
+    {
+        const BindingFlags Declared =
+            BindingFlags.Public | BindingFlags.Instance | BindingFlags.DeclaredOnly;
+
+        for (Type? declaring = targetType; declaring is not null; declaring = declaring.BaseType)
+        {
+            if (declaring.GetEvent(name, Declared) is { } declared)
+            {
+                return declared;
+            }
+        }
+
+        return null;
     }
 
     private static XamlMemberDescriptor Unresolved(Type targetType, string name) =>

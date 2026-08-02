@@ -45,7 +45,13 @@ public sealed partial class XamlLoadSession : IAsyncDisposable
         Document = document;
         Environment = environment;
         Projection = projection;
-        Objects = XamlObjectMap.Build(document, rootObject, projection);
+        Objects = XamlObjectMap.Build(
+            document,
+            rootObject,
+            projection,
+            System.Collections.Immutable.ImmutableDictionary<Uri, TextProjection>.Empty,
+            carried: null,
+            environment.MemberResolver);
         Options = options;
         RootObject = rootObject;
         Diagnostics = diagnostics;

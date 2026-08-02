@@ -68,25 +68,24 @@ internal static class XamlObjectReplacement
                 || Fail(element, diagnostics, $"{memberName} could not be written");
         }
 
-        // Children is where a panel's unnamed content goes, and it is a property rather than the
-        // panel itself, so reaching it takes knowing that about a panel.
-        if (owner is Panel panel && ReplaceInList(panel.Children, previous, fresh))
+        // Unnamed content goes to the member Avalonia marks [Content] — Children on a panel,
+        // Content on a content control, Child on a decorator, and whatever a control library
+        // marks in its own controls. Naming the framework's three would answer for the framework
+        // and silently refuse to update anybody else's control.
+        if (members.FindContent(owner.GetType()) is { CanRead: true } content)
         {
-            return true;
-        }
+            object? held = Read(owner, content.Name, members);
 
-        if (owner is ContentControl content && ReferenceEquals(content.Content, previous))
-        {
-            content.Content = fresh;
+            if (held is not null && ReplaceInList(held, previous, fresh))
+            {
+                return true;
+            }
 
-            return true;
-        }
-
-        if (owner is Decorator decorator && ReferenceEquals(decorator.Child, previous))
-        {
-            decorator.Child = fresh as Control;
-
-            return true;
+            if (ReferenceEquals(held, previous))
+            {
+                return Write(owner, content.Name, fresh, members, diagnostics)
+                    || Fail(element, diagnostics, $"{content.Name} could not be written");
+            }
         }
 
         return Fail(element, diagnostics, $"{owner.GetType().Name} does not say where it holds it");
@@ -152,14 +151,16 @@ internal static class XamlObjectReplacement
                     : null;
         }
 
-        return objects.GetObject(parent) switch
+        if (objects.GetObject(parent) is not { } holder)
         {
-            // Children is where a panel's unnamed content goes, and it is a property rather than
-            // the panel itself.
-            Panel panel => panel.Children,
-            { } holder => holder,
-            _ => null,
-        };
+            return null;
+        }
+
+        // The children live in the member marked [Content] where there is one — a panel's
+        // Children, an items control's Items — and in the object itself where there is not.
+        return members.FindContent(holder.GetType()) is { CanRead: true } content
+            ? Read(holder, content.Name, members) ?? holder
+            : holder;
     }
 
     /// <summary>Moves the items of a collection into a given order, without removing any.</summary>
@@ -240,12 +241,14 @@ internal static class XamlObjectReplacement
     /// <param name="target">The object whose content is being rebuilt.</param>
     /// <param name="fresh">A freshly built copy of the same element.</param>
     /// <param name="element">The element, for diagnostics.</param>
+    /// <param name="members">What decides which member the type calls its content.</param>
     /// <param name="diagnostics">Collects a report when the content cannot be moved across.</param>
     /// <returns><see langword="true"/> if the content was rebuilt.</returns>
     internal static bool ReplaceContent(
         object target,
         object fresh,
         XamlElement element,
+        XamlMemberResolver members,
         List<MarkupDiagnostic> diagnostics)
     {
         if (target.GetType() != fresh.GetType())
@@ -253,33 +256,17 @@ internal static class XamlObjectReplacement
             return Fail(element, diagnostics, "the rebuilt object is not the same kind of object");
         }
 
+        // Whatever the type says its content is, moved across from the rebuilt copy. A dictionary
+        // has no [Content] and is handled below, because what it holds is keys and merged files
+        // rather than a member.
+        if (target is not IResourceDictionary
+            && members.FindContent(target.GetType()) is { CanRead: true } content)
+        {
+            return MoveContent(target, fresh, content, members, element, diagnostics);
+        }
+
         switch (target)
         {
-            case Panel panel when fresh is Panel rebuilt:
-                Control[] children = [.. rebuilt.Children];
-
-                // Detached from the copy first: a control belongs to one parent, and adding it
-                // to a second while the first still holds it is how Avalonia is made to throw.
-                rebuilt.Children.Clear();
-                panel.Children.Clear();
-                panel.Children.AddRange(children);
-
-                return true;
-
-            case ContentControl control when fresh is ContentControl rebuilt:
-                object? value = rebuilt.Content;
-                rebuilt.Content = null;
-                control.Content = value;
-
-                return true;
-
-            case Decorator decorator when fresh is Decorator rebuilt:
-                Control? child = rebuilt.Child;
-                rebuilt.Child = null;
-                decorator.Child = child;
-
-                return true;
-
             case IResourceDictionary dictionary when fresh is IResourceDictionary rebuilt:
                 dictionary.Clear();
 
@@ -309,6 +296,52 @@ internal static class XamlObjectReplacement
             default:
                 return Fail(element, diagnostics, $"{target.GetType().Name} does not say what it holds");
         }
+    }
+
+    /// <summary>Moves what a rebuilt copy holds in its content member onto the object that stays.</summary>
+    /// <remarks>
+    /// Taken out of the copy before it is put into the original, always. A control belongs to one
+    /// parent, and adding it to a second while the first still holds it is how Avalonia is made to
+    /// throw.
+    /// </remarks>
+    private static bool MoveContent(
+        object target,
+        object fresh,
+        XamlMemberDescriptor content,
+        XamlMemberResolver members,
+        XamlElement element,
+        List<MarkupDiagnostic> diagnostics)
+    {
+        object? held = Read(target, content.Name, members);
+        object? rebuilt = Read(fresh, content.Name, members);
+
+        if (held is IList current && rebuilt is IList replacement)
+        {
+            object?[] items = [.. replacement.Cast<object?>()];
+
+            replacement.Clear();
+            current.Clear();
+
+            foreach (object? item in items)
+            {
+                current.Add(item);
+            }
+
+            return true;
+        }
+
+        if (!content.CanWrite)
+        {
+            return Fail(
+                element,
+                diagnostics,
+                $"{content.Name} is neither a list nor writable, so its content cannot be moved");
+        }
+
+        Write(fresh, content.Name, null, members, diagnostics);
+
+        return Write(target, content.Name, rebuilt, members, diagnostics)
+            || Fail(element, diagnostics, $"{content.Name} could not be written");
     }
 
     /// <summary>

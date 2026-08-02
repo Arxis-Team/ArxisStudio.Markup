@@ -545,6 +545,91 @@ public sealed class PropertyMatrixTests
             second.MemberResolver.Resolve(typeof(Border), "Width"),
             session.GetMember(session.GetRoot<Border>(), "Width"));
     }
+    [AvaloniaFact]
+    public async Task TheContentMemberIsWhateverTheTypeMarks()
+    {
+        await using XamlLoadSession session = await Load($"<Border xmlns=\"{AvaloniaNamespace}\" />");
+
+        XamlMemberResolver members = session.Environment.MemberResolver;
+
+        // What Avalonia marks [Content], which is not a list a library can keep: every control
+        // set declares its own, and this one is ours.
+        Assert.Equal("Child", members.FindContent(typeof(Border))?.Name);
+        Assert.Equal("Children", members.FindContent(typeof(StackPanel))?.Name);
+        Assert.Equal("Content", members.FindContent(typeof(Button))?.Name);
+        Assert.Equal("Items", members.FindContent(typeof(ListBox))?.Name);
+        Assert.Equal("Slots", members.FindContent(typeof(SlotHost))?.Name);
+        Assert.Equal("Body", members.FindContent(typeof(ShellHost))?.Name);
+
+        Assert.Null(members.FindContent(typeof(Avalonia.Styling.Style)));
+
+        // And it is classified as content wherever it is asked for.
+        Assert.Equal(XamlMemberKind.Content, members.Resolve(typeof(SlotHost), "Slots").Kind);
+    }
+
+    [AvaloniaFact]
+    public async Task AControlThatKeepsItsChildrenItsOwnWayIsUpdatedLikeAnyOther()
+    {
+        // The case a list of framework types cannot cover: a control library's own content
+        // member. Editing a child of one used to be refused with "does not say where it holds it".
+        await using XamlLoadSession session = await Load(
+            $"<local:SlotHost xmlns=\"{AvaloniaNamespace}\" xmlns:local=\"{TestControlsNamespace}\">\n" +
+            "  <Button Content=\"one\" />\n" +
+            "  <Button Content=\"two\" />\n" +
+            "</local:SlotHost>");
+
+        var host = session.GetRoot<SlotHost>();
+
+        Assert.Equal(2, host.Slots.Count);
+
+        XamlElement first = session.Document.Root!.ContentElements.First();
+
+        XamlUpdateResult result = await session.ApplyDocumentUpdateAsync(
+            session.Document.ReplaceElement(first, "<CheckBox Content=\"one\" />"),
+            TestContext.Current.CancellationToken);
+
+        Assert.True(result.Applied);
+        Assert.Equal(2, host.Slots.Count);
+        Assert.IsType<CheckBox>(host.Slots[0]);
+        Assert.IsType<Button>(host.Slots[1]);
+    }
+
+    [AvaloniaFact]
+    public async Task AControlWithAContentOfItsOwnNamingIsUpdatedToo()
+    {
+        await using XamlLoadSession session = await Load(
+            $"<local:ShellHost xmlns=\"{AvaloniaNamespace}\" xmlns:local=\"{TestControlsNamespace}\">\n" +
+            "  <Button Content=\"one\" />\n" +
+            "</local:ShellHost>");
+
+        var host = session.GetRoot<ShellHost>();
+
+        Assert.IsType<Button>(host.Body);
+
+        XamlUpdateResult result = await session.ApplyDocumentUpdateAsync(
+            session.Document.ReplaceElement(
+                session.Document.Root!.ContentElements.Single(), "<CheckBox Content=\"one\" />"),
+            TestContext.Current.CancellationToken);
+
+        Assert.True(result.Applied);
+        Assert.IsType<CheckBox>(host.Body);
+    }
+
+    [AvaloniaFact]
+    public async Task AShadowedMemberIsAnsweredRatherThanAmbiguous()
+    {
+        await using XamlLoadSession session = await Load($"<Border xmlns=\"{AvaloniaNamespace}\" />");
+
+        XamlMemberResolver members = session.Environment.MemberResolver;
+
+        // Window re-declares PlatformImpl with 'new' and a narrower type, which makes
+        // Type.GetProperty ambiguous — asking a window about any of its members used to end in
+        // that exception rather than in an answer.
+        Assert.True(members.Resolve(typeof(Window), "PlatformImpl").IsResolved);
+        Assert.NotEmpty(members.Enumerate(typeof(Window)));
+        Assert.Contains(members.Enumerate(typeof(Window)), member => member.Name == "Title");
+    }
+
 
 
 

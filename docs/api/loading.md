@@ -177,6 +177,21 @@ process-wide cache would hold those types alive against a collectible load conte
 answering about a build that no longer exists. `XamlMemberResolver.Instance` remains for a caller
 with no environment at all.
 
+### Where do unnamed children go?
+
+```csharp
+XamlMemberDescriptor? content = members.FindContent(typeof(Border));   // Child
+```
+
+Avalonia says which member that is with `[Content]`, and every control library says it for its own
+controls: `Panel.Children`, `ContentControl.Content`, `Decorator.Child`, `ItemsControl.Items`,
+`TextBlock.Inlines`, `YourHost.Slots`. A designer deciding whether a control can take a dropped
+child, and where, asks this rather than testing for the framework's own base classes — which is
+also how the loader finds content when an update has to replace or reorder it.
+
+`null` means the type declares none. A few types take children another way — `Style`,
+`ControlTheme` and their like implement `IAddChild` — and those answer `null` here.
+
 ### Is this text a value?
 
 ```csharp

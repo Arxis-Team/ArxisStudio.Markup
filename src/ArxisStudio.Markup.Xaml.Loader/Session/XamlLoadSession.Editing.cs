@@ -346,7 +346,13 @@ public sealed partial class XamlLoadSession
         // Editing reparses, so every element the caller holds now describes text that has moved.
         // The projection is the one the objects were built from, because the positions being
         // read back are the ones Avalonia recorded against it.
-        Objects = XamlObjectMap.Build(Document, RootObject, Projection);
+        Objects = XamlObjectMap.Build(
+            Document,
+            RootObject,
+            Projection,
+            System.Collections.Immutable.ImmutableDictionary<Uri, TextProjection>.Empty,
+            carried: null,
+            Environment.MemberResolver);
     }
 
     /// <summary>Reads what the document says a property is.</summary>

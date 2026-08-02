@@ -1,4 +1,5 @@
 using System;
+using System.Collections;
 using System.Collections.Generic;
 using System.Collections.Immutable;
 using System.Linq;
@@ -45,16 +46,21 @@ public sealed class XamlObjectMap
     private readonly List<object> _objects = [];
 
     private readonly TextProjection _projection;
+    private readonly XamlMemberResolver _members;
     private readonly IReadOnlyDictionary<Uri, TextProjection> _fragments;
     private readonly HashSet<Uri> _observed = new(XamlUri.Comparer);
     private readonly HashSet<object> _carried = new(ReferenceEqualityComparer.Instance);
 
     private Uri? _documentSourceUri;
 
-    private XamlObjectMap(TextProjection projection, IReadOnlyDictionary<Uri, TextProjection> fragments)
+    private XamlObjectMap(
+        TextProjection projection,
+        IReadOnlyDictionary<Uri, TextProjection> fragments,
+        XamlMemberResolver members)
     {
         _projection = projection;
         _fragments = fragments;
+        _members = members;
     }
 
     /// <summary>
@@ -115,7 +121,7 @@ public sealed class XamlObjectMap
         object root,
         TextProjection projection,
         IReadOnlyDictionary<Uri, TextProjection> fragments) =>
-        Build(document, root, projection, fragments, null);
+        Build(document, root, projection, fragments, null, XamlMemberResolver.Instance);
 
     /// <summary>
     /// Builds a map for a tree after an update, carrying forward what an update already knows.
@@ -132,19 +138,25 @@ public sealed class XamlObjectMap
     /// <param name="projection">The text the document as a whole was built from.</param>
     /// <param name="fragments">The projection behind each separately loaded fragment, by the name Avalonia gave it.</param>
     /// <param name="carried">Objects already known to belong to elements of <paramref name="document"/>.</param>
+    /// <param name="members">
+    /// What decides which member a type calls its content. A session hands over its environment's,
+    /// so that what is learnt about an assembly is discarded with the environment that resolved
+    /// it; the public overloads, which have no environment to ask, use the shared resolver.
+    /// </param>
     /// <returns>The map.</returns>
     internal static XamlObjectMap Build(
         XamlDocument document,
         object root,
         TextProjection projection,
         IReadOnlyDictionary<Uri, TextProjection> fragments,
-        IReadOnlyDictionary<XamlElement, object>? carried)
+        IReadOnlyDictionary<XamlElement, object>? carried,
+        XamlMemberResolver members)
     {
         ArgumentNullException.ThrowIfNull(document);
         ArgumentNullException.ThrowIfNull(root);
         ArgumentNullException.ThrowIfNull(projection);
 
-        var map = new XamlObjectMap(projection, fragments)
+        var map = new XamlObjectMap(projection, fragments, members)
         {
             // Avalonia names a runtime-loaded document with a synthetic URI of its own rather
             // than the base URI it was handed, so what the document "is" can only be learnt
@@ -453,7 +465,7 @@ public sealed class XamlObjectMap
     /// children are produced by templates and measured layout, neither of which the document
     /// declared.
     /// </remarks>
-    private static IEnumerable<object> ChildrenOf(object current)
+    private IEnumerable<object> ChildrenOf(object current)
     {
         if (current is ILogical logical)
         {
@@ -463,9 +475,41 @@ public sealed class XamlObjectMap
             }
         }
 
-        if (current is ContentControl { Content: { } content } && content is not string)
+        // What the type calls its content, where holding it is all that has happened to it: a
+        // ContentControl before its template has run keeps its content in a property and nowhere
+        // else, and so does any control library's own control that says [Content] on one. Asking
+        // the attribute covers both; naming ContentControl covers only the framework's.
+        if (_members.FindContent(current.GetType()) is { CanRead: true } content)
         {
-            yield return content;
+            object? held = content switch
+            {
+                { AvaloniaProperty: { } property } when current is AvaloniaObject styled =>
+                    styled.GetValue(property),
+                { ClrProperty.CanRead: true } => content.ClrProperty!.GetValue(current),
+                _ => null,
+            };
+
+            switch (held)
+            {
+                case null or string:
+                    break;
+
+                case IEnumerable many when held is not IResourceProvider:
+                    foreach (object? item in many)
+                    {
+                        if (item is not null)
+                        {
+                            yield return item;
+                        }
+                    }
+
+                    break;
+
+                default:
+                    yield return held;
+
+                    break;
+            }
         }
 
         // Resources hang off the concrete hosts rather off a single interface, so the two that
