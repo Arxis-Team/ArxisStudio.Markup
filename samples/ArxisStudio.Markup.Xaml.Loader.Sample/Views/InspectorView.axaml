@@ -80,7 +80,7 @@
 
   </UserControl.DataTemplates>
 
-  <Grid RowDefinitions="Auto,*" Margin="24">
+  <Grid RowDefinitions="Auto,*" Margin="20">
 
     <StackPanel Grid.Row="0" Margin="0,0,0,18">
       <TextBlock Classes="h1" Text="Инспектор" />
@@ -88,7 +88,7 @@
                  Text="Слева — объекты, которые описывает файл; в центре — они же, живые; справа — свойства выбранного. Правка в инспекторе не ставится на объект: она пишется атрибутом в документ, а объекты приводятся к нему тем же обновлением, что и на вкладке «Живой документ». Поэтому «применилось в превью» и «сохранилось в .axaml» — это одно действие, а не два, которые надо держать в согласии." />
     </StackPanel>
 
-    <Grid Grid.Row="1" ColumnDefinitions="248,14,*,14,352">
+    <Grid Grid.Row="1" ColumnDefinitions="214,12,*,12,336">
 
       <Border Grid.Column="0" Classes="card">
         <DockPanel>
@@ -106,9 +106,10 @@
                        Classes="mono muted"
                        FontSize="11"
                        TextTrimming="CharacterEllipsis"
-                       MaxWidth="420" />
+                       MaxWidth="220" />
           </Grid>
-          <ScrollViewer>
+          <!-- A designed screen has a size of its own; the pane scrolls rather than cropping it. -->
+          <ScrollViewer HorizontalScrollBarVisibility="Auto">
             <controls:PreviewSurface x:Name="Preview" />
           </ScrollViewer>
         </DockPanel>

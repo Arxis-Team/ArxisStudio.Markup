@@ -61,7 +61,8 @@ internal sealed partial class InspectorView : UserControl
         Tree.ItemsSource = _nodes;
         Properties.ItemsSource = _properties;
         ReportList.ItemsSource = _report.Rows;
-        FilePath.Text = DocumentPath;
+        FilePath.Text = Path.GetFileName(DocumentPath);
+        ToolTip.SetTip(FilePath, DocumentPath);
 
         Tree.SelectionChanged += (_, _) =>
         {
@@ -159,11 +160,7 @@ internal sealed partial class InspectorView : UserControl
 
             if (!element.IsPropertyElementSyntax && _session!.Objects.GetObject(element) is { } target)
             {
-                _nodes.Add(new ObjectNode(
-                    target,
-                    target.GetType().Name,
-                    XamlElementName(element) is { } name ? name : $"<{element.Name}>",
-                    depth));
+                _nodes.Add(new ObjectNode(target, target.GetType().Name, Detail(element), depth));
 
                 next = depth + 1;
             }
@@ -175,12 +172,33 @@ internal sealed partial class InspectorView : UserControl
         }
     }
 
-    /// <summary>Reads what an element calls itself, when it calls itself anything.</summary>
-    private static string? XamlElementName(XamlElement element) =>
-        element.GetDirective("Name")
-        ?? (element.GetAttribute(XamlQualifiedName.Parse("Name"))?.GetValue() is XamlLiteralValue literal
-            ? literal.Text
-            : null);
+    /// <summary>
+    /// Says which one this is, when the type name does not already.
+    /// </summary>
+    /// <remarks>
+    /// A name, or the key it is filed under. Repeating the element name next to the type name it
+    /// produced fills the column with <c>SolidColorBrush &lt;SolidColorBrush&gt;</c> and pushes
+    /// out the part that distinguishes one row from another.
+    /// </remarks>
+    private static string Detail(XamlElement element)
+    {
+        if (element.GetDirective("Name") is { } declared)
+        {
+            return declared;
+        }
+
+        if (element.GetAttribute(XamlQualifiedName.Parse("Name"))?.GetValue() is XamlLiteralValue literal)
+        {
+            return literal.Text;
+        }
+
+        if (element.GetDirective("Key") is { } key)
+        {
+            return $"#{key}";
+        }
+
+        return string.Empty;
+    }
 
     /// <summary>Builds a row for every member of the selected object worth offering.</summary>
     private void ShowProperties()

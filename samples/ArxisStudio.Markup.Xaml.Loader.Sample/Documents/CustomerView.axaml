@@ -1,27 +1,132 @@
 <Border xmlns="https://github.com/avaloniaui"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-        Padding="18"
-        Background="#FFF6F7F9">
+        x:Name="Card"
+        Width="400"
+        Background="#FFFFFFFF"
+        BorderBrush="#FFE2E6EC"
+        BorderThickness="1"
+        CornerRadius="10">
 
   <!-- Настоящий файл на диске. Инспектор справа правит именно его. -->
   <Border.Resources>
     <SolidColorBrush x:Key="Accent" Color="#FF2A63CC" />
+    <SolidColorBrush x:Key="Line" Color="#FFE2E6EC" />
+    <SolidColorBrush x:Key="Muted" Color="#FF6B7484" />
+    <SolidColorBrush x:Key="Positive" Color="#FF17805A" />
+    <SolidColorBrush x:Key="PositiveSoft" Color="#FFE4F3EC" />
+    <Thickness x:Key="SectionPadding">18,14</Thickness>
   </Border.Resources>
 
-  <StackPanel x:Name="Root" Orientation="Vertical" Spacing="10">
-    <TextBlock x:Name="Title"
-               Text="{Binding Customer.Name}"
-               FontSize="20"
-               FontWeight="SemiBold"
-               Foreground="{StaticResource Accent}" />
-    <TextBlock x:Name="Subtitle" Text="Постоянный клиент" Opacity="0.6" />
-    <Border x:Name="Card"
-            Background="#FFFFFFFF"
-            BorderBrush="#FFDCE0E7"
-            BorderThickness="1"
-            CornerRadius="6"
-            Padding="12">
-      <Button x:Name="Save" Content="Сохранить" Width="160" />
+  <Border.Styles>
+    <Style Selector="TextBlock.label">
+      <Setter Property="Foreground" Value="{StaticResource Muted}" />
+      <Setter Property="FontSize" Value="11" />
+    </Style>
+    <Style Selector="TextBlock.value">
+      <Setter Property="FontSize" Value="13" />
+    </Style>
+  </Border.Styles>
+
+  <StackPanel x:Name="Root" Orientation="Vertical">
+
+    <Border x:Name="Header" Padding="{StaticResource SectionPadding}">
+      <Grid ColumnDefinitions="Auto,14,*,Auto" RowDefinitions="Auto,Auto">
+
+        <Border x:Name="Avatar"
+                Grid.RowSpan="2"
+                Width="46"
+                Height="46"
+                CornerRadius="23"
+                Background="{DynamicResource Accent}">
+          <TextBlock x:Name="Initials"
+                     Text="GH"
+                     Foreground="White"
+                     FontSize="17"
+                     FontWeight="SemiBold"
+                     HorizontalAlignment="Center"
+                     VerticalAlignment="Center" />
+        </Border>
+
+        <TextBlock x:Name="FullName"
+                   Grid.Column="2"
+                   Text="{Binding Customer.Name}"
+                   FontSize="19"
+                   FontWeight="SemiBold" />
+
+        <TextBlock x:Name="Role"
+                   Grid.Column="2"
+                   Grid.Row="1"
+                   Classes="label"
+                   Text="{Binding Customer.Title}"
+                   Margin="0,4,0,0" />
+
+        <Border x:Name="Status"
+                Grid.Column="3"
+                Background="{StaticResource PositiveSoft}"
+                CornerRadius="11"
+                Padding="10,4"
+                VerticalAlignment="Top">
+          <TextBlock x:Name="StatusText"
+                     Text="{Binding Customer.Status}"
+                     Foreground="{StaticResource Positive}"
+                     FontSize="11"
+                     FontWeight="SemiBold" />
+        </Border>
+
+      </Grid>
     </Border>
+
+    <Border x:Name="HeaderRule" Height="1" Background="{StaticResource Line}" />
+
+    <Grid x:Name="Body" ColumnDefinitions="*,18,*" Margin="{StaticResource SectionPadding}">
+
+      <StackPanel x:Name="Contacts" Spacing="7">
+        <TextBlock Classes="label" Text="КОНТАКТЫ" />
+        <TextBlock x:Name="Email" Classes="value" Text="{Binding Customer.Email}" />
+        <TextBlock x:Name="Phone" Classes="value" Text="{Binding Customer.Phone}" />
+        <TextBlock x:Name="City" Classes="value" Text="{Binding Customer.City}" />
+      </StackPanel>
+
+      <StackPanel x:Name="Figures" Grid.Column="2" Spacing="7">
+        <TextBlock Classes="label" Text="ПОКАЗАТЕЛИ" />
+        <TextBlock x:Name="Orders" Classes="value" Text="{Binding Customer.Orders}" />
+        <TextBlock x:Name="Total" Classes="value" Text="{Binding Customer.Total}" FontWeight="SemiBold" />
+        <ProgressBar x:Name="Loyalty"
+                     Value="72"
+                     Maximum="100"
+                     Height="6"
+                     Margin="0,4,0,0"
+                     Foreground="{StaticResource Positive}" />
+      </StackPanel>
+
+    </Grid>
+
+    <Border x:Name="NoteRule" Height="1" Background="{StaticResource Line}" />
+
+    <StackPanel x:Name="Note" Margin="{StaticResource SectionPadding}" Spacing="7">
+      <TextBlock Classes="label" Text="ЗАМЕТКА" />
+      <TextBox x:Name="NoteText"
+               Text="{Binding Customer.Note}"
+               AcceptsReturn="True"
+               TextWrapping="Wrap"
+               Height="62" />
+    </StackPanel>
+
+    <Border x:Name="Footer"
+            Background="#FFF7F8FA"
+            BorderBrush="{StaticResource Line}"
+            BorderThickness="0,1,0,0"
+            CornerRadius="0,0,9,9"
+            Padding="18,12">
+      <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Spacing="8">
+        <Button x:Name="Cancel" Content="Отмена" Width="104" />
+        <Button x:Name="Save"
+                Content="Сохранить"
+                Width="132"
+                Background="{StaticResource Accent}"
+                Foreground="White" />
+      </StackPanel>
+    </Border>
+
   </StackPanel>
 </Border>
