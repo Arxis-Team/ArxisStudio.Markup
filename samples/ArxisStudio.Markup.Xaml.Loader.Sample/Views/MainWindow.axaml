@@ -96,7 +96,7 @@
       <TabItem Classes="nav">
         <TabItem.Header>
           <StackPanel>
-            <TextBlock Classes="nav-title" Text="Режим дизайна" />
+            <TextBlock Classes="nav-title" Text="Дизайн-атрибуты" />
             <TextBlock Classes="nav-sub" Text="один и тот же текст, загруженный дважды" />
           </StackPanel>
         </TabItem.Header>
