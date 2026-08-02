@@ -88,7 +88,19 @@
                  Text="Слева — объекты, которые описывает файл; в центре — они же, живые; справа — свойства выбранного. Правка в инспекторе не ставится на объект: она пишется атрибутом в документ, а объекты приводятся к нему тем же обновлением, что и на вкладке «Живой документ». Поэтому «применилось в превью» и «сохранилось в .axaml» — это одно действие, а не два, которые надо держать в согласии." />
     </StackPanel>
 
-    <Grid Grid.Row="1" ColumnDefinitions="214,12,*,12,336">
+    <Grid Grid.Row="1">
+
+      <!--
+        The side panels keep a width of their own and the canvas takes what is left, which is what
+        the splitters between them move. Minimums so that neither can be dragged shut.
+      -->
+      <Grid.ColumnDefinitions>
+        <ColumnDefinition Width="214" MinWidth="150" MaxWidth="440" />
+        <ColumnDefinition Width="12" />
+        <ColumnDefinition Width="*" MinWidth="220" />
+        <ColumnDefinition Width="12" />
+        <ColumnDefinition Width="336" MinWidth="230" MaxWidth="560" />
+      </Grid.ColumnDefinitions>
 
       <Border Grid.Column="0" Classes="card">
         <DockPanel>
@@ -96,6 +108,8 @@
           <ListBox x:Name="Tree" Classes="tree" />
         </DockPanel>
       </Border>
+
+      <GridSplitter Grid.Column="1" Classes="gutter" />
 
       <Border Grid.Column="2" Classes="card">
         <DockPanel>
@@ -114,6 +128,8 @@
           </ScrollViewer>
         </DockPanel>
       </Border>
+
+      <GridSplitter Grid.Column="3" Classes="gutter" />
 
       <Border Grid.Column="4" Classes="card">
         <DockPanel>

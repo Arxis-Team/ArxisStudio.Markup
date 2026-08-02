@@ -186,6 +186,25 @@
     <Setter Property="BorderBrush" Value="{DynamicResource AppAccentBrush}" />
   </Style>
 
+  <!--
+    The gutter between two panels, which is also the handle that moves it. Invisible until it is
+    pointed at, because a divider that is always drawn reads as a wall rather than as something to
+    take hold of.
+  -->
+
+  <Style Selector="GridSplitter.gutter">
+    <Setter Property="ResizeDirection" Value="Columns" />
+    <Setter Property="Background" Value="Transparent" />
+  </Style>
+
+  <Style Selector="GridSplitter.gutter:pointerover">
+    <Setter Property="Background" Value="{DynamicResource AppAccentSoftBrush}" />
+  </Style>
+
+  <Style Selector="GridSplitter.gutter:pressed">
+    <Setter Property="Background" Value="{DynamicResource AppAccentBrush}" />
+  </Style>
+
   <!-- Inspector rows. -->
 
   <Style Selector="ListBox.tree">
