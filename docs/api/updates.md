@@ -30,6 +30,12 @@ if (!result.Applied && session.PendingDocument is { } refused)
 }
 ```
 
+That covers values as well as syntax. `Margin="6,0,0,0"` is converted the way the same text is
+converted at load — through the member's `TypeConverter`, or through the static `Parse` that Avalonia
+types such as `Thickness` and `CornerRadius` are read by instead. Text the member cannot hold is an
+ordinary user error: a diagnostic with the attribute's span, `Applied` false, the objects untouched,
+and nothing thrown.
+
 ## Strategies
 
 In increasing order of what each costs and how much it disturbs. An update takes the smallest one

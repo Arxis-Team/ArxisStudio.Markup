@@ -1,6 +1,8 @@
 using System;
 using System.Collections.Generic;
 using System.ComponentModel;
+using System.Globalization;
+using System.Reflection;
 
 namespace ArxisStudio.Markup.Xaml.Loader;
 
@@ -34,6 +36,14 @@ internal static class XamlValueConversion
             {
                 return converter.ConvertFromInvariantString(text);
             }
+
+            // Not every type Avalonia writes as text declares a converter: Thickness, CornerRadius
+            // and their like are parsed by the XAML compiler through a static Parse, and a document
+            // updated at runtime has to reach the same value the same text reached at load.
+            if (Parse(targetType, text, out object? parsed))
+            {
+                return parsed;
+            }
         }
         catch (Exception error) when (error is NotSupportedException or FormatException or ArgumentException)
         {
@@ -43,5 +53,53 @@ internal static class XamlValueConversion
         }
 
         return text;
+    }
+
+    /// <summary>Converts through a static <c>Parse</c> the type declares, if it declares one.</summary>
+    /// <remarks>
+    /// The culture-aware overload first and the plain one after it, both read with the invariant
+    /// culture — a document says <c>8,4</c> in every locale, and reading it under a locale where
+    /// the comma is a decimal separator would turn one thickness into another.
+    /// </remarks>
+    private static bool Parse(Type targetType, string text, out object? value)
+    {
+        MethodInfo? method =
+            targetType.GetMethod(
+                "Parse",
+                BindingFlags.Public | BindingFlags.Static,
+                binder: null,
+                [typeof(string), typeof(IFormatProvider)],
+                modifiers: null)
+            ?? targetType.GetMethod(
+                "Parse",
+                BindingFlags.Public | BindingFlags.Static,
+                binder: null,
+                [typeof(string)],
+                modifiers: null);
+
+        if (method is null || !targetType.IsAssignableFrom(method.ReturnType))
+        {
+            value = null;
+
+            return false;
+        }
+
+        object?[] arguments = method.GetParameters().Length == 2
+            ? [text, CultureInfo.InvariantCulture]
+            : [text];
+
+        try
+        {
+            value = method.Invoke(null, arguments);
+
+            return true;
+        }
+        catch (TargetInvocationException error)
+            when (error.InnerException is FormatException or ArgumentException or OverflowException)
+        {
+            // The type knows how to read its own text and says this is not it. Reported by the
+            // caller as a refused conversion, like any other.
+            throw new FormatException(error.InnerException.Message, error.InnerException);
+        }
     }
 }

@@ -402,4 +402,49 @@ public sealed class PropertyMatrixTests
         Assert.Equal(members, members.OrderBy(static member => member.Name, StringComparer.Ordinal));
         Assert.Equal(members.Length, members.Select(static member => member.Name).Distinct().Count());
     }
+    [AvaloniaFact]
+    public async Task AValueWrittenAsTextReachesTheSameValueTheDocumentLoadedWith()
+    {
+        // Thickness carries no TypeConverter: it is read by the XAML compiler through its own
+        // Parse, and an update that did not do the same would hand the setter a string.
+        await using XamlLoadSession session = await Load(
+            $"<Border xmlns=\"{AvaloniaNamespace}\" Margin=\"1\" />");
+
+        var border = session.GetRoot<Border>();
+
+        XamlDocument updated = session.Document.SetAttribute(
+            session.Document.Root!, XamlQualifiedName.Parse("Margin"), "6,0,4,0");
+
+        XamlUpdateResult result = await session.ApplyDocumentUpdateAsync(
+            updated, TestContext.Current.CancellationToken);
+
+        Assert.True(result.Applied);
+        Assert.Equal(new Thickness(6, 0, 4, 0), border.Margin);
+    }
+
+    [AvaloniaFact]
+    public async Task TextTheMemberCannotHoldIsReportedRatherThanThrown()
+    {
+        await using XamlLoadSession session = await Load(
+            $"<Border xmlns=\"{AvaloniaNamespace}\" Margin=\"1\" />");
+
+        var border = session.GetRoot<Border>();
+
+        XamlDocument updated = session.Document.SetAttribute(
+            session.Document.Root!, XamlQualifiedName.Parse("Margin"), "not a thickness");
+
+        // Half-typed text in an inspector is an ordinary user error, and the contract is that
+        // those are diagnostics with a span rather than exceptions out of an update.
+        XamlUpdateResult result = await session.ApplyDocumentUpdateAsync(
+            updated, TestContext.Current.CancellationToken);
+
+        Assert.False(result.Applied);
+        Assert.Contains(result.Diagnostics, static d => d.Severity == MarkupDiagnosticSeverity.Error);
+
+        // And the objects are left as they were, so the tree still matches the document the
+        // session is still holding.
+        Assert.Equal(new Thickness(1), border.Margin);
+    }
+
+
 }

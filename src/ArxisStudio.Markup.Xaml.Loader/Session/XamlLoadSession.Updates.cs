@@ -462,8 +462,25 @@ public sealed partial class XamlLoadSession
             }
 
             string text = updatedElement.GetAttribute(XamlQualifiedName.Parse(name))?.GetValueText() ?? string.Empty;
+            object? value = XamlValueConversion.Convert(member.ValueType, text, diagnostics);
 
-            writes.Add((target, member, XamlValueConversion.Convert(member.ValueType, text, diagnostics)));
+            // Checked here rather than found out by the setter throwing. A value the member cannot
+            // hold is an ordinary user error — half-typed text in an inspector, most of the time —
+            // and refusing before anything is written is what keeps the objects and the document
+            // from disagreeing over it.
+            if (!Holds(member.ValueType, value))
+            {
+                diagnostics.Add(MarkupDiagnostic.Synchronization(
+                    XamlLoaderDiagnosticCodes.IncompatibleValue,
+                    $"'{text}' is not a {member.ValueType.Name}, which is what {target.GetType().Name}.{name} holds.",
+                    MarkupDiagnosticSeverity.Error,
+                    Document.Uri,
+                    updatedElement.GetAttribute(XamlQualifiedName.Parse(name))?.Span ?? element.NameSpan));
+
+                return false;
+            }
+
+            writes.Add((target, member, value));
         }
 
         // Before anything is rebuilt: a reorder moves the objects that already exist, and a
@@ -502,10 +519,38 @@ public sealed partial class XamlLoadSession
 
         foreach ((object target, XamlMemberDescriptor member, object? value) in writes)
         {
-            XamlDesignValues.Write(target, member, value);
+            try
+            {
+                XamlDesignValues.Write(target, member, value);
+            }
+            catch (Exception error)
+                when (error is InvalidCastException or ArgumentException or InvalidOperationException)
+            {
+                // A value of the right type the property still refuses — a validating setter, a
+                // negative length. Reported like any other refused value; an exception out of an
+                // update is for broken invariants, not for what a document says.
+                diagnostics.Add(MarkupDiagnostic.Synchronization(
+                    XamlLoaderDiagnosticCodes.IncompatibleValue,
+                    $"{target.GetType().Name}.{member.Name} refused the value: {error.Message}",
+                    MarkupDiagnosticSeverity.Error,
+                    Document.Uri));
+
+                return false;
+            }
         }
 
         return true;
+    }
+
+    /// <summary>Reports whether a member of a type can hold a value.</summary>
+    private static bool Holds(Type valueType, object? value)
+    {
+        if (value is null)
+        {
+            return !valueType.IsValueType || Nullable.GetUnderlyingType(valueType) is not null;
+        }
+
+        return valueType.IsInstanceOfType(value);
     }
 
     /// <summary>
@@ -592,7 +637,7 @@ public sealed partial class XamlLoadSession
     {
         into[element] = target;
 
-        XamlElement[] children = [.. element.Elements.Where(static child => !child.IsPropertyElementSyntax)];
+        XamlElement[] children = [.. element.ContentElements];
         object[] objects = target is ILogical logical ? [.. logical.LogicalChildren] : [];
 
         if (children.Length != objects.Length)
