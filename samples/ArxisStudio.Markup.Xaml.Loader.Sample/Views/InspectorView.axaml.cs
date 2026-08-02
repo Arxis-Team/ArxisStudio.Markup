@@ -33,15 +33,6 @@ namespace ArxisStudio.Markup.Xaml.Loader.Sample.Views;
 /// </remarks>
 internal sealed partial class InspectorView : UserControl
 {
-    /// <summary>Properties worth offering on anything that has them.</summary>
-    private static readonly string[] Common =
-    [
-        "Width", "Height", "Margin", "Padding", "Background", "Foreground", "BorderBrush",
-        "BorderThickness", "CornerRadius", "Opacity", "IsVisible", "IsEnabled", "FontSize",
-        "FontWeight", "Text", "Content", "Spacing", "Orientation", "HorizontalAlignment",
-        "VerticalAlignment",
-    ];
-
     private const string Stated = "задано в документе";
     private const string Inherited = "унаследовано: стиль, тема или значение по умолчанию";
 
@@ -52,7 +43,7 @@ internal sealed partial class InspectorView : UserControl
     private XamlWorkspace? _workspace;
     private MarkupDocumentId _documentId;
     private XamlLoadSession? _session;
-    private object? _selected;
+    private XamlElementPath _selected = XamlElementPath.Root;
     private bool _filling;
     private bool _started;
 
@@ -71,7 +62,7 @@ internal sealed partial class InspectorView : UserControl
         {
             if (!_filling && Tree.SelectedItem is ObjectNode node)
             {
-                _selected = node.Target;
+                _selected = node.Path;
 
                 ShowProperties();
             }
@@ -79,6 +70,21 @@ internal sealed partial class InspectorView : UserControl
 
         _report.Note("правьте свойство справа");
     }
+
+    /// <summary>Gets the element the tree has selected, in a given version of the document.</summary>
+    /// <remarks>
+    /// The path is resolved against whichever document is being worked on rather than remembered
+    /// as an element, because the session's document and the workspace's are two parses and an
+    /// element of one is not an element of the other. That they describe the same text is what
+    /// makes one path answer for both.
+    /// </remarks>
+    private XamlElement? ElementIn(XamlDocument document) => _selected.Resolve(document);
+
+    /// <summary>Gets the object the selected element produced, if it produced one.</summary>
+    private object? Selection =>
+        _session is null ? null : ElementIn(_session.Document) is { } element
+            ? _session.GetObject(element)
+            : null;
 
     /// <summary>Gets the file the showcase reads and writes.</summary>
     /// <remarks>
@@ -139,7 +145,7 @@ internal sealed partial class InspectorView : UserControl
         _session = session;
 
         Preview.Content = SampleData.Attach(session.RootObject);
-        _selected = session.RootObject;
+        _selected = XamlElementPath.Root;
 
         ShowTree();
         ShowProperties();
@@ -165,94 +171,46 @@ internal sealed partial class InspectorView : UserControl
     private void OnDelete(object? sender, RoutedEventArgs e) =>
         _ = EditAsync(
             static (editor, element) => editor.RemoveElement(element),
-            element => $"Удалить <{element.Name}>");
+            element => $"Удалить <{element.Name}>",
+
+            // Nothing is at that position any more, and the position now holds whatever moved up
+            // into it. Selecting what contained the deleted element is the tool saying which of
+            // those two it meant.
+            _selected.Parent);
 
     private void OnDuplicate(object? sender, RoutedEventArgs e) =>
-        _ = EditAsync(Duplicate, element => $"Дублировать <{element.Name}>");
+        _ = EditAsync(
+            static (editor, element) => editor.DuplicateElement(element),
+            element => $"Дублировать <{element.Name}>");
 
     private void OnWrap(object? sender, RoutedEventArgs e) =>
         _ = EditAsync(
             static (editor, element) => editor.WrapElement(element, "<Border Padding=\"8\"></Border>"),
             element => $"Обернуть <{element.Name}> в Border");
 
-    /// <summary>Puts a copy of an element straight after it, among the same siblings.</summary>
-    /// <remarks>
-    /// The copy loses every name in it. Avalonia registers a name once per scope and refuses a
-    /// second, so a copy that kept them would not load — which is a decision about what
-    /// duplicating means, and therefore this tool's to make rather than the library's.
-    /// </remarks>
-    private static XamlDocumentEditor Duplicate(XamlDocumentEditor editor, XamlElement element)
-    {
-        if (element.Parent is not XamlElement parent)
-        {
-            return editor;
-        }
-
-        XamlElement[] siblings = [.. parent.Elements];
-
-        return editor.InsertElement(parent, Array.IndexOf(siblings, element) + 1, Anonymous(element));
-    }
-
-    /// <summary>Renders an element's text with every name taken out of it.</summary>
-    /// <remarks>
-    /// Parsed inside a wrapper that declares the XAML namespace, because a fragment lifted out of
-    /// its document does not carry the prefix its own <c>x:Name</c> is written with — and an
-    /// attribute whose prefix is bound to nothing is not the directive it looks like.
-    /// </remarks>
-    private static string Anonymous(XamlElement element)
-    {
-        var copy = XamlDocument.Parse(
-            $"<Fragment xmlns:x=\"{XamlNamespaces.Xaml}\">{element.GetText()}</Fragment>");
-
-        XamlDocumentEditor editor = copy.Edit();
-
-        foreach (XamlElement node in copy.DescendantElements())
-        {
-            if (node.GetDirectiveAttribute(XamlDirectives.Name) is { } directive)
-            {
-                editor.RemoveAttribute(node, directive.Name);
-            }
-
-            if (node.GetAttribute("Name") is { } attribute)
-            {
-                editor.RemoveAttribute(node, attribute.Name);
-            }
-        }
-
-        return editor.Apply().Root!.Elements.First().GetText();
-    }
-
     /// <summary>Records one structural edit, applies it, and lets everything follow.</summary>
     private async Task EditAsync(
         Func<XamlDocumentEditor, XamlElement, XamlDocumentEditor> record,
-        Func<XamlElement, string> describe)
+        Func<XamlElement, string> describe,
+        XamlElementPath? select = null)
     {
-        if (_workspace is null
-            || _session is null
-            || _selected is not { } target
-            || _session.GetElement(target) is not { } element
-            || ReferenceEquals(element, _session.Document.Root))
+        if (_workspace is null || _session is null || _selected.Steps.IsEmpty)
         {
             return;
         }
 
         XamlDocument document = _workspace.GetDocument(_documentId);
 
-        // The session's element belongs to the session's document; the editor must be opened on
-        // the workspace's. Both are the same text, so the same element is at the same span.
-        if (Find(document, element) is not { } subject)
+        if (ElementIn(document) is not { } element)
         {
             return;
         }
 
         await SyncAsync(
-            _workspace.Apply(record(document.Edit(), subject), describe(element)),
-            describe(element));
+            _workspace.Apply(record(document.Edit(), element), describe(element)),
+            describe(element),
+            select: select);
     }
-
-    /// <summary>Finds the element that stands where another one stands, in another parse.</summary>
-    private static XamlElement? Find(XamlDocument document, XamlElement element) =>
-        document.DescendantElements().FirstOrDefault(candidate => candidate.Span == element.Span);
 
     /// <summary>Moves the history and brings everything else along.</summary>
     /// <remarks>
@@ -281,7 +239,8 @@ internal sealed partial class InspectorView : UserControl
     private async Task SyncAsync(
         XamlDocument document,
         string what,
-        Func<XamlWorkspace, bool>? rollback = null)
+        Func<XamlWorkspace, bool>? rollback = null,
+        XamlElementPath? select = null)
     {
         XamlUpdateResult result = await _session!.ApplyDocumentUpdateAsync(document, CancellationToken.None);
 
@@ -302,9 +261,17 @@ internal sealed partial class InspectorView : UserControl
         _report.Caption("ДИАГНОСТИКА").Diagnostics(result.Diagnostics, _session.Document.SourceText);
         ShowMarkup();
 
-        if (_session.GetElement(_selected!) is null)
+        if (result.Applied && select is not null)
         {
-            _selected = _session.RootObject;
+            _selected = select;
+        }
+
+        // Whatever the path led to, the document may no longer have anything there — an undo that
+        // took a subtree away is enough. The library says the path no longer resolves; where to
+        // put the selection instead is the tool's answer.
+        if (ElementIn(_session.Document) is null)
+        {
+            _selected = XamlElementPath.Root;
         }
 
         ShowTree();
@@ -335,25 +302,39 @@ internal sealed partial class InspectorView : UserControl
         _nodes.Clear();
         Add(root, 0);
 
-        // Selection is by object, so it survives an update: the document's elements are replaced
-        // wholesale by one, and the objects are what both versions have in common.
+        // Selection is a path, so it means the same element after an edit as before it — including
+        // after an undo, where nothing the tree held on to the last time still exists.
         _filling = false;
-        Tree.SelectedItem = _nodes.FirstOrDefault(node => ReferenceEquals(node.Target, _selected));
+        Tree.SelectedItem = _nodes.FirstOrDefault(node => node.Path.Equals(_selected));
 
         void Add(XamlElement element, int depth)
         {
             int next = depth;
 
-            if (!element.IsPropertyElementSyntax && _session!.Objects.GetObject(element) is { } target)
+            if (_session!.GetObject(element) is { } target)
             {
-                _nodes.Add(new ObjectNode(target, target.GetType().Name, Detail(element), depth));
+                _nodes.Add(new ObjectNode(
+                    XamlElementPath.Of(element), target.GetType().Name, Detail(element), depth));
 
                 next = depth + 1;
             }
 
-            foreach (XamlElement child in element.Elements)
+            // ContentElements rather than Elements: <Border.Resources> is a member of the border
+            // and not a thing standing beside its children. Walking the two separately is what puts
+            // the controls above the resources, in the order someone building a screen thinks in.
+            foreach (XamlElement child in element.ContentElements)
             {
                 Add(child, next);
+            }
+
+            // What a member holds is part of the document too — the brushes under
+            // <Border.Resources> are objects with properties like any other.
+            foreach (XamlElement member in element.MemberElements)
+            {
+                foreach (XamlElement child in member.ContentElements)
+                {
+                    Add(child, next);
+                }
             }
         }
     }
@@ -362,36 +343,23 @@ internal sealed partial class InspectorView : UserControl
     /// Says which one this is, when the type name does not already.
     /// </summary>
     /// <remarks>
-    /// A name, or the key it is filed under. Repeating the element name next to the type name it
-    /// produced fills the column with <c>SolidColorBrush &lt;SolidColorBrush&gt;</c> and pushes
-    /// out the part that distinguishes one row from another.
+    /// The name the document gives it, which <see cref="XamlElement.Identity"/> answers, or else
+    /// the key it is filed under. Repeating the element name next to the type name it produced
+    /// fills the column with <c>SolidColorBrush &lt;SolidColorBrush&gt;</c> and pushes out the part
+    /// that distinguishes one row from another.
     /// </remarks>
-    private static string Detail(XamlElement element)
-    {
-        if (element.GetDirective("Name") is { } declared)
-        {
-            return declared;
-        }
-
-        if (element.GetAttribute(XamlQualifiedName.Parse("Name"))?.GetValue() is XamlLiteralValue literal)
-        {
-            return literal.Text;
-        }
-
-        if (element.GetDirective("Key") is { } key)
-        {
-            return $"#{key}";
-        }
-
-        return string.Empty;
-    }
+    private static string Detail(XamlElement element) =>
+        element.Identity
+        ?? (element.GetDirective(XamlDirectives.Key) is { } key ? $"#{key}" : string.Empty);
 
     /// <summary>Builds a row for every member of the selected object worth offering.</summary>
     private void ShowProperties()
     {
         _properties.Clear();
 
-        if (_session is null || _selected is not { } target || _session.GetElement(target) is not { } element)
+        if (_session is null
+            || ElementIn(_session.Document) is not { } element
+            || Selection is not { } target)
         {
             Selected.Text = "—";
 
@@ -408,10 +376,13 @@ internal sealed partial class InspectorView : UserControl
         DuplicateButton.IsEnabled = structural;
         WrapButton.IsEnabled = structural;
 
-        // What the document already says about this element first, then the rest of what it could
-        // say. Which names are worth offering is the host's business; what each one means is the
-        // library's, and that is the question GetMember answers.
-        var names = new List<string>();
+        // What the document already says about this element first, then everything else the type
+        // has. The list comes from GetMembers rather than from a table of names kept here: which
+        // members exist is the library's question, and a curated table answers it only for the
+        // controls whoever wrote it thought of.
+        string filter = Filter.Text ?? string.Empty;
+        var seen = new HashSet<string>(StringComparer.Ordinal);
+        var members = new List<XamlMemberDescriptor>();
 
         foreach (XamlAttribute attribute in element.Attributes)
         {
@@ -423,18 +394,34 @@ internal sealed partial class InspectorView : UserControl
                 continue;
             }
 
-            names.Add(attribute.Name.LocalName);
+            if (seen.Add(attribute.Name.LocalName))
+            {
+                members.Add(_session.GetMember(target, attribute.Name.LocalName));
+            }
         }
 
-        names.AddRange(Common.Where(name => !names.Contains(name, StringComparer.Ordinal)));
+        // Attached members last. They belong to whatever the element happens to sit in rather than
+        // to the element, there are a great many of them, and alphabetical order would otherwise
+        // open every panel on AutomationProperties.
+        members.AddRange(_session.GetMembers(target)
+            .Where(member => seen.Add(member.Name))
+            .OrderBy(static member => member.IsAttached));
 
-        foreach (string name in names)
+        foreach (XamlMemberDescriptor member in members)
         {
-            if (Row(target, element, name) is { } row)
+            if (filter.Length > 0
+                && !member.Name.Contains(filter, StringComparison.OrdinalIgnoreCase))
+            {
+                continue;
+            }
+
+            if (Row(target, element, member) is { } row)
             {
                 _properties.Add(row);
             }
         }
+
+        Count.Text = $"{_properties.Count} из {members.Count}";
 
         if (_properties.Count == 0)
         {
@@ -442,9 +429,17 @@ internal sealed partial class InspectorView : UserControl
         }
     }
 
-    private PropertyRow? Row(object target, XamlElement element, string name)
+    /// <summary>Rebuilds the rows for a narrowed list of names.</summary>
+    /// <remarks>
+    /// A control has upwards of two hundred settable members and all of them are shown, so finding
+    /// one by scrolling is not realistic. The box narrows the list rather than the library doing
+    /// it: what is worth showing is the tool's decision, and here it is the user's.
+    /// </remarks>
+    private void OnFilterChanged(object? sender, TextChangedEventArgs e) => ShowProperties();
+
+    private PropertyRow? Row(object target, XamlElement element, XamlMemberDescriptor member)
     {
-        XamlMemberDescriptor member = _session!.GetMember(target, name);
+        string name = member.Name;
 
         // An unwritable member is not something an inspector may offer, and an event is not a
         // value at all.
@@ -522,10 +517,14 @@ internal sealed partial class InspectorView : UserControl
     /// <summary>Writes one property into the document, and lets the objects follow.</summary>
     private async Task CommitAsync(string name, string text)
     {
-        if (_workspace is null
-            || _session is null
-            || _selected is not { } target
-            || _session.GetElement(target) is not { } element)
+        if (_workspace is null || _session is null)
+        {
+            return;
+        }
+
+        XamlDocument document = _workspace.GetDocument(_documentId);
+
+        if (ElementIn(document) is not { } element)
         {
             return;
         }
@@ -542,17 +541,10 @@ internal sealed partial class InspectorView : UserControl
             return;
         }
 
-        XamlDocument document = _workspace.GetDocument(_documentId);
-
-        if (Find(document, element) is not { } subject)
-        {
-            return;
-        }
-
         string action = $"{element.Name.LocalName}.{name}";
 
         XamlDocument edited = _workspace.Apply(
-            document.Edit().SetAttribute(subject, qualified, text), action);
+            document.Edit().SetAttribute(element, qualified, text), action);
 
         XamlUpdateResult result = await _session.ApplyDocumentUpdateAsync(edited, CancellationToken.None);
 
@@ -588,7 +580,7 @@ internal sealed partial class InspectorView : UserControl
         }
 
         // Anything larger did more than it was asked, or nothing at all. Either way the rows and
-        // the tree are rebuilt: the objects are what selection is keyed on, and they survive.
+        // the tree are rebuilt; selection is a path, and the path still says the same thing.
         ShowTree();
         ShowProperties();
     }

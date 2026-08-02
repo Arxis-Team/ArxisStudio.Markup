@@ -21,6 +21,14 @@ internal abstract class PropertyRow(string name, string origin) : INotifyPropert
     /// <summary>Gets the member's name.</summary>
     public string Name { get; } = name;
 
+    /// <summary>Gets what to say about the row when it is pointed at.</summary>
+    /// <remarks>
+    /// The name is in the tooltip as well as in the label because an attached member is written
+    /// <c>Owner.Member</c> and does not fit the column — <c>AutomationProperties.HelpText</c> is
+    /// trimmed to something several other rows also trim to.
+    /// </remarks>
+    public string Hint => $"{Name} — {Origin}";
+
     private string _origin = origin;
 
     /// <summary>Gets or sets where the value shown came from.</summary>
@@ -43,6 +51,7 @@ internal abstract class PropertyRow(string name, string origin) : INotifyPropert
             _origin = value;
 
             Raise();
+            Raise(nameof(Hint));
         }
     }
 

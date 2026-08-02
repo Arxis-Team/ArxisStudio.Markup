@@ -17,7 +17,7 @@
         <TextBlock Grid.Column="0"
                    Classes="muted"
                    Text="{Binding Name}"
-                   ToolTip.Tip="{Binding Origin}"
+                   ToolTip.Tip="{Binding Hint}"
                    VerticalAlignment="Center"
                    TextTrimming="CharacterEllipsis"
                    Margin="0,0,10,0" />
@@ -33,7 +33,7 @@
         <TextBlock Grid.Column="0"
                    Classes="muted"
                    Text="{Binding Name}"
-                   ToolTip.Tip="{Binding Origin}"
+                   ToolTip.Tip="{Binding Hint}"
                    VerticalAlignment="Center"
                    Margin="0,0,10,0" />
         <CheckBox Grid.Column="1" IsChecked="{Binding IsChecked, Mode=TwoWay}" />
@@ -45,7 +45,7 @@
         <TextBlock Grid.Column="0"
                    Classes="muted"
                    Text="{Binding Name}"
-                   ToolTip.Tip="{Binding Origin}"
+                   ToolTip.Tip="{Binding Hint}"
                    VerticalAlignment="Center"
                    Margin="0,0,10,0" />
         <ComboBox Grid.Column="1"
@@ -60,7 +60,7 @@
         <TextBlock Grid.Column="0"
                    Classes="muted"
                    Text="{Binding Name}"
-                   ToolTip.Tip="{Binding Origin}"
+                   ToolTip.Tip="{Binding Hint}"
                    VerticalAlignment="Center"
                    Margin="0,0,10,0" />
         <Border Grid.Column="1" Classes="expression">
@@ -171,8 +171,22 @@
         <DockPanel>
 
           <StackPanel DockPanel.Dock="Top" Margin="0,0,0,10">
-            <TextBlock Classes="caption" Text="СВОЙСТВА" />
+            <Grid ColumnDefinitions="*,Auto">
+              <TextBlock Classes="caption" Text="СВОЙСТВА" />
+              <TextBlock x:Name="Count" Grid.Column="1" Classes="caption muted" />
+            </Grid>
             <TextBlock x:Name="Selected" Classes="mono" Margin="0,6,0,0" />
+
+            <!--
+              Every settable member of the selected type is listed, which for a control is a couple
+              of hundred. The box is how one of them is found; nothing here decides for the user
+              which members are the interesting ones.
+            -->
+            <TextBox x:Name="Filter"
+                     Classes="field"
+                     PlaceholderText="фильтр по имени"
+                     TextChanged="OnFilterChanged"
+                     Margin="0,8,0,0" />
           </StackPanel>
 
           <Border DockPanel.Dock="Bottom" Classes="divider" Margin="0,10,0,10" />
