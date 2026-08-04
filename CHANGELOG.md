@@ -5,6 +5,72 @@ What changed between releases of the three packages, which are versioned and rel
 The three rules in [`README.md`](README.md) are never traded away for any of it: the document stays
 the source of truth, an unchanged document round-trips byte for byte, and unknown content survives.
 
+## 0.2.0-preview.2
+
+What a review of the previous release found. Four things, all of them cases where the code was
+*nearly* right — which is why the tests written alongside it passed. No public API changed;
+`XamlMutationGate` and `XamlObjectExposure` are internal. See
+[ADR 0011](docs/adr/0011-what-a-review-found-in-the-mutation-boundary.md).
+
+### An edit could race past a session that had already stopped accepting them
+
+`SetValue` and `SetXamlValue` asked whether the session was still usable and *then* took the
+mutation gate. Between those two moments an update that owned the gate could fail after writing,
+mark the session and let go — and the edit would take its turn on a session that by then refused
+everything. Both checks now happen with the gate held, and the answer read on the way in is not
+consulted at all. Disposal is checked the same way, and its flag moved from a plain `bool` to an
+`Interlocked` read, which is also what makes disposing twice safe rather than accidentally safe.
+
+### A cancelled update could leave nowhere to recover to
+
+`docs/api/updates.md` tells a caller whose update stopped part-way to build a new session from
+`PendingDocument`, and the path that marked the session after a post-write failure did not set it.
+It is now set wherever the session is marked, cancellation included; once set by the failure that
+broke the session it is not replaced by a later refusal, and it is cleared only when a whole update
+is adopted.
+
+### An invoked setter that throws is never a clean refusal
+
+**This reverses a judgement from the previous release.** It was treated as clean when it was the
+first write of an update, on the reasoning that a setter refusing a value leaves the object as it
+was. That is true of a property which validates before assigning — Avalonia's `validate` callback
+is exactly that, which is what made it look general — and false of this, which any control library
+may write:
+
+```csharp
+set
+{
+    _value = value;
+    Tag = Describe(value);
+    throw new InvalidOperationException("…and now I am unhappy.");
+}
+```
+
+The rule is now that **a refusal has to be reached without running the object's own code**.
+Everything checkable is still checked first and that is where clean refusals come from; past that
+point a failure is `RequiresNewSession`, even as an update's first change. Two things keep this
+from being ruinous: the conversion check means a half-typed value never reaches a setter, and
+Avalonia reports `IsReadOnly` on an items control's `Items` once `ItemsSource` is bound, so the
+case a designer meets daily is refused before anything is invoked. A write to a rebuilt copy the
+session has never exposed is still clean whatever it does.
+
+### Queued updates now really are a queue
+
+`SemaphoreSlim` gives mutual exclusion and promises nothing about the order it releases waiters in,
+while the documentation said updates queue. For a host watching files, three saves whose oldest is
+released last means a preview showing text from two saves ago with every mutation perfectly
+serialised. An internal FIFO gate replaces it: order fixed when the call is made, ownership handed
+straight to the next waiter rather than dropped for whoever wakes first, a lock held only long
+enough to move a link in a list and never across an `await`, a lease released exactly once, and a
+non-blocking `TryEnter` for the synchronous edits which also refuses while anyone is *waiting*.
+Cancelling a waiter removes that one turn and can never release ownership it did not hold.
+
+### Migrating
+
+Nothing to change unless you relied on a throwing setter leaving a session usable. If you did, that
+was never safe; check `Outcome`/`State` and rebuild the session, as
+[docs/api/updates.md](docs/api/updates.md#a-tools-update-loop) shows.
+
 ## 0.2.0-preview.1
 
 Milestones 12 to 14, and the hardening a review asked for before anything is built on these
