@@ -27,6 +27,7 @@ namespace ArxisStudio.Markup.Xaml.Loader.Tests;
 public sealed class SessionConcurrencyTests
 {
     private const string AvaloniaNamespace = "https://github.com/avaloniaui";
+    private const string TestControlsNamespace = "https://arxis.studio/test-controls";
 
     private static readonly Uri ViewUri = new("file:///Views/View.axaml");
 
@@ -39,7 +40,7 @@ public sealed class SessionConcurrencyTests
     private static ValueTask<XamlLoadSession> Load(IXamlDispatcher dispatcher, string? xaml = null)
     {
         XamlLoadEnvironment defaults =
-            XamlLoadEnvironment.CreateDefault([typeof(ValidatingControl).Assembly]);
+            XamlLoadEnvironment.CreateDefault([typeof(ThrowingControl).Assembly]);
 
         return XamlLoadSession.CreateAsync(
             Parse(xaml ?? View("10")),
@@ -260,6 +261,98 @@ public sealed class SessionConcurrencyTests
         Assert.True(
             (await session.ApplyDocumentUpdateAsync(
                 Parse(View("50")), TestContext.Current.CancellationToken)).Applied);
+    }
+
+    [AvaloniaFact]
+    public async Task AnEditThatStartedWhileAnUpdateWasBreakingTheSessionStillCannotApply()
+    {
+        var dispatcher = new ControllableDispatcher();
+
+        await using XamlLoadSession session = await Load(
+            dispatcher,
+            $"<local:ThrowingControl xmlns=\"{AvaloniaNamespace}\"\n" +
+            $"                       xmlns:local=\"{TestControlsNamespace}\"\n" +
+            "                       Tag=\"one\" ThrowsBeforeAssigning=\"5\" />");
+
+        var control = session.GetRoot<ThrowingControl>();
+
+        dispatcher.Hold();
+
+        // This update will write Tag and then be refused by the setter, which leaves the session
+        // describing nothing.
+        Task<XamlUpdateResult> breaking = session
+            .ApplyDocumentUpdateAsync(
+                XamlDocument.Parse(
+                    $"<local:ThrowingControl xmlns=\"{AvaloniaNamespace}\"\n" +
+                    $"                       xmlns:local=\"{TestControlsNamespace}\"\n" +
+                    "                       Tag=\"two\" ThrowsBeforeAssigning=\"-1\" />",
+                    new XamlParseOptions { DocumentUri = ViewUri }),
+                TestContext.Current.CancellationToken)
+            .AsTask();
+
+        await dispatcher.Arrived;
+
+        // While the update owns the session the edit is refused for being too early, which is the
+        // easy half. The half that used to be wrong is what happens once it lets go.
+        Assert.Contains(
+            session.SetValue(control, ThrowingControl.ThrowsBeforeAssigningProperty, 3).Diagnostics,
+            static diagnostic => diagnostic.Code == XamlLoaderDiagnosticCodes.SessionBusy);
+
+        dispatcher.Release();
+
+        Assert.Equal(XamlUpdateOutcome.RequiresNewSession, (await breaking).Outcome);
+
+        // The gate is free now, so an edit can take it — and the answer it gets must be the state
+        // as it is inside the gate, not the state it might have read on the way in.
+        XamlEditResult edit = session.SetValue(control, ThrowingControl.ThrowsBeforeAssigningProperty, 3);
+
+        Assert.False(edit.Applied);
+        Assert.Contains(
+            edit.Diagnostics,
+            static diagnostic => diagnostic.Code == XamlLoaderDiagnosticCodes.SessionRequiresRecreation);
+
+        Assert.False(
+            session.SetXamlValue(
+                control, ThrowingControl.ThrowsBeforeAssigningProperty, new XamlLiteralValue("3")).Applied);
+
+        Assert.Equal(5, control.ThrowsBeforeAssigning);
+    }
+
+    [AvaloniaFact]
+    public async Task BothEditingMethodsRefuseOnceDisposalHasBegun()
+    {
+        var dispatcher = new ControllableDispatcher();
+
+        XamlLoadSession session = await Load(dispatcher);
+
+        var border = session.GetRoot<Border>();
+
+        dispatcher.Hold();
+
+        Task<XamlUpdateResult> update = session
+            .ApplyDocumentUpdateAsync(Parse(View("20")), TestContext.Current.CancellationToken)
+            .AsTask();
+
+        await dispatcher.Arrived;
+
+        Task disposal = session.DisposeAsync().AsTask();
+
+        dispatcher.Release();
+
+        Assert.True((await update).Applied);
+
+        await disposal;
+
+        // Disposal is decided inside the gate too, so an edit that arrives afterwards is refused
+        // by the same rule rather than by whatever it happened to read on the way in.
+        Assert.Throws<ObjectDisposedException>(() =>
+            session.SetValue(border, Avalonia.Layout.Layoutable.HeightProperty, 44d));
+
+        Assert.Throws<ObjectDisposedException>(() =>
+            session.SetXamlValue(
+                border, Avalonia.Layout.Layoutable.HeightProperty, new XamlLiteralValue("44")));
+
+        Assert.False(border.IsSet(Avalonia.Layout.Layoutable.HeightProperty));
     }
 
     [AvaloniaFact]

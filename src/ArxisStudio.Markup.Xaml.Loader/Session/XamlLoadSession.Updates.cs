@@ -31,12 +31,17 @@ namespace ArxisStudio.Markup.Xaml.Loader;
 /// the next keystroke is the correction.
 /// </para>
 /// <para>
-/// What cannot be checked in advance is user code. A validating setter may refuse a value of the
-/// right type after an earlier write has landed, and a collection may refuse to take back what
-/// was moved out of it. An update that gets that far and then stops is
-/// <see cref="XamlUpdateOutcome.RequiresNewSession"/>: the objects agree with neither document,
-/// nothing here can undo arbitrary side effects, and the session refuses every later mutation
-/// rather than compounding the disagreement.
+/// What cannot be checked in advance is user code. Once a setter, an accessor or a collection has
+/// been invoked on a live object and thrown, nothing here can prove what it did first — a setter
+/// is free to assign its field, touch a second property and then throw. An update that gets that
+/// far and then stops is <see cref="XamlUpdateOutcome.RequiresNewSession"/>: the objects agree
+/// with neither document, nothing can undo arbitrary side effects, and the session refuses every
+/// later mutation rather than compounding the disagreement.
+/// </para>
+/// <para>
+/// Every one of those failures keeps the document it was moving towards as
+/// <see cref="PendingDocument"/>, cancellation included, because building a new session from it is
+/// the documented way out and a caller told to do that must be given something to do it with.
 /// </para>
 /// </remarks>
 public sealed partial class XamlLoadSession
@@ -89,61 +94,56 @@ public sealed partial class XamlLoadSession
         CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(updated);
-        ObjectDisposedException.ThrowIf(_disposed, this);
 
-        await _mutation.WaitAsync(cancellationToken).ConfigureAwait(false);
+        using XamlMutationGate.XamlMutationLease lease =
+            await _mutation.EnterAsync(cancellationToken).ConfigureAwait(false);
 
-        try
+        // Inside the gate, where the answer cannot change under the caller. Reading either of
+        // these before taking a turn is reading a session somebody else may be part-way through.
+        ObjectDisposedException.ThrowIf(IsDisposed, this);
+
+        if (Unusable() is { } unusable)
         {
-            ObjectDisposedException.ThrowIf(_disposed, this);
-
-            if (Unusable(updated) is { } unusable)
-            {
-                return unusable;
-            }
-
-            var diagnostics = new List<MarkupDiagnostic>();
-
-            // A document that did not parse describes nothing to update towards, and the errors
-            // saying why are more use than anything an attempt would produce.
-            if (!updated.IsWellFormed)
-            {
-                diagnostics.AddRange(updated.GetDiagnostics().Where(static diagnostic => diagnostic.IsError));
-
-                return Refuse(
-                    updated,
-                    XamlUpdateStrategy.None,
-                    [],
-                    diagnostics,
-                    XamlLoaderDiagnosticCodes.UpdateRejected,
-                    "The document offered does not parse, so nothing was written to the objects.");
-            }
-
-            ImmutableArray<XamlDocumentChange> changes = XamlDocumentDiff.Compare(Document, updated);
-            XamlUpdateStrategy strategy = XamlDocumentDiff.Largest(changes);
-
-            if (strategy == XamlUpdateStrategy.RecreateSession)
-            {
-                // Nothing was written, so this session is as usable as it was — it is the new
-                // document that cannot be reached from here, which Strategy is what says.
-                return Refuse(
-                    updated,
-                    strategy,
-                    changes,
-                    diagnostics,
-                    XamlLoaderDiagnosticCodes.UpdateRequiresNewSession,
-                    "The root element or x:Class changed. Nothing was written to the objects, and this " +
-                    "session goes on describing the document it loaded; create a new session to load the " +
-                    "new one.");
-            }
-
-            return await ApplyAsync(updated, strategy, changes, diagnostics, cancellationToken)
-                .ConfigureAwait(false);
+            return unusable;
         }
-        finally
+
+        var diagnostics = new List<MarkupDiagnostic>();
+
+        // A document that did not parse describes nothing to update towards, and the errors
+        // saying why are more use than anything an attempt would produce.
+        if (!updated.IsWellFormed)
         {
-            _mutation.Release();
+            diagnostics.AddRange(updated.GetDiagnostics().Where(static diagnostic => diagnostic.IsError));
+
+            return Refuse(
+                updated,
+                XamlUpdateStrategy.None,
+                [],
+                diagnostics,
+                XamlLoaderDiagnosticCodes.UpdateRejected,
+                "The document offered does not parse, so nothing was written to the objects.");
         }
+
+        ImmutableArray<XamlDocumentChange> changes = XamlDocumentDiff.Compare(Document, updated);
+        XamlUpdateStrategy strategy = XamlDocumentDiff.Largest(changes);
+
+        if (strategy == XamlUpdateStrategy.RecreateSession)
+        {
+            // Nothing was written, so this session is as usable as it was — it is the new
+            // document that cannot be reached from here, which Strategy is what says.
+            return Refuse(
+                updated,
+                strategy,
+                changes,
+                diagnostics,
+                XamlLoaderDiagnosticCodes.UpdateRequiresNewSession,
+                "The root element or x:Class changed. Nothing was written to the objects, and this " +
+                "session goes on describing the document it loaded; create a new session to load the " +
+                "new one.");
+        }
+
+        return await ApplyAsync(updated, strategy, changes, diagnostics, cancellationToken)
+            .ConfigureAwait(false);
     }
 
     /// <summary>
@@ -166,102 +166,97 @@ public sealed partial class XamlLoadSession
         CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(resourceUri);
-        ObjectDisposedException.ThrowIf(_disposed, this);
 
-        await _mutation.WaitAsync(cancellationToken).ConfigureAwait(false);
+        using XamlMutationGate.XamlMutationLease lease =
+            await _mutation.EnterAsync(cancellationToken).ConfigureAwait(false);
 
-        try
+        // Inside the gate, where the answer cannot change under the caller. Reading either of
+        // these before taking a turn is reading a session somebody else may be part-way through.
+        ObjectDisposedException.ThrowIf(IsDisposed, this);
+
+        // No document is offered to a source update, so there is none to remember.
+        if (Unusable() is { } unusable)
         {
-            ObjectDisposedException.ThrowIf(_disposed, this);
+            return unusable;
+        }
 
-            // No document is offered to a source update, so there is none to remember.
-            if (Unusable() is { } unusable)
+        var diagnostics = new List<MarkupDiagnostic>();
+
+        TextProjection projection = await XamlDocumentProjector
+            .ProjectAsync(Document, Environment, diagnostics, cancellationToken)
+            .ConfigureAwait(false);
+
+        // Nothing the document reaches changed, whatever the caller was told about the file.
+        if (string.Equals(projection.Text.ToString(), Projection.Text.ToString(), StringComparison.Ordinal))
+        {
+            return new XamlUpdateResult
             {
-                return unusable;
-            }
+                Outcome = XamlUpdateOutcome.Applied,
+                Strategy = XamlUpdateStrategy.None,
+                Changes = [],
+                Diagnostics = [.. diagnostics],
+            };
+        }
 
-            var diagnostics = new List<MarkupDiagnostic>();
+        // The included content is not part of the document, so there is no element of it to
+        // set a property on. What has to be built again is whatever element of the document
+        // the include was expanded inside — every one of them, because which include's
+        // expansion changed is not a question the projected text answers.
+        var hosts = new List<XamlElement>();
+        bool atRoot = false;
 
-            TextProjection projection = await XamlDocumentProjector
-                .ProjectAsync(Document, Environment, diagnostics, cancellationToken)
-                .ConfigureAwait(false);
-
-            // Nothing the document reaches changed, whatever the caller was told about the file.
-            if (string.Equals(projection.Text.ToString(), Projection.Text.ToString(), StringComparison.Ordinal))
+        foreach (XamlResourceReference reference in Document.GetResourceReferences())
+        {
+            if (Host(reference.Element) is { } host)
             {
-                return new XamlUpdateResult
+                if (!hosts.Contains(host))
                 {
-                    Outcome = XamlUpdateOutcome.Applied,
-                    Strategy = XamlUpdateStrategy.None,
-                    Changes = [],
-                    Diagnostics = [.. diagnostics],
-                };
-            }
-
-            // The included content is not part of the document, so there is no element of it to
-            // set a property on. What has to be built again is whatever element of the document
-            // the include was expanded inside — every one of them, because which include's
-            // expansion changed is not a question the projected text answers.
-            var hosts = new List<XamlElement>();
-            bool atRoot = false;
-
-            foreach (XamlResourceReference reference in Document.GetResourceReferences())
-            {
-                if (Host(reference.Element) is { } host)
-                {
-                    if (!hosts.Contains(host))
-                    {
-                        hosts.Add(host);
-                    }
-                }
-                else
-                {
-                    atRoot = true;
+                    hosts.Add(host);
                 }
             }
-
-            var builder = ImmutableArray.CreateBuilder<XamlDocumentChange>();
-
-            foreach (XamlElement host in hosts)
+            else
             {
-                builder.Add(new XamlDocumentChange(XamlUpdateStrategy.ReplaceResource, host, host, null)
-                {
-                    ReplacesObject = true,
-                });
+                atRoot = true;
             }
-
-            // An include with nothing between it and the root — a theme file is nothing else — has
-            // no smaller element to rebuild. What is rebuilt is then the root's content rather than
-            // the root: the object itself stays, because the session is built around it and the
-            // caller holds it, and only what is inside it is built again.
-            if (atRoot && Document.Root is { } root)
-            {
-                builder.Add(new XamlDocumentChange(XamlUpdateStrategy.ReplaceResource, root, root, null));
-            }
-
-            ImmutableArray<XamlDocumentChange> changes = builder.ToImmutable();
-
-            if (changes.IsEmpty)
-            {
-                return Refuse(
-                    Document,
-                    XamlUpdateStrategy.RecreateSession,
-                    [],
-                    diagnostics,
-                    XamlLoaderDiagnosticCodes.UpdateRequiresNewSession,
-                    $"'{XamlUri.ToDisplayString(resourceUri)}' is reached by no element of this document " +
-                    "that can be rebuilt. Nothing was written to the objects; create a new session from " +
-                    "the same document to pick the file up.");
-            }
-
-            return await ApplyAsync(
-                    Document, XamlUpdateStrategy.ReplaceResource, changes, diagnostics, cancellationToken)
-                .ConfigureAwait(false);
         }
-        finally
+
+        var builder = ImmutableArray.CreateBuilder<XamlDocumentChange>();
+
+        foreach (XamlElement host in hosts)
         {
-            _mutation.Release();
+            builder.Add(new XamlDocumentChange(XamlUpdateStrategy.ReplaceResource, host, host, null)
+            {
+                ReplacesObject = true,
+            });
         }
+
+        // An include with nothing between it and the root — a theme file is nothing else — has
+        // no smaller element to rebuild. What is rebuilt is then the root's content rather than
+        // the root: the object itself stays, because the session is built around it and the
+        // caller holds it, and only what is inside it is built again.
+        if (atRoot && Document.Root is { } root)
+        {
+            builder.Add(new XamlDocumentChange(XamlUpdateStrategy.ReplaceResource, root, root, null));
+        }
+
+        ImmutableArray<XamlDocumentChange> changes = builder.ToImmutable();
+
+        if (changes.IsEmpty)
+        {
+            return Refuse(
+                Document,
+                XamlUpdateStrategy.RecreateSession,
+                [],
+                diagnostics,
+                XamlLoaderDiagnosticCodes.UpdateRequiresNewSession,
+                $"'{XamlUri.ToDisplayString(resourceUri)}' is reached by no element of this document " +
+                "that can be rebuilt. Nothing was written to the objects; create a new session from " +
+                "the same document to pick the file up.");
+        }
+
+        return await ApplyAsync(
+                Document, XamlUpdateStrategy.ReplaceResource, changes, diagnostics, cancellationToken)
+            .ConfigureAwait(false);
     }
 
     /// <summary>
@@ -352,7 +347,10 @@ public sealed partial class XamlLoadSession
 
         // Past here the objects have moved. Anything that goes wrong from now on — including the
         // token being cancelled — leaves them describing something no document says, so the
-        // session is marked before the failure is allowed out.
+        // session is marked, and the document it was moving towards is kept, before the failure is
+        // allowed out. Keeping it is not bookkeeping: the documented way out of this state is to
+        // build a new session from PendingDocument, and a caller told to do that has to be given
+        // something to do it with.
         try
         {
             return await FinishAsync(updated, strategy, changes, projection, diagnostics, cancellationToken)
@@ -360,6 +358,8 @@ public sealed partial class XamlLoadSession
         }
         catch (Exception)
         {
+            PendingDocument = updated;
+
             RequireRecreation();
 
             throw;
@@ -657,9 +657,13 @@ public sealed partial class XamlLoadSession
                 or InvalidOperationException
                 or TargetInvocationException)
             {
-                // A value of the right type the property still refuses — a validating setter, a
-                // negative length. Reported like any other refused value; an exception out of an
-                // update is for broken invariants, not for what a document says.
+                // The setter ran and threw. What it did before throwing is not knowable from here
+                // — assigning the field and then failing a cross-check is a thing controls do, and
+                // so is setting a second property on the way — so this is never reported as
+                // though the object were untouched, not even when it is the first write of the
+                // update. Everything that could be checked without running it was checked above:
+                // the member exists, it can be written, and the text converts to something it
+                // holds. That is where a clean refusal comes from, and it has already passed.
                 //
                 // TargetInvocationException among them because a CLR property and an attached
                 // accessor pair are written by reflection, which wraps whatever the setter threw.
@@ -667,13 +671,11 @@ public sealed partial class XamlLoadSession
 
                 diagnostics.Add(MarkupDiagnostic.Synchronization(
                     XamlLoaderDiagnosticCodes.IncompatibleValue,
-                    $"{target.GetType().Name}.{member.Name} refused the value: {refusal.Message}",
+                    $"{target.GetType().Name}.{member.Name} threw while being written: {refusal.Message}",
                     MarkupDiagnosticSeverity.Error,
                     Document.Uri));
 
-                // One property set, which either happened or did not: the object is as it was.
-                // Whether that leaves the session usable depends on what ran before it.
-                return Worsen(XamlMutationOutcome.Refused, mutated, diagnostics, Document.Uri);
+                return XamlMutationOutcome.Inconsistent;
             }
 
             mutated = true;
@@ -899,22 +901,16 @@ public sealed partial class XamlLoadSession
     /// would be written onto a tree nobody can describe, and the second failure would be harder to
     /// explain than the first.
     /// </remarks>
-    /// <param name="offered">
-    /// The document this call was given, kept only when nothing else has been. A session left
-    /// unusable by a cancelled update has no pending document of its own, and the next thing a
-    /// caller offers is a better answer to "what should I load instead" than nothing.
-    /// </param>
-    private XamlUpdateResult? Unusable(XamlDocument? offered = null)
+    private XamlUpdateResult? Unusable()
     {
         if (State == XamlSessionState.Usable)
         {
             return null;
         }
 
-        // Not through Break: the state is already set, and a document offered after the fact must
-        // not displace the one the session was actually left part-way towards.
-        PendingDocument ??= offered;
-
+        // PendingDocument is deliberately not touched. It was set by whatever broke the session,
+        // and it is the document a replacement session must be built from; a later attempt that
+        // arrives and is refused has no claim to replace it.
         return new XamlUpdateResult
         {
             Outcome = XamlUpdateOutcome.RequiresNewSession,

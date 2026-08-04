@@ -51,11 +51,25 @@ types such as `Thickness` and `CornerRadius` are read by instead. Text the membe
 ordinary user error: a diagnostic with the attribute's span, `RejectedCleanly`, the objects
 untouched, and nothing thrown.
 
-`RequiresNewSession` is what cannot be checked in advance: **user code**. A validating setter may
-refuse a value of the right type after an earlier write has already landed, and a collection may
-refuse to take back what was moved out of it. There is no generic rollback for that — what ran
-were constructors, setters, converters and control code with side effects nothing here can
-reverse — so instead of guessing, the session says so:
+`RequiresNewSession` is what cannot be checked in advance: **user code**. The rule is simple and
+deliberately blunt — *a refusal has to be reached without running the object's own code.* Once a
+setter, an accessor or a collection method has been called and thrown, what it did first is
+unknowable:
+
+```csharp
+set
+{
+    _value = value;                  // already happened
+    Tag = Describe(value);           // so did this
+    throw new InvalidOperationException("…and now I am unhappy.");
+}
+```
+
+Nothing in the CLR or in Avalonia prevents that, and looking at the property afterwards would not
+even notice the second line. So an exception out of a live setter is `RequiresNewSession` — *even
+when it is the first change the update tried to make.* There is no generic rollback: what ran were
+constructors, setters, converters and control code with side effects nothing here can reverse, so
+instead of guessing, the session says so:
 
 ```csharp
 if (result.Outcome == XamlUpdateOutcome.RequiresNewSession)
@@ -66,11 +80,21 @@ if (result.Outcome == XamlUpdateOutcome.RequiresNewSession)
 }
 ```
 
-`PendingDocument` is kept for exactly this: it is the state the caller was trying to reach and the
-one the objects are part-way towards. Correct whatever the diagnostics report, then load it.
+`PendingDocument` is kept for exactly this, on **every** post-write failure including cancellation:
+it is the state the caller was trying to reach and the one the objects are part-way towards. Once
+set by the failure that broke the session it is not replaced — a later update that arrives and is
+refused has no claim on the answer — and it is cleared only when a whole update is adopted.
+Correct whatever the diagnostics report, then load it.
 
 Reading a session in this state still works — a tool has to be able to show what it was holding —
 but nothing that changes it does.
+
+The blunt rule would be ruinous without two things in front of it. **Everything checkable is still
+checked first**, and that is where clean refusals come from: the member exists, it can be written,
+the text converts, the collection reports itself read-only. A typo in a property field never
+reaches a setter. And Avalonia answers `IsReadOnly` on an items control's `Items` once
+`ItemsSource` is bound, so the case a designer actually meets — a document adding a child to a
+bound list — is refused before anything is invoked and stays clean.
 
 A tool with a property field should ask before it writes — `XamlMemberDescriptor.ConvertFromText`
 is the same conversion with no side effects, so half a value never reaches the undo history. See
@@ -84,13 +108,20 @@ the same document, projection, object map and object tree. Two updates arriving 
 what a host watching a folder gets when a form and its dictionary are saved at once, cannot
 interleave.
 
-- **The asynchronous updates queue.** The second waits for the first and then runs, observing its
-  own cancellation token while it waits. Cancelling while waiting never leaves the gate held.
+- **The asynchronous updates queue, first in first out.** The order is fixed when the call is made,
+  not when a continuation happens to be scheduled, so three saves apply oldest first and the newest
+  document is what the preview ends on. Each waiter observes its own cancellation token while it
+  waits; giving up removes that one turn and strands nobody behind it.
 - **The synchronous edits refuse.** `SetValue` and `SetXamlValue` cannot wait without blocking a
   thread that may be the one the update is dispatching to, so they return `Applied` false with
-  `AXM3044` and write nothing. Await the update and make the edit again.
-- **Disposal waits** for an update already running rather than cutting it off, and anything that
-  arrives afterwards gets `ObjectDisposedException`.
+  `AXM3044` and write nothing. They also refuse when somebody is merely *waiting* — an edit
+  unwilling to stand in the queue does not get to walk past it. Await the update and edit again.
+- **Disposal waits** for an update already running rather than cutting it off. Queued work takes
+  its turn, finds the session disposed and throws `ObjectDisposedException`; disposal does not
+  deadlock behind it, and disposing twice at once is safe.
+- **Whether the session is disposed, and whether it still describes its document, are decided
+  inside the gate.** An answer read on the way in is an answer about a session somebody else may be
+  in the middle of breaking.
 - **Reading takes no lock at all** — the object map, `GetMembers`, `GetValueInfo`.
 
 ## Strategies

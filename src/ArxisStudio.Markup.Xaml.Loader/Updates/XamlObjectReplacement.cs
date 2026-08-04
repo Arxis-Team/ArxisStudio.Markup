@@ -29,6 +29,18 @@ namespace ArxisStudio.Markup.Xaml.Loader;
 /// rebuilt copy and into the original empties one before it fills the other, and a failure
 /// between the two is not a refusal however it is reported.
 /// </para>
+/// <para>
+/// The rule for deciding between them: <b>a refusal has to be reached without running the
+/// object's own code.</b> Ask first — is the member writable, does the collection say it is
+/// read-only — and refuse on the answer. Once a setter, an accessor or a collection method has
+/// actually been called and thrown, what it did before throwing is unknowable, and looking at the
+/// property afterwards proves nothing about the rest of the object.
+/// </para>
+/// <para>
+/// The exception is a write to a rebuilt copy. Those are built by this update and have never been
+/// handed to anybody, so whatever a failing setter did to one goes out with it.
+/// <see cref="XamlObjectExposure"/> is which of the two a write is against.
+/// </para>
 /// </remarks>
 internal static class XamlObjectReplacement
 {
@@ -75,7 +87,9 @@ internal static class XamlObjectReplacement
         if (memberName is not null)
         {
             return Report(
-                element, diagnostics, Write(owner, memberName, fresh, members, diagnostics),
+                element,
+                diagnostics,
+                Write(owner, memberName, fresh, members, diagnostics, XamlObjectExposure.Live),
                 $"{memberName} could not be written");
         }
 
@@ -95,7 +109,9 @@ internal static class XamlObjectReplacement
             if (ReferenceEquals(held, previous))
             {
                 return Report(
-                    element, diagnostics, Write(owner, content.Name, fresh, members, diagnostics),
+                    element,
+                    diagnostics,
+                    Write(owner, content.Name, fresh, members, diagnostics, XamlObjectExposure.Live),
                     $"{content.Name} could not be written");
             }
         }
@@ -400,13 +416,16 @@ internal static class XamlObjectReplacement
         // string, a number — has no such rule, and a member that refuses null must not fail
         // the update over one. The copy is not live, so failing here changes nothing.
         if (rebuilt is ILogical
-            && Write(fresh, content.Name, null, members, Quiet) != XamlMutationOutcome.Applied)
+            && Write(fresh, content.Name, null, members, Quiet, XamlObjectExposure.Rebuilt)
+                != XamlMutationOutcome.Applied)
         {
             return Fail(element, diagnostics, $"{content.Name} could not be cleared on the rebuilt copy");
         }
 
         return Report(
-            element, diagnostics, Write(target, content.Name, rebuilt, members, diagnostics),
+            element,
+            diagnostics,
+            Write(target, content.Name, rebuilt, members, diagnostics, XamlObjectExposure.Live),
             $"{content.Name} could not be written");
     }
 
@@ -422,6 +441,15 @@ internal static class XamlObjectReplacement
     /// </remarks>
     private static XamlMutationOutcome MoveItems(object into, object from)
     {
+        // Asked before anything is emptied. A collection that says it is read-only — an items
+        // control reading ItemsSource says exactly that — is refused here, with nothing invoked
+        // and nothing to be uncertain about afterwards. This is the check that keeps the common
+        // case a clean refusal now that invoking and catching no longer can.
+        if (into is IList { IsReadOnly: true } or IList { IsFixedSize: true })
+        {
+            return XamlMutationOutcome.Refused;
+        }
+
         object?[] items;
 
         try
@@ -434,13 +462,13 @@ internal static class XamlObjectReplacement
         }
 
         // The rebuilt copy, which nothing outside this update has ever seen. Emptying it changes
-        // nothing a caller could observe, so a refusal here is still a clean one.
-        if (Clear(from) != XamlMutationOutcome.Applied)
+        // nothing a caller could observe, so a failure here is still a clean one.
+        if (Clear(from, XamlObjectExposure.Rebuilt) != XamlMutationOutcome.Applied)
         {
             return XamlMutationOutcome.Refused;
         }
 
-        XamlMutationOutcome emptied = Clear(into);
+        XamlMutationOutcome emptied = Clear(into, XamlObjectExposure.Live);
 
         if (emptied != XamlMutationOutcome.Applied)
         {
@@ -454,14 +482,13 @@ internal static class XamlObjectReplacement
 
     /// <summary>Empties a collection through whichever list interface it has.</summary>
     /// <remarks>
-    /// A collection that refuses is told apart from one that stopped part-way by counting it:
-    /// Avalonia's own refusals — an items control reading <c>ItemsSource</c> — throw before
-    /// removing anything, and that is a refusal a caller can be told about and carry on from.
+    /// A collection with no <c>Clear</c> at all is refused without anything being called. One that
+    /// throws out of its own <c>Clear</c> has been running, and how far it got is not a question
+    /// counting the items afterwards answers — a collection is free to remove three of five and
+    /// then throw, and free to have told its owner about it.
     /// </remarks>
-    private static XamlMutationOutcome Clear(object collection)
+    private static XamlMutationOutcome Clear(object collection, XamlObjectExposure exposure)
     {
-        int before = Size(collection);
-
         try
         {
             if (collection is IList list)
@@ -485,22 +512,9 @@ internal static class XamlObjectReplacement
         }
         catch (Exception error) when (Ordinary(error))
         {
-            return Size(collection) == before
-                ? XamlMutationOutcome.Refused
-                : XamlMutationOutcome.Inconsistent;
-        }
-    }
-
-    /// <summary>Counts a collection, or reports -1 for something that cannot be counted.</summary>
-    private static int Size(object collection)
-    {
-        try
-        {
-            return collection is IEnumerable items ? items.Cast<object?>().Count() : -1;
-        }
-        catch (Exception error) when (Ordinary(error))
-        {
-            return -1;
+            return exposure == XamlObjectExposure.Live
+                ? XamlMutationOutcome.Inconsistent
+                : XamlMutationOutcome.Refused;
         }
     }
 
@@ -623,6 +637,12 @@ internal static class XamlObjectReplacement
     /// </remarks>
     private static XamlMutationOutcome Set(object slot, int index, object value)
     {
+        // Asked rather than found out, for the same reason as everywhere else here.
+        if (slot is IList { IsReadOnly: true })
+        {
+            return XamlMutationOutcome.Refused;
+        }
+
         try
         {
             if (slot is IList list)
@@ -678,18 +698,20 @@ internal static class XamlObjectReplacement
         }
     }
 
-    /// <summary>Writes a member, treating a setter that refuses as a refusal rather than a fault.</summary>
+    /// <summary>Writes a member, saying what running its setter may have cost.</summary>
     /// <remarks>
-    /// One property set, which either happened or did not. A setter that validates and throws has
-    /// refused the value; that is an ordinary answer and leaves the object as it was, which is why
-    /// this never reports a half-made change.
+    /// The member is asked whether it can be written before it is written, and one that says no is
+    /// refused with nothing invoked. Past that point the setter runs, and a setter that throws has
+    /// already had its chance to do whatever it liked first — so on a live object the honest answer
+    /// is that its state is unknown, and only on a copy nobody has seen is it still a refusal.
     /// </remarks>
     private static XamlMutationOutcome Write(
         object owner,
         string memberName,
         object? value,
         XamlMemberResolver members,
-        List<MarkupDiagnostic> diagnostics)
+        List<MarkupDiagnostic> diagnostics,
+        XamlObjectExposure exposure)
     {
         XamlMemberDescriptor member = members.Resolve(owner.GetType(), memberName);
 
@@ -712,10 +734,12 @@ internal static class XamlObjectReplacement
 
             diagnostics.Add(MarkupDiagnostic.Synchronization(
                 XamlLoaderDiagnosticCodes.IncompatibleValue,
-                $"The rebuilt value could not be assigned to {owner.GetType().Name}.{memberName}: {refusal.Message}",
+                $"{owner.GetType().Name}.{memberName} threw while being written: {refusal.Message}",
                 MarkupDiagnosticSeverity.Error));
 
-            return XamlMutationOutcome.Refused;
+            return exposure == XamlObjectExposure.Live
+                ? XamlMutationOutcome.Inconsistent
+                : XamlMutationOutcome.Refused;
         }
     }
 

@@ -33,7 +33,7 @@ public sealed class SessionStateTests
     private static XamlLoadEnvironment Environment(IXamlDispatcher? dispatcher = null)
     {
         XamlLoadEnvironment defaults =
-            XamlLoadEnvironment.CreateDefault([typeof(ValidatingControl).Assembly]);
+            XamlLoadEnvironment.CreateDefault([typeof(ThrowingControl).Assembly]);
 
         return dispatcher is null
             ? defaults
@@ -67,9 +67,9 @@ public sealed class SessionStateTests
     /// <see cref="int"/>, so every check an update makes before writing passes.
     /// </remarks>
     private static string Pair(string label, string limit) =>
-        $"<local:ValidatingControl xmlns=\"{AvaloniaNamespace}\"\n" +
+        $"<local:ThrowingControl xmlns=\"{AvaloniaNamespace}\"\n" +
         $"                         xmlns:local=\"{TestControlsNamespace}\"\n" +
-        $"                         Tag=\"{label}\" Limit=\"{limit}\" />";
+        $"                         Tag=\"{label}\" ThrowsBeforeAssigning=\"{limit}\" />";
 
     [AvaloniaFact]
     public async Task ADocumentThatDoesNotParseIsRefusedWithoutTouchingAnything()
@@ -140,21 +140,156 @@ public sealed class SessionStateTests
     }
 
     [AvaloniaFact]
-    public async Task ASetterRefusingTheFirstWriteLeavesTheSessionUsable()
+    public async Task ASetterThatThrowsOnTheVeryFirstWriteStillRequiresANewSession()
     {
         await using XamlLoadSession session = await Load(Pair("one", "5"));
 
-        var control = session.GetRoot<ValidatingControl>();
+        var control = session.GetRoot<ThrowingControl>();
 
         XamlUpdateResult result = await Update(session, Pair("one", "-1"));
 
-        // Nothing was written before it: the value is the only change the update carried.
-        Assert.Equal(XamlUpdateOutcome.RejectedCleanly, result.Outcome);
-        Assert.Equal(XamlSessionState.Usable, session.State);
-        Assert.Equal(5, control.Limit);
+        // The only change the update carried, and it failed — but it failed *inside* the property
+        // system, which had already been called. This one happens to validate before assigning;
+        // knowing that means knowing how this property is written, and the next control along
+        // assigns first. So the answer is the conservative one whatever the control does.
+        Assert.Equal(XamlUpdateOutcome.RequiresNewSession, result.Outcome);
+        Assert.Equal(XamlSessionState.RequiresNewSession, session.State);
+        Assert.Equal(5, control.ThrowsBeforeAssigning);
 
-        Assert.True((await Update(session, Pair("one", "7"))).Applied);
-        Assert.Equal(7, control.Limit);
+        Assert.Contains(
+            result.Diagnostics,
+            static diagnostic => diagnostic.Code == XamlLoaderDiagnosticCodes.SessionRequiresRecreation);
+    }
+
+    [AvaloniaFact]
+    public async Task ASetterThatAssignsAndThenThrowsIsNotCleanEither()
+    {
+        await using XamlLoadSession session = await Load(Pair("one", "5"));
+
+        var control = session.GetRoot<ThrowingControl>();
+
+        XamlUpdateResult result = await Update(
+            session,
+            $"<local:ThrowingControl xmlns=\"{AvaloniaNamespace}\"\n" +
+            $"                       xmlns:local=\"{TestControlsNamespace}\"\n" +
+            "                       Tag=\"one\" ThrowsBeforeAssigning=\"5\" AssignsThenThrows=\"x\" />");
+
+        Assert.Equal(XamlUpdateOutcome.RequiresNewSession, result.Outcome);
+        Assert.Equal(XamlSessionState.RequiresNewSession, session.State);
+
+        // The evidence that calling it clean would have been a lie: the value is on the object.
+        Assert.Equal("x", control.AssignsThenThrows);
+    }
+
+    [AvaloniaFact]
+    public async Task ASetterThatChangesSomethingElseAndThrowsIsNotCleanEither()
+    {
+        await using XamlLoadSession session = await Load(Pair("one", "5"));
+
+        var control = session.GetRoot<ThrowingControl>();
+
+        XamlUpdateResult result = await Update(
+            session,
+            $"<local:ThrowingControl xmlns=\"{AvaloniaNamespace}\"\n" +
+            $"                       xmlns:local=\"{TestControlsNamespace}\"\n" +
+            "                       Tag=\"one\" ThrowsBeforeAssigning=\"5\" SpreadsThenThrows=\"y\" />");
+
+        Assert.Equal(XamlUpdateOutcome.RequiresNewSession, result.Outcome);
+        Assert.Equal(XamlSessionState.RequiresNewSession, session.State);
+
+        // And part of what changed is not even the property that was written, which is why
+        // comparing the written property before and after could never have been the test.
+        Assert.Equal("touched by y", control.Tag);
+    }
+
+    [AvaloniaFact]
+    public async Task ACollectionThatEmptiesPartOfTheWayAndThrowsRequiresANewSession()
+    {
+        await using XamlLoadSession session = await Load(
+            $"<local:BrittleHost xmlns=\"{AvaloniaNamespace}\" xmlns:local=\"{TestControlsNamespace}\">\n" +
+            "  <Border />\n" +
+            "  <Border />\n" +
+            "</local:BrittleHost>");
+
+        var host = session.GetRoot<BrittleHost>();
+
+        Assert.Equal(2, host.Panels.Count);
+
+        // A collection is not one assignment. Rebuilding this element's content empties it before
+        // refilling it, and this one loses an item on the way out.
+        host.Panels.Brittle = true;
+
+        XamlUpdateResult result = await Update(
+            session,
+            $"<local:BrittleHost xmlns=\"{AvaloniaNamespace}\" xmlns:local=\"{TestControlsNamespace}\">\n" +
+            "  <Border />\n" +
+            "  <Border />\n" +
+            "  <Border />\n" +
+            "</local:BrittleHost>");
+
+        Assert.Equal(XamlUpdateOutcome.RequiresNewSession, result.Outcome);
+        Assert.Equal(XamlSessionState.RequiresNewSession, session.State);
+        Assert.Single(host.Panels);
+    }
+
+    [AvaloniaFact]
+    public async Task NoDiagnosticClaimsNothingWasWrittenAfterASetterHasRun()
+    {
+        await using XamlLoadSession session = await Load(Pair("one", "5"));
+
+        XamlUpdateResult result = await Update(session, Pair("one", "-1"));
+
+        Assert.Equal(XamlUpdateOutcome.RequiresNewSession, result.Outcome);
+
+        foreach (MarkupDiagnostic diagnostic in result.Diagnostics)
+        {
+            Assert.DoesNotContain("nothing was written", diagnostic.Message, StringComparison.OrdinalIgnoreCase);
+            Assert.DoesNotContain("left as they were", diagnostic.Message, StringComparison.OrdinalIgnoreCase);
+            Assert.DoesNotContain("were left", diagnostic.Message, StringComparison.OrdinalIgnoreCase);
+            Assert.DoesNotContain("untouched", diagnostic.Message, StringComparison.OrdinalIgnoreCase);
+        }
+    }
+
+    [AvaloniaFact]
+    public async Task AnEditWhoseSetterThrowsMarksTheSessionRatherThanCallingItRefused()
+    {
+        await using XamlLoadSession session = await Load(Pair("one", "5"));
+
+        var control = session.GetRoot<ThrowingControl>();
+
+        XamlEditResult edit = session.SetValue(control, ThrowingControl.ThrowsBeforeAssigningProperty, -1);
+
+        Assert.False(edit.Applied);
+        Assert.Equal(XamlSessionState.RequiresNewSession, session.State);
+        Assert.Contains(
+            edit.Diagnostics,
+            static diagnostic => diagnostic.Code == XamlLoaderDiagnosticCodes.SessionRequiresRecreation);
+
+        // And from here nothing else is accepted, by either door.
+        Assert.False(session.SetValue(control, ThrowingControl.ThrowsBeforeAssigningProperty, 2).Applied);
+        Assert.Equal(XamlUpdateOutcome.RequiresNewSession, (await Update(session, Pair("two", "6"))).Outcome);
+    }
+
+    [AvaloniaFact]
+    public async Task ValueTheMemberCannotHoldIsStillRefusedBeforeAnySetterRuns()
+    {
+        await using XamlLoadSession session = await Load(Pair("one", "5"));
+
+        var control = session.GetRoot<ThrowingControl>();
+
+        // The conversion is asked before anything is invoked, so this stays the clean case it was.
+        XamlEditResult edit = session.SetXamlValue(
+            control, ThrowingControl.ThrowsBeforeAssigningProperty, new XamlLiteralValue("not a number"));
+
+        Assert.False(edit.Applied);
+        Assert.Equal(XamlSessionState.Usable, session.State);
+        Assert.Equal(5, control.ThrowsBeforeAssigning);
+
+        Assert.Equal(
+            XamlUpdateOutcome.RejectedCleanly,
+            (await Update(session, Pair("one", "not a number"))).Outcome);
+
+        Assert.Equal(XamlSessionState.Usable, session.State);
     }
 
     [AvaloniaFact]
@@ -162,7 +297,7 @@ public sealed class SessionStateTests
     {
         await using XamlLoadSession session = await Load(Pair("one", "5"));
 
-        var control = session.GetRoot<ValidatingControl>();
+        var control = session.GetRoot<ThrowingControl>();
 
         XamlUpdateResult result = await Update(session, Pair("two", "-1"));
 
@@ -172,7 +307,7 @@ public sealed class SessionStateTests
         Assert.False(result.Applied);
         Assert.Equal(XamlSessionState.RequiresNewSession, session.State);
         Assert.Equal("two", control.Tag);
-        Assert.Equal(5, control.Limit);
+        Assert.Equal(5, control.ThrowsBeforeAssigning);
 
         Assert.Contains(
             result.Diagnostics,
@@ -231,7 +366,7 @@ public sealed class SessionStateTests
 
         Assert.Equal(XamlUpdateOutcome.RequiresNewSession, later.Outcome);
         Assert.Equal(XamlUpdateStrategy.RecreateSession, later.Strategy);
-        Assert.Equal("two", session.GetRoot<ValidatingControl>().Tag);
+        Assert.Equal("two", session.GetRoot<ThrowingControl>().Tag);
 
         Assert.Contains(
             later.Diagnostics,
@@ -247,19 +382,19 @@ public sealed class SessionStateTests
             XamlUpdateOutcome.RequiresNewSession,
             (await Update(session, Pair("two", "-1"))).Outcome);
 
-        var control = session.GetRoot<ValidatingControl>();
+        var control = session.GetRoot<ThrowingControl>();
 
-        XamlEditResult edit = session.SetValue(control, ValidatingControl.LimitProperty, 3);
+        XamlEditResult edit = session.SetValue(control, ThrowingControl.ThrowsBeforeAssigningProperty, 3);
 
         Assert.False(edit.Applied);
-        Assert.Equal(5, control.Limit);
+        Assert.Equal(5, control.ThrowsBeforeAssigning);
         Assert.Contains(
             edit.Diagnostics,
             static diagnostic => diagnostic.Code == XamlLoaderDiagnosticCodes.SessionRequiresRecreation);
 
         // The XAML-aware direction is the same door.
         Assert.False(
-            session.SetXamlValue(control, ValidatingControl.LimitProperty, new XamlLiteralValue("3")).Applied);
+            session.SetXamlValue(control, ThrowingControl.ThrowsBeforeAssigningProperty, new XamlLiteralValue("3")).Applied);
     }
 
     [AvaloniaFact]
@@ -300,8 +435,8 @@ public sealed class SessionStateTests
             corrected, Environment(), cancellationToken: TestContext.Current.CancellationToken);
 
         Assert.Equal(XamlSessionState.Usable, fresh.State);
-        Assert.Equal("two", fresh.GetRoot<ValidatingControl>().Tag);
-        Assert.Equal(1, fresh.GetRoot<ValidatingControl>().Limit);
+        Assert.Equal("two", fresh.GetRoot<ThrowingControl>().Tag);
+        Assert.Equal(1, fresh.GetRoot<ThrowingControl>().ThrowsBeforeAssigning);
         Assert.True((await Update(fresh, Pair("four", "2"))).Applied);
     }
 
@@ -359,6 +494,74 @@ public sealed class SessionStateTests
         Assert.Equal(XamlSessionState.RequiresNewSession, session.State);
         Assert.Equal(20d, ((Border)session.RootObject).Width);
         Assert.Contains("Width=\"10\"", session.Document.GetText(), StringComparison.Ordinal);
+
+        // And the way out is kept. The guides tell a caller to build the replacement session from
+        // PendingDocument; a caller told that has to be given something to do it with.
+        XamlDocument pending = Assert.IsType<XamlDocument>(session.PendingDocument);
+
+        Assert.Contains("Width=\"20\"", pending.GetText(), StringComparison.Ordinal);
+
+        await using XamlLoadSession fresh = await XamlLoadSession.CreateAsync(
+            pending, Environment(), cancellationToken: TestContext.Current.CancellationToken);
+
+        Assert.Equal(XamlSessionState.Usable, fresh.State);
+        Assert.Equal(20d, fresh.GetRoot<Border>().Width);
+    }
+
+    [AvaloniaFact]
+    public async Task AFailureAfterAWriteKeepsTheDocumentItWasMovingTowards()
+    {
+        await using XamlLoadSession session = await Load(Pair("one", "5"));
+
+        string wanted = Pair("two", "-1");
+
+        Assert.Equal(XamlUpdateOutcome.RequiresNewSession, (await Update(session, wanted)).Outcome);
+
+        // Not only cancellation: every way of stopping after the first write leaves the same
+        // recovery document, because the caller's way out of all of them is the same.
+        Assert.Equal(wanted, Assert.IsType<XamlDocument>(session.PendingDocument).GetText());
+    }
+
+    [AvaloniaFact]
+    public async Task ALaterRefusalDoesNotReplaceTheDocumentThatBrokeTheSession()
+    {
+        await using XamlLoadSession session = await Load(Pair("one", "5"));
+
+        string wanted = Pair("two", "-1");
+
+        Assert.Equal(XamlUpdateOutcome.RequiresNewSession, (await Update(session, wanted)).Outcome);
+
+        // Something else arrives afterwards and is refused. It has no claim on the answer to
+        // "what should I load instead": the objects are part-way towards the first document, not
+        // this one.
+        Assert.Equal(
+            XamlUpdateOutcome.RequiresNewSession,
+            (await Update(session, Pair("three", "9"))).Outcome);
+
+        Assert.Equal(wanted, Assert.IsType<XamlDocument>(session.PendingDocument).GetText());
+
+        await session.ApplySourceUpdateAsync(
+            new Uri("file:///Themes/Colors.axaml"), TestContext.Current.CancellationToken);
+
+        Assert.Equal(wanted, Assert.IsType<XamlDocument>(session.PendingDocument).GetText());
+    }
+
+    [AvaloniaFact]
+    public async Task AnAppliedUpdateClearsADocumentAnEarlierCleanRefusalLeftBehind()
+    {
+        await using XamlLoadSession session = await Load($"<Border xmlns=\"{AvaloniaNamespace}\" Width=\"10\" />");
+
+        Assert.Equal(
+            XamlUpdateOutcome.RejectedCleanly,
+            (await Update(session, $"<Border xmlns=\"{AvaloniaNamespace}\" Width=\"wide\" />")).Outcome);
+
+        Assert.NotNull(session.PendingDocument);
+
+        Assert.True((await Update(session, $"<Border xmlns=\"{AvaloniaNamespace}\" Width=\"20\" />")).Applied);
+
+        // Nothing is pending once a whole update has landed: the document and the objects agree
+        // again, and there is nothing left to recover to.
+        Assert.Null(session.PendingDocument);
     }
 
     [AvaloniaFact]

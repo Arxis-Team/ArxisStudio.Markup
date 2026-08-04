@@ -112,11 +112,19 @@ the document — see `docs/adr/0005-resource-includes.md` for why. That leaves f
   code — with side effects nothing can reverse on its behalf. The session marks itself, refuses
   every later mutation with `AXM3043`, and keeps the offered document as `PendingDocument` so a
   caller can build the replacement session from it.
-- **A setter that refuses a value of the right type stops the run where it is.** Everything that can
-  be checked is checked before anything is written — the element still has an object, the member
-  exists and can be written, the text converts to something the member holds — so the ordinary case
-  costs nothing and a refusal on the first write is clean. A validating setter refusing *after* an
-  earlier write of the same update has landed is `RequiresNewSession`.
+- **A setter that throws costs the session, not the edit.** Everything that can be checked without
+  running the object's own code is checked first — the element still has an object, the member
+  exists and can be written, the text converts to something the member holds, the collection says
+  whether it is read-only — and that is where clean refusals come from. Once a setter has actually
+  been called and thrown, what it did before throwing is unknowable: assigning the field, raising a
+  notification and setting a second property before failing a cross-check is all legal, and looking
+  at the written property afterwards would not notice any of it. So an exception out of a live
+  setter is `RequiresNewSession` even when it is the first change the update tried to make. The
+  price is real: a control library whose setter throws makes the session unusable rather than the
+  edit refused. The conversion check in front of it is what keeps a half-typed value from ever
+  reaching a setter.
+- **A write to a rebuilt copy is still clean whatever it does.** An object this update built and is
+  about to discard has never been handed to anybody, so a failing setter on one costs nothing.
 - **A refused rebuild can leave the objects part-way.** Every fragment is built before any object
   is touched, so a fragment that will not build refuses the update cleanly; but the replacements
   themselves are applied one after another, and one that fails after another has succeeded stops
@@ -190,10 +198,14 @@ the document — see `docs/adr/0005-resource-includes.md` for why. That leaves f
   methods must be called from the thread that owns the objects.
 - **One session mutates at a time, and the two kinds of caller are treated differently.** Every
   change to a session passes through one gate. `ApplyDocumentUpdateAsync` and
-  `ApplySourceUpdateAsync` **queue**, observing their cancellation token while they wait.
-  `SetValue` and `SetXamlValue` **refuse** with `AXM3044` instead of waiting, because blocking a
-  thread there could be blocking the very thread the running update is dispatching to — a deadlock
-  rather than a delay. Disposal waits for an update already running rather than cutting it off.
-  Nothing about *reading* a session is guarded, and nothing about it needs to be.
+  `ApplySourceUpdateAsync` **queue, first in first out**, with the order fixed when the call is
+  made rather than when a continuation is scheduled; each observes its cancellation token while it
+  waits. `SetValue` and `SetXamlValue` **refuse** with `AXM3044` instead of waiting, because
+  blocking a thread there could be blocking the very thread the running update is dispatching
+  to — a deadlock rather than a delay — and they refuse while anyone is queued, not only while the
+  gate is held. Disposal waits for an update already running rather than cutting it off. Nothing
+  about *reading* a session is guarded, and nothing about it needs to be.
+- **The gate is not a public abstraction.** A host that wants to order work across *several*
+  sessions has to do that itself; what is guaranteed here is the order within one.
 - **`ArxisStudio.Markup.Xaml` grants its internals to the benchmarks assembly** so that lexing
   can be measured separately from parsing, as the contract asks. Nothing else has access.

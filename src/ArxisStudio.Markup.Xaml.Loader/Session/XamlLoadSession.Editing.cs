@@ -125,7 +125,7 @@ public sealed partial class XamlLoadSession
     public ImmutableArray<XamlMemberDescriptor> GetMembers(object target)
     {
         ArgumentNullException.ThrowIfNull(target);
-        ObjectDisposedException.ThrowIf(_disposed, this);
+        ObjectDisposedException.ThrowIf(IsDisposed, this);
 
         return Environment.MemberResolver.Enumerate(target.GetType());
     }
@@ -173,24 +173,19 @@ public sealed partial class XamlLoadSession
         ArgumentNullException.ThrowIfNull(property);
         VerifyAccess();
 
-        if (UnusableForEdit() is { } unusable)
-        {
-            return unusable;
-        }
+        using XamlMutationGate.XamlMutationLease? lease = _mutation.TryEnter();
 
-        if (!_mutation.Wait(0))
+        if (lease is null)
         {
             return Busy();
         }
 
-        try
-        {
-            return SetValueCore(target, property, value);
-        }
-        finally
-        {
-            _mutation.Release();
-        }
+        // Inside the gate, and only here. Asking beforehand answers about a session an update may
+        // be in the middle of breaking: it can read Usable, wait for the gate the update is still
+        // holding, and take its turn on a session that by then refuses every change.
+        ObjectDisposedException.ThrowIf(IsDisposed, this);
+
+        return UnusableForEdit() ?? SetValueCore(target, property, value);
     }
 
     /// <summary>Sets a property with the mutation gate already held.</summary>
@@ -215,10 +210,18 @@ public sealed partial class XamlLoadSession
         }
         catch (Exception error)
         {
+            // The setter ran and threw, so what it did first is not knowable — a control may
+            // assign its field, raise a notification, set a second property and only then fail a
+            // check. Nothing here may call that an untouched object, so the session says it can no
+            // longer be believed rather than letting the next edit be written onto it.
+            RequireRecreation();
+
             return Failure(
                 diagnostics,
-                XamlLoaderDiagnosticCodes.IncompatibleValue,
-                $"'{value}' could not be assigned to {property.OwnerType.Name}.{property.Name}: {error.Message}");
+                XamlLoaderDiagnosticCodes.SessionRequiresRecreation,
+                $"{property.OwnerType.Name}.{property.Name} threw while being set to '{value}': " +
+                $"{error.Message}. What the setter did before throwing is unknown, so this session " +
+                "accepts no further change; create a new session from the document you want.");
         }
 
         string text = Format(value);
@@ -270,17 +273,22 @@ public sealed partial class XamlLoadSession
         ArgumentNullException.ThrowIfNull(value);
         VerifyAccess();
 
+        using XamlMutationGate.XamlMutationLease? lease = _mutation.TryEnter();
+
+        if (lease is null)
+        {
+            return Busy();
+        }
+
+        // Inside the gate, for the same reason as SetValue: the answer read before taking a turn
+        // is an answer about a session somebody else may still be changing.
+        ObjectDisposedException.ThrowIf(IsDisposed, this);
+
         if (UnusableForEdit() is { } unusable)
         {
             return unusable;
         }
 
-        if (!_mutation.Wait(0))
-        {
-            return Busy();
-        }
-
-        try
         {
             XamlMemberDescriptor member = Environment.MemberResolver.Resolve(target.GetType(), property);
 
@@ -323,10 +331,6 @@ public sealed partial class XamlLoadSession
                 Document.Uri));
 
             return new XamlEditResult { Applied = true, Diagnostics = [.. diagnostics] };
-        }
-        finally
-        {
-            _mutation.Release();
         }
     }
 

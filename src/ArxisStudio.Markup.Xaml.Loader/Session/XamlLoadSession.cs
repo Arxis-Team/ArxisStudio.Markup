@@ -28,16 +28,22 @@ namespace ArxisStudio.Markup.Xaml.Loader;
 /// forks its compiler.
 /// </para>
 /// <para>
-/// <b>One session mutates at a time.</b> Every operation that changes the document, the object
-/// map or a live object passes through one gate, so two updates arriving together — which is what
-/// a host watching a folder gets when a form and its dictionary are saved at once — cannot
-/// interleave their reads and writes of <see cref="Document"/>, <see cref="Projection"/> and
-/// <see cref="Objects"/>. The asynchronous updates <b>wait</b> for whoever holds the gate,
-/// observing their cancellation token while they wait. The synchronous editing methods —
+/// <b>One session mutates at a time, in the order it was asked.</b> Every operation that changes
+/// the document, the object map or a live object passes through one gate, so two updates arriving
+/// together — which is what a host watching a folder gets when a form and its dictionary are saved
+/// at once — cannot interleave their reads and writes of <see cref="Document"/>,
+/// <see cref="Projection"/> and <see cref="Objects"/>. The asynchronous updates <b>queue</b>, and
+/// run in the order they were submitted rather than the order the thread pool happens to wake
+/// them; each observes its cancellation token while it waits. The synchronous editing methods —
 /// <see cref="SetValue"/> and <see cref="SetXamlValue"/> — cannot wait without blocking a thread
 /// that may be the one the update is dispatching to, so they <b>fail fast</b> with
-/// <see cref="XamlLoaderDiagnosticCodes.SessionBusy"/> instead. Reading — the object map, member
-/// lists, value information — takes no lock at all.
+/// <see cref="XamlLoaderDiagnosticCodes.SessionBusy"/> instead, and never step ahead of a waiting
+/// update. Reading — the object map, member lists, value information — takes no lock at all.
+/// </para>
+/// <para>
+/// Whether the session is disposed, and whether it still describes its document, are decided
+/// <em>inside</em> that gate. Reading either beforehand is a guess about a session somebody else
+/// may be in the middle of changing.
 /// </para>
 /// </remarks>
 public sealed partial class XamlLoadSession : IAsyncDisposable
@@ -48,15 +54,24 @@ public sealed partial class XamlLoadSession : IAsyncDisposable
     /// The session's one mutation boundary, held for the whole of any change to it.
     /// </summary>
     /// <remarks>
-    /// A <see cref="SemaphoreSlim"/> rather than a lock because it is held across <c>await</c> —
-    /// an update dispatches to the owning thread and waits for it — and a monitor lock is owned by
-    /// a thread rather than by an operation. Never waited on synchronously from a mutating path:
-    /// blocking a thread here while the operation that holds it is dispatching to that same thread
-    /// is the deadlock this is meant to prevent.
+    /// Not a lock, because it is held across <c>await</c> — an update dispatches to the owning
+    /// thread and waits for it — and a monitor lock belongs to a thread rather than to an
+    /// operation. Never waited on synchronously from a mutating path either: blocking a thread
+    /// here while the operation holding it is dispatching to that same thread is the deadlock this
+    /// exists to prevent.
     /// </remarks>
-    private readonly SemaphoreSlim _mutation = new(1, 1);
+    private readonly XamlMutationGate _mutation = new();
 
-    private bool _disposed;
+    /// <summary>
+    /// Whether the session has been disposed, as 0 or 1.
+    /// </summary>
+    /// <remarks>
+    /// An <see cref="int"/> read and written through <see cref="Interlocked"/> rather than a plain
+    /// <see langword="bool"/>: disposal and the mutations it races are on different threads by
+    /// design, and an unsynchronised read of a field another thread just wrote is not a read of
+    /// anything in particular. The exchange is also what makes disposing twice safe.
+    /// </remarks>
+    private int _disposal;
 
     private XamlLoadSession(
         XamlDocument document,
@@ -260,7 +275,7 @@ public sealed partial class XamlLoadSession : IAsyncDisposable
     /// <exception cref="ObjectDisposedException">The session has been disposed.</exception>
     public void VerifyAccess()
     {
-        ObjectDisposedException.ThrowIf(_disposed, this);
+        ObjectDisposedException.ThrowIf(IsDisposed, this);
 
         if (!_dispatcher.CheckAccess())
         {
@@ -301,22 +316,17 @@ public sealed partial class XamlLoadSession : IAsyncDisposable
     /// <returns>A task that completes once no mutation is in flight.</returns>
     public async ValueTask DisposeAsync()
     {
-        if (_disposed)
-        {
-            return;
-        }
+        // Marked before the wait, so anything queued behind this sees a disposed session when its
+        // turn comes. Interlocked because a second caller must not race past the first, and both
+        // must still wait for the work in flight rather than one returning while it runs.
+        Interlocked.Exchange(ref _disposal, 1);
 
-        _disposed = true;
-
-        await _mutation.WaitAsync().ConfigureAwait(false);
-
-        // Released rather than left held, and never disposed: a mutation still queued behind this
-        // one has to be able to take the gate, see the disposed flag and report that in the words
-        // of this library. Disposing the semaphore would answer it with an exception about a
-        // semaphore instead, and only because of when it happened to arrive. Nothing is leaked by
-        // not disposing one whose wait handle was never asked for.
-        _mutation.Release();
+        using XamlMutationGate.XamlMutationLease lease =
+            await _mutation.EnterAsync(CancellationToken.None).ConfigureAwait(false);
     }
+
+    /// <summary>Whether the session has been disposed, read so that another thread's write is seen.</summary>
+    private bool IsDisposed => Interlocked.CompareExchange(ref _disposal, 0, 0) != 0;
 
     /// <summary>
     /// Closes the session to further changes, because its objects no longer describe a document.

@@ -33,6 +33,15 @@ internal sealed class ControllableDispatcher : IXamlDispatcher
     /// </remarks>
     public Action<int>? Before { get; set; }
 
+    /// <summary>
+    /// Gets or sets something to run after each dispatched operation, given its ordinal from 1.
+    /// </summary>
+    /// <remarks>
+    /// For recording what an operation did at the moment it did it. Watching the tasks complete
+    /// records the order a test awaited them in, which is not the question.
+    /// </remarks>
+    public Action<int>? After { get; set; }
+
     /// <summary>Gets how many operations have been dispatched.</summary>
     public int Invocations { get; private set; }
 
@@ -55,8 +64,9 @@ internal sealed class ControllableDispatcher : IXamlDispatcher
     /// <inheritdoc />
     public async ValueTask<T> InvokeAsync<T>(Func<T> operation, CancellationToken cancellationToken = default)
     {
-        Invocations++;
-        Before?.Invoke(Invocations);
+        int ordinal = ++Invocations;
+
+        Before?.Invoke(ordinal);
 
         if (_holding)
         {
@@ -65,6 +75,17 @@ internal sealed class ControllableDispatcher : IXamlDispatcher
             await _released.Task.WaitAsync(cancellationToken);
         }
 
-        return await AvaloniaXamlDispatcher.Instance.InvokeAsync(operation, cancellationToken);
+        // Run inside the dispatched operation rather than after awaiting it, because what it is
+        // there to look at is Avalonia objects, and they belong to that thread.
+        return await AvaloniaXamlDispatcher.Instance.InvokeAsync(
+            () =>
+            {
+                T value = operation();
+
+                After?.Invoke(ordinal);
+
+                return value;
+            },
+            cancellationToken);
     }
 }

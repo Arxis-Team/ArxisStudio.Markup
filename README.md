@@ -1193,8 +1193,16 @@ public enum XamlUpdateOutcome
 
 `RequiresNewSession` must mark the session, refuse every later mutation deterministically with a
 stable code, keep the offered document as `PendingDocument` for the replacement session to be built
-from, and never be described in words that claim the objects are unchanged. Do not promise generic
-rollback for arbitrary user code.
+from — on every post-write failure, cancellation included — and never be described in words that
+claim the objects are unchanged. Do not promise generic rollback for arbitrary user code.
+
+The rule for telling the two failures apart is that **a clean refusal must be reached without
+running the object's own code.** Check what can be checked — the member resolves, it can be
+written, the text converts, the collection reports itself read-only — and refuse on the answer.
+Once a setter, accessor or collection method has been invoked and thrown, nothing may claim the
+object is unchanged, because it is free to have assigned its field and touched a second property
+first; that is `RequiresNewSession` even when it is the update's first change. A write to an object
+this update built and has not exposed is the one exception.
 
 #### Runtime diagnostics
 
@@ -1372,9 +1380,16 @@ objects — which is what a host receiving two file-system notifications at once
 interleave. Asynchronous mutations wait for it and observe their cancellation token while waiting;
 a synchronous mutating API must not wait, because the thread it would block may be the one the
 running operation is dispatching to, and must fail fast with a clear result instead. The boundary
-is released in a `finally` on success, failure and cancellation alike, disposal waits for a
-mutation already in flight, and reading takes no lock. Which of queueing and refusing each API does
-is part of its documented contract and is covered by tests.
+is released on success, failure and cancellation alike, disposal waits for a mutation already in
+flight, and reading takes no lock. Which of queueing and refusing each API does is part of its
+documented contract and is covered by tests.
+
+Waiting must be **first in first out**, with the order fixed when the call is made. Mutual
+exclusion alone is not enough: a host that saves three times and has the oldest snapshot applied
+last has serialised every mutation perfectly and still shows stale content. Whether the session is
+disposed and whether it still describes its document are decided *inside* the boundary; an answer
+read before taking a turn is an answer about a session another operation may be in the middle of
+changing.
 
 ## Performance requirements
 
