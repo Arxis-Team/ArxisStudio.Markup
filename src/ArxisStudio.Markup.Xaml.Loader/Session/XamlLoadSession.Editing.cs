@@ -153,6 +153,13 @@ public sealed partial class XamlLoadSession
     /// mixed on one document: the session's document is not the workspace's, and this would
     /// advance one while the other stood still.
     /// </para>
+    /// <para>
+    /// This mutates the session, so it passes through the same gate the asynchronous updates use —
+    /// but it cannot wait for it. Blocking here would block a thread that may be the very one an
+    /// update is dispatching to, which is a deadlock rather than a delay. It therefore fails fast
+    /// with <see cref="XamlLoaderDiagnosticCodes.SessionBusy"/> when an update is running, and the
+    /// caller retries or awaits the update it already has.
+    /// </para>
     /// </remarks>
     /// <param name="target">The object to change.</param>
     /// <param name="property">The property to set.</param>
@@ -171,6 +178,24 @@ public sealed partial class XamlLoadSession
             return unusable;
         }
 
+        if (!_mutation.Wait(0))
+        {
+            return Busy();
+        }
+
+        try
+        {
+            return SetValueCore(target, property, value);
+        }
+        finally
+        {
+            _mutation.Release();
+        }
+    }
+
+    /// <summary>Sets a property with the mutation gate already held.</summary>
+    private XamlEditResult SetValueCore(AvaloniaObject target, AvaloniaProperty property, object? value)
+    {
         XamlMemberDescriptor member = Environment.MemberResolver.Resolve(target.GetType(), property);
 
         if (Reject(member, property, out XamlEditResult? rejected))
@@ -250,45 +275,59 @@ public sealed partial class XamlLoadSession
             return unusable;
         }
 
-        XamlMemberDescriptor member = Environment.MemberResolver.Resolve(target.GetType(), property);
-
-        if (Reject(member, property, out XamlEditResult? rejected))
+        if (!_mutation.Wait(0))
         {
-            return rejected;
+            return Busy();
         }
 
-        var diagnostics = new List<MarkupDiagnostic>();
-
-        WarnIfExpressionWouldBeLost(target, property, diagnostics);
-
-        if (value is XamlLiteralValue literal)
+        try
         {
-            XamlValueConversionResult converted = member.ConvertFromText(literal.Text);
+            XamlMemberDescriptor member = Environment.MemberResolver.Resolve(target.GetType(), property);
 
-            if (!converted.Succeeded)
+            if (Reject(member, property, out XamlEditResult? rejected))
             {
-                // The same refusal an update would report, said before either side is touched.
-                return Failure(
-                    diagnostics,
-                    XamlLoaderDiagnosticCodes.IncompatibleValue,
-                    $"{target.GetType().Name}.{property.Name} cannot be set: {converted.Error}");
+                return rejected;
             }
 
-            return SetValue(target, property, converted.Value);
+            var diagnostics = new List<MarkupDiagnostic>();
+
+            WarnIfExpressionWouldBeLost(target, property, diagnostics);
+
+            if (value is XamlLiteralValue literal)
+            {
+                XamlValueConversionResult converted = member.ConvertFromText(literal.Text);
+
+                if (!converted.Succeeded)
+                {
+                    // The same refusal an update would report, said before either side is touched.
+                    return Failure(
+                        diagnostics,
+                        XamlLoaderDiagnosticCodes.IncompatibleValue,
+                        $"{target.GetType().Name}.{property.Name} cannot be set: {converted.Error}");
+                }
+
+                // The core rather than the public method: the gate is this operation's already,
+                // and taking it a second time would refuse the caller its own edit.
+                return SetValueCore(target, property, converted.Value);
+            }
+
+            // An expression cannot be evaluated here — resolving it is what a load does. The
+            // document is updated and the object is left alone rather than given something wrong.
+            UpdateDocument(target, property.Name, value, diagnostics);
+
+            diagnostics.Add(MarkupDiagnostic.Synchronization(
+                XamlLoaderDiagnosticCodes.ExpressionNotApplied,
+                $"{property.Name} now reads '{value.ToXamlText()}' in the document. " +
+                "The object keeps its current value until the document is loaded again.",
+                MarkupDiagnosticSeverity.Info,
+                Document.Uri));
+
+            return new XamlEditResult { Applied = true, Diagnostics = [.. diagnostics] };
         }
-
-        // An expression cannot be evaluated here — resolving it is what a load does. The
-        // document is updated and the object is left alone rather than given something wrong.
-        UpdateDocument(target, property.Name, value, diagnostics);
-
-        diagnostics.Add(MarkupDiagnostic.Synchronization(
-            XamlLoaderDiagnosticCodes.ExpressionNotApplied,
-            $"{property.Name} now reads '{value.ToXamlText()}' in the document. " +
-            "The object keeps its current value until the document is loaded again.",
-            MarkupDiagnosticSeverity.Info,
-            Document.Uri));
-
-        return new XamlEditResult { Applied = true, Diagnostics = [.. diagnostics] };
+        finally
+        {
+            _mutation.Release();
+        }
     }
 
     /// <summary>
@@ -315,6 +354,27 @@ public sealed partial class XamlLoadSession
                         Document.Uri),
                 ],
             };
+
+    /// <summary>Refuses an edit that arrived while an update owned the session.</summary>
+    /// <remarks>
+    /// A refusal rather than a wait, and rather than an exception: an edit racing an update is
+    /// something a host can meet in ordinary use — a property field committed while a file watcher
+    /// reloads the document — and the answer to it is to try again, not to unwind.
+    /// </remarks>
+    private XamlEditResult Busy() => new()
+    {
+        Applied = false,
+        Diagnostics =
+        [
+            MarkupDiagnostic.Synchronization(
+                XamlLoaderDiagnosticCodes.SessionBusy,
+                "An update is running on this session, and a synchronous edit does not wait for one. " +
+                "Nothing was written; await the update and make the edit again.",
+                MarkupDiagnosticSeverity.Warning,
+                Document.Uri),
+        ],
+    };
+
     /// <summary>Rejects an edit the member itself rules out.</summary>
     private XamlEditResult? RejectedOrNull(XamlMemberDescriptor member, AvaloniaProperty property) =>
         member.Kind switch

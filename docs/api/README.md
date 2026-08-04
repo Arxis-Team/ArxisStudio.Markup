@@ -120,4 +120,8 @@ fails with `AXM3004` rather than corrupting state that would surface later and s
 the environment a dispatcher — `AvaloniaXamlDispatcher` by default — and the session will marshal
 for you.
 
+One session also mutates one thing at a time: the asynchronous updates queue behind each other,
+and the synchronous edits refuse rather than wait. See
+[Updates](updates.md#one-session-mutates-at-a-time) for why the two differ.
+
 Every asynchronous method takes a `CancellationToken`.

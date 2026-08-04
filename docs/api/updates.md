@@ -76,6 +76,23 @@ A tool with a property field should ask before it writes — `XamlMemberDescript
 is the same conversion with no side effects, so half a value never reaches the undo history. See
 [Loading](loading.md#is-this-text-a-value).
 
+## One session mutates at a time
+
+Every operation that changes a session — `ApplyDocumentUpdateAsync`, `ApplySourceUpdateAsync`,
+`SetValue`, `SetXamlValue` — passes through one gate per session, because they all read and write
+the same document, projection, object map and object tree. Two updates arriving together, which is
+what a host watching a folder gets when a form and its dictionary are saved at once, cannot
+interleave.
+
+- **The asynchronous updates queue.** The second waits for the first and then runs, observing its
+  own cancellation token while it waits. Cancelling while waiting never leaves the gate held.
+- **The synchronous edits refuse.** `SetValue` and `SetXamlValue` cannot wait without blocking a
+  thread that may be the one the update is dispatching to, so they return `Applied` false with
+  `AXM3044` and write nothing. Await the update and make the edit again.
+- **Disposal waits** for an update already running rather than cutting it off, and anything that
+  arrives afterwards gets `ObjectDisposedException`.
+- **Reading takes no lock at all** — the object map, `GetMembers`, `GetValueInfo`.
+
 ## Strategies
 
 In increasing order of what each costs and how much it disturbs. An update takes the smallest one

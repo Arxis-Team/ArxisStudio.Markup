@@ -30,13 +30,30 @@ public sealed class SessionStateTests
     private static XamlDocument Parse(string xaml) =>
         XamlDocument.Parse(xaml, new XamlParseOptions { DocumentUri = ViewUri });
 
-    private static XamlLoadEnvironment Environment() =>
-        XamlLoadEnvironment.CreateDefault([typeof(ValidatingControl).Assembly]);
+    private static XamlLoadEnvironment Environment(IXamlDispatcher? dispatcher = null)
+    {
+        XamlLoadEnvironment defaults =
+            XamlLoadEnvironment.CreateDefault([typeof(ValidatingControl).Assembly]);
 
-    private static ValueTask<XamlLoadSession> Load(string xaml, XamlLoadMode mode = XamlLoadMode.Runtime) =>
+        return dispatcher is null
+            ? defaults
+            : new XamlLoadEnvironment
+            {
+                SourceProvider = defaults.SourceProvider,
+                AssemblyResolver = defaults.AssemblyResolver,
+                TypeResolver = defaults.TypeResolver,
+                ResourceResolver = defaults.ResourceResolver,
+                Dispatcher = dispatcher,
+            };
+    }
+
+    private static ValueTask<XamlLoadSession> Load(
+        string xaml,
+        XamlLoadMode mode = XamlLoadMode.Runtime,
+        IXamlDispatcher? dispatcher = null) =>
         XamlLoadSession.CreateAsync(
             Parse(xaml),
-            Environment(),
+            Environment(dispatcher),
             new XamlLoadOptions { Mode = mode },
             TestContext.Current.CancellationToken);
 
@@ -306,6 +323,42 @@ public sealed class SessionStateTests
 
         // The gate was released on the way out, so the session still takes work.
         Assert.True((await Update(session, $"<Border xmlns=\"{AvaloniaNamespace}\" Width=\"30\" />")).Applied);
+    }
+
+    [AvaloniaFact]
+    public async Task CancellationAfterSomethingHasBeenWrittenRequiresANewSession()
+    {
+        var dispatcher = new ControllableDispatcher();
+
+        await using XamlLoadSession session = await Load(
+            $"<Border xmlns=\"{AvaloniaNamespace}\" Width=\"10\" />",
+            dispatcher: dispatcher);
+
+        using var cancellation = new CancellationTokenSource();
+
+        int loaded = dispatcher.Invocations;
+
+        // An update dispatches twice: once to write the changes onto the objects, and once to
+        // adopt the document they now describe. Cancelling as the second arrives is the only way
+        // in from outside, and it is exactly the case the classification has to be conservative
+        // about — the first one has already put the new width on the object.
+        dispatcher.Before = ordinal =>
+        {
+            if (ordinal == loaded + 2)
+            {
+                cancellation.Cancel();
+            }
+        };
+
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(async () =>
+            await session.ApplyDocumentUpdateAsync(
+                Parse($"<Border xmlns=\"{AvaloniaNamespace}\" Width=\"20\" />"), cancellation.Token));
+
+        // The width is on the object and the session's document never advanced, which is exactly
+        // the disagreement this state exists to report.
+        Assert.Equal(XamlSessionState.RequiresNewSession, session.State);
+        Assert.Equal(20d, ((Border)session.RootObject).Width);
+        Assert.Contains("Width=\"10\"", session.Document.GetText(), StringComparison.Ordinal);
     }
 
     [AvaloniaFact]

@@ -27,10 +27,34 @@ namespace ArxisStudio.Markup.Xaml.Loader;
 /// Objects are built by Avalonia's own public runtime loader. Nothing here reimplements or
 /// forks its compiler.
 /// </para>
+/// <para>
+/// <b>One session mutates at a time.</b> Every operation that changes the document, the object
+/// map or a live object passes through one gate, so two updates arriving together — which is what
+/// a host watching a folder gets when a form and its dictionary are saved at once — cannot
+/// interleave their reads and writes of <see cref="Document"/>, <see cref="Projection"/> and
+/// <see cref="Objects"/>. The asynchronous updates <b>wait</b> for whoever holds the gate,
+/// observing their cancellation token while they wait. The synchronous editing methods —
+/// <see cref="SetValue"/> and <see cref="SetXamlValue"/> — cannot wait without blocking a thread
+/// that may be the one the update is dispatching to, so they <b>fail fast</b> with
+/// <see cref="XamlLoaderDiagnosticCodes.SessionBusy"/> instead. Reading — the object map, member
+/// lists, value information — takes no lock at all.
+/// </para>
 /// </remarks>
 public sealed partial class XamlLoadSession : IAsyncDisposable
 {
     private readonly IXamlDispatcher _dispatcher;
+
+    /// <summary>
+    /// The session's one mutation boundary, held for the whole of any change to it.
+    /// </summary>
+    /// <remarks>
+    /// A <see cref="SemaphoreSlim"/> rather than a lock because it is held across <c>await</c> —
+    /// an update dispatches to the owning thread and waits for it — and a monitor lock is owned by
+    /// a thread rather than by an operation. Never waited on synchronously from a mutating path:
+    /// blocking a thread here while the operation that holds it is dispatching to that same thread
+    /// is the deadlock this is meant to prevent.
+    /// </remarks>
+    private readonly SemaphoreSlim _mutation = new(1, 1);
 
     private bool _disposed;
 
@@ -262,15 +286,36 @@ public sealed partial class XamlLoadSession : IAsyncDisposable
 
     /// <summary>Releases the session.</summary>
     /// <remarks>
+    /// <para>
     /// The objects themselves are the caller's, and are not torn down here: a caller routinely
     /// keeps the tree after the session that built it has gone.
+    /// </para>
+    /// <para>
+    /// An update already running is waited for rather than cut off. Cutting one off is what would
+    /// leave objects part-way built with nothing left to report it, and the wait is asynchronous,
+    /// so a caller disposing from the owning thread does not block the thread the update is
+    /// dispatching to. Mutations that arrive after this point are refused: the flag is set before
+    /// the wait, so whoever takes the gate next sees a disposed session.
+    /// </para>
     /// </remarks>
-    /// <returns>A completed task.</returns>
-    public ValueTask DisposeAsync()
+    /// <returns>A task that completes once no mutation is in flight.</returns>
+    public async ValueTask DisposeAsync()
     {
+        if (_disposed)
+        {
+            return;
+        }
+
         _disposed = true;
 
-        return ValueTask.CompletedTask;
+        await _mutation.WaitAsync().ConfigureAwait(false);
+
+        // Released rather than left held, and never disposed: a mutation still queued behind this
+        // one has to be able to take the gate, see the disposed flag and report that in the words
+        // of this library. Disposing the semaphore would answer it with an exception about a
+        // semaphore instead, and only because of when it happened to arrive. Nothing is leaked by
+        // not disposing one whose wait handle was never asked for.
+        _mutation.Release();
     }
 
     /// <summary>

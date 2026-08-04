@@ -1367,6 +1367,15 @@ public sealed class XamlLoadResult
 - Workspace snapshots must support safe concurrent reads.
 - Mutations to one document/session must be serialized or guarded explicitly.
 
+One boundary per session covers every operation that changes its document, its bookkeeping or its
+objects — which is what a host receiving two file-system notifications at once will otherwise
+interleave. Asynchronous mutations wait for it and observe their cancellation token while waiting;
+a synchronous mutating API must not wait, because the thread it would block may be the one the
+running operation is dispatching to, and must fail fast with a clear result instead. The boundary
+is released in a `finally` on success, failure and cancellation alike, disposal waits for a
+mutation already in flight, and reading takes no lock. Which of queueing and refusing each API does
+is part of its documented contract and is covered by tests.
+
 ## Performance requirements
 
 The first implementation should prioritize correctness, but the architecture must avoid obvious scaling limitations.

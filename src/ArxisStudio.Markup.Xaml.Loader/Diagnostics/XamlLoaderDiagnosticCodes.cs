@@ -119,4 +119,9 @@ public static class XamlLoaderDiagnosticCodes
     /// describes any document and must be replaced.
     /// </summary>
     public const string SessionRequiresRecreation = "AXM3043";
+
+    /// <summary>
+    /// A mutation was attempted while another one owned the session, and this one does not wait.
+    /// </summary>
+    public const string SessionBusy = "AXM3044";
 }

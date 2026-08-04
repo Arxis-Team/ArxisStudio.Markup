@@ -21,6 +21,7 @@ ArxisStudio.Markup.Xaml.Loader.XamlValueConversionResult.Error.get -> string?
 ArxisStudio.Markup.Xaml.Loader.XamlValueConversionResult.Succeeded.get -> bool
 ArxisStudio.Markup.Xaml.Loader.XamlValueConversionResult.Value.get -> object?
 ArxisStudio.Markup.Xaml.Loader.XamlValueConversionResult.XamlValueConversionResult() -> void
+const ArxisStudio.Markup.Xaml.Loader.XamlLoaderDiagnosticCodes.SessionBusy = "AXM3044" -> string!
 const ArxisStudio.Markup.Xaml.Loader.XamlLoaderDiagnosticCodes.SessionRequiresRecreation = "AXM3043" -> string!
 override ArxisStudio.Markup.Xaml.Loader.XamlValueConversionResult.GetHashCode() -> int
 static ArxisStudio.Markup.Xaml.Loader.XamlValueConversionResult.FromError(string! error) -> ArxisStudio.Markup.Xaml.Loader.XamlValueConversionResult

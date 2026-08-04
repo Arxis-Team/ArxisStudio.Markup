@@ -185,6 +185,15 @@ the document — see `docs/adr/0005-resource-includes.md` for why. That leaves f
   `project.assets.json` or a package cache, and nothing here will.
 - **Avalonia thread affinity.** Parsing and text editing are free of it; creating and mutating
   objects is not, and calling from the wrong thread fails with `AXM3004` rather than corrupting
-  state that would surface later and somewhere else.
+  state that would surface later and somewhere else. The asynchronous updates may be called from
+  any thread and marshal through the environment's dispatcher themselves; the synchronous editing
+  methods must be called from the thread that owns the objects.
+- **One session mutates at a time, and the two kinds of caller are treated differently.** Every
+  change to a session passes through one gate. `ApplyDocumentUpdateAsync` and
+  `ApplySourceUpdateAsync` **queue**, observing their cancellation token while they wait.
+  `SetValue` and `SetXamlValue` **refuse** with `AXM3044` instead of waiting, because blocking a
+  thread there could be blocking the very thread the running update is dispatching to — a deadlock
+  rather than a delay. Disposal waits for an update already running rather than cutting it off.
+  Nothing about *reading* a session is guarded, and nothing about it needs to be.
 - **`ArxisStudio.Markup.Xaml` grants its internals to the benchmarks assembly** so that lexing
   can be measured separately from parsing, as the contract asks. Nothing else has access.
