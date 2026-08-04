@@ -20,6 +20,11 @@ jobs:
 
     steps:
       - uses: actions/checkout@v4
+        with:
+          # Source Link writes the commit into the symbols, and the packages record it. A shallow
+          # clone still has the sha, but the full history is what makes the recorded commit
+          # resolvable from the package by anyone debugging it.
+          fetch-depth: 0
 
       - name: Set up .NET
         uses: actions/setup-dotnet@v4
@@ -49,9 +54,13 @@ jobs:
           path: '**/*.trx'
           if-no-files-found: ignore
 
+      # Symbols alongside the packages: a preview nobody can step into is a preview whose bug
+      # reports are guesses.
       - name: Upload packages
         uses: actions/upload-artifact@v4
         with:
           name: packages
-          path: artifacts/*.nupkg
+          path: |
+            artifacts/*.nupkg
+            artifacts/*.snupkg
           if-no-files-found: error

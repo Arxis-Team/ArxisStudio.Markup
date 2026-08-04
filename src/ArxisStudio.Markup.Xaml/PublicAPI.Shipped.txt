@@ -23,6 +23,7 @@ ArxisStudio.Markup.Xaml.XamlDiagnosticCodes
 ArxisStudio.Markup.Xaml.XamlDirectives
 ArxisStudio.Markup.Xaml.XamlDocument
 ArxisStudio.Markup.Xaml.XamlDocument.BaseUri.get -> System.Uri?
+ArxisStudio.Markup.Xaml.XamlDocument.DuplicateElement(ArxisStudio.Markup.Xaml.XamlElement! element, ArxisStudio.Markup.Xaml.XamlDuplicateNames names = ArxisStudio.Markup.Xaml.XamlDuplicateNames.Remove) -> ArxisStudio.Markup.Xaml.XamlDocument!
 ArxisStudio.Markup.Xaml.XamlDocument.Edit() -> ArxisStudio.Markup.Xaml.XamlDocumentEditor!
 ArxisStudio.Markup.Xaml.XamlDocument.GetDiagnostics() -> System.Collections.Generic.IEnumerable<ArxisStudio.Markup.MarkupDiagnostic!>!
 ArxisStudio.Markup.Xaml.XamlDocument.GetResourceReferences() -> System.Collections.Immutable.ImmutableArray<ArxisStudio.Markup.Xaml.XamlResourceReference!>
@@ -32,16 +33,25 @@ ArxisStudio.Markup.Xaml.XamlDocument.IsWellFormed.get -> bool
 ArxisStudio.Markup.Xaml.XamlDocument.MoveElement(ArxisStudio.Markup.Xaml.XamlElement! element, ArxisStudio.Markup.Xaml.XamlElement! newParent, int index) -> ArxisStudio.Markup.Xaml.XamlDocument!
 ArxisStudio.Markup.Xaml.XamlDocument.RemoveAttribute(ArxisStudio.Markup.Xaml.XamlElement! element, ArxisStudio.Markup.Xaml.XamlQualifiedName name) -> ArxisStudio.Markup.Xaml.XamlDocument!
 ArxisStudio.Markup.Xaml.XamlDocument.RemoveElement(ArxisStudio.Markup.Xaml.XamlElement! element) -> ArxisStudio.Markup.Xaml.XamlDocument!
+ArxisStudio.Markup.Xaml.XamlDocument.ReplaceElement(ArxisStudio.Markup.Xaml.XamlElement! element, string! xaml) -> ArxisStudio.Markup.Xaml.XamlDocument!
 ArxisStudio.Markup.Xaml.XamlDocument.Root.get -> ArxisStudio.Markup.Xaml.XamlElement?
 ArxisStudio.Markup.Xaml.XamlDocument.SetAttribute(ArxisStudio.Markup.Xaml.XamlElement! element, ArxisStudio.Markup.Xaml.XamlQualifiedName name, ArxisStudio.Markup.Xaml.XamlValue! value) -> ArxisStudio.Markup.Xaml.XamlDocument!
 ArxisStudio.Markup.Xaml.XamlDocument.SetAttribute(ArxisStudio.Markup.Xaml.XamlElement! element, ArxisStudio.Markup.Xaml.XamlQualifiedName name, string! text) -> ArxisStudio.Markup.Xaml.XamlDocument!
 ArxisStudio.Markup.Xaml.XamlDocument.SourceText.get -> ArxisStudio.Markup.SourceText!
 ArxisStudio.Markup.Xaml.XamlDocument.Tokens.get -> System.Collections.Immutable.ImmutableArray<ArxisStudio.Markup.Xaml.XamlToken>
+ArxisStudio.Markup.Xaml.XamlDocument.UnwrapElement(ArxisStudio.Markup.Xaml.XamlElement! element) -> ArxisStudio.Markup.Xaml.XamlDocument!
 ArxisStudio.Markup.Xaml.XamlDocument.Uri.get -> System.Uri?
+ArxisStudio.Markup.Xaml.XamlDocument.WrapElement(ArxisStudio.Markup.Xaml.XamlElement! element, string! wrapperXaml) -> ArxisStudio.Markup.Xaml.XamlDocument!
+ArxisStudio.Markup.Xaml.XamlDocumentChangedEventArgs
+ArxisStudio.Markup.Xaml.XamlDocumentChangedEventArgs.Document.get -> ArxisStudio.Markup.Xaml.XamlDocument?
+ArxisStudio.Markup.Xaml.XamlDocumentChangedEventArgs.DocumentId.get -> ArxisStudio.Markup.MarkupDocumentId
+ArxisStudio.Markup.Xaml.XamlDocumentChangedEventArgs.Kind.get -> ArxisStudio.Markup.DocumentChangeKind
+ArxisStudio.Markup.Xaml.XamlDocumentChangedEventArgs.XamlDocumentChangedEventArgs(ArxisStudio.Markup.DocumentChangeKind kind, ArxisStudio.Markup.MarkupDocumentId documentId, ArxisStudio.Markup.Xaml.XamlDocument? document) -> void
 ArxisStudio.Markup.Xaml.XamlDocumentEditor
 ArxisStudio.Markup.Xaml.XamlDocumentEditor.Apply() -> ArxisStudio.Markup.Xaml.XamlDocument!
 ArxisStudio.Markup.Xaml.XamlDocumentEditor.Diagnostics.get -> System.Collections.Immutable.ImmutableArray<ArxisStudio.Markup.MarkupDiagnostic!>
 ArxisStudio.Markup.Xaml.XamlDocumentEditor.Document.get -> ArxisStudio.Markup.Xaml.XamlDocument!
+ArxisStudio.Markup.Xaml.XamlDocumentEditor.DuplicateElement(ArxisStudio.Markup.Xaml.XamlElement! element, ArxisStudio.Markup.Xaml.XamlDuplicateNames names = ArxisStudio.Markup.Xaml.XamlDuplicateNames.Remove) -> ArxisStudio.Markup.Xaml.XamlDocumentEditor!
 ArxisStudio.Markup.Xaml.XamlDocumentEditor.GetTextChanges() -> System.Collections.Immutable.ImmutableArray<ArxisStudio.Markup.TextChange>
 ArxisStudio.Markup.Xaml.XamlDocumentEditor.HasChanges.get -> bool
 ArxisStudio.Markup.Xaml.XamlDocumentEditor.InsertElement(ArxisStudio.Markup.Xaml.XamlElement! parent, int index, ArxisStudio.Markup.Xaml.XamlElement! element) -> ArxisStudio.Markup.Xaml.XamlDocumentEditor!
@@ -49,11 +59,19 @@ ArxisStudio.Markup.Xaml.XamlDocumentEditor.InsertElement(ArxisStudio.Markup.Xaml
 ArxisStudio.Markup.Xaml.XamlDocumentEditor.MoveElement(ArxisStudio.Markup.Xaml.XamlElement! element, ArxisStudio.Markup.Xaml.XamlElement! newParent, int index) -> ArxisStudio.Markup.Xaml.XamlDocumentEditor!
 ArxisStudio.Markup.Xaml.XamlDocumentEditor.RemoveAttribute(ArxisStudio.Markup.Xaml.XamlElement! element, ArxisStudio.Markup.Xaml.XamlQualifiedName name) -> ArxisStudio.Markup.Xaml.XamlDocumentEditor!
 ArxisStudio.Markup.Xaml.XamlDocumentEditor.RemoveElement(ArxisStudio.Markup.Xaml.XamlElement! element) -> ArxisStudio.Markup.Xaml.XamlDocumentEditor!
+ArxisStudio.Markup.Xaml.XamlDocumentEditor.ReplaceElement(ArxisStudio.Markup.Xaml.XamlElement! element, ArxisStudio.Markup.Xaml.XamlElement! replacement) -> ArxisStudio.Markup.Xaml.XamlDocumentEditor!
+ArxisStudio.Markup.Xaml.XamlDocumentEditor.ReplaceElement(ArxisStudio.Markup.Xaml.XamlElement! element, string! xaml) -> ArxisStudio.Markup.Xaml.XamlDocumentEditor!
 ArxisStudio.Markup.Xaml.XamlDocumentEditor.SetAttribute(ArxisStudio.Markup.Xaml.XamlElement! element, ArxisStudio.Markup.Xaml.XamlQualifiedName name, ArxisStudio.Markup.Xaml.XamlValue! value) -> ArxisStudio.Markup.Xaml.XamlDocumentEditor!
 ArxisStudio.Markup.Xaml.XamlDocumentEditor.SetAttribute(ArxisStudio.Markup.Xaml.XamlElement! element, ArxisStudio.Markup.Xaml.XamlQualifiedName name, string! text) -> ArxisStudio.Markup.Xaml.XamlDocumentEditor!
+ArxisStudio.Markup.Xaml.XamlDocumentEditor.UnwrapElement(ArxisStudio.Markup.Xaml.XamlElement! element) -> ArxisStudio.Markup.Xaml.XamlDocumentEditor!
+ArxisStudio.Markup.Xaml.XamlDocumentEditor.WrapElement(ArxisStudio.Markup.Xaml.XamlElement! element, string! wrapperXaml) -> ArxisStudio.Markup.Xaml.XamlDocumentEditor!
+ArxisStudio.Markup.Xaml.XamlDuplicateNames
+ArxisStudio.Markup.Xaml.XamlDuplicateNames.Keep = 1 -> ArxisStudio.Markup.Xaml.XamlDuplicateNames
+ArxisStudio.Markup.Xaml.XamlDuplicateNames.Remove = 0 -> ArxisStudio.Markup.Xaml.XamlDuplicateNames
 ArxisStudio.Markup.Xaml.XamlElement
 ArxisStudio.Markup.Xaml.XamlElement.Attributes.get -> System.Collections.Immutable.ImmutableArray<ArxisStudio.Markup.Xaml.XamlAttribute!>
 ArxisStudio.Markup.Xaml.XamlElement.Content.get -> System.Collections.Immutable.ImmutableArray<ArxisStudio.Markup.Xaml.XamlSyntaxNode!>
+ArxisStudio.Markup.Xaml.XamlElement.ContentElements.get -> System.Collections.Generic.IEnumerable<ArxisStudio.Markup.Xaml.XamlElement!>!
 ArxisStudio.Markup.Xaml.XamlElement.DesignTimeAttributes.get -> System.Collections.Generic.IEnumerable<ArxisStudio.Markup.Xaml.XamlAttribute!>!
 ArxisStudio.Markup.Xaml.XamlElement.Directives.get -> System.Collections.Generic.IEnumerable<ArxisStudio.Markup.Xaml.XamlAttribute!>!
 ArxisStudio.Markup.Xaml.XamlElement.Elements.get -> System.Collections.Generic.IEnumerable<ArxisStudio.Markup.Xaml.XamlElement!>!
@@ -64,9 +82,12 @@ ArxisStudio.Markup.Xaml.XamlElement.GetAttribute(string! localName) -> ArxisStud
 ArxisStudio.Markup.Xaml.XamlElement.GetDesignTimeAttribute(string! localName) -> string?
 ArxisStudio.Markup.Xaml.XamlElement.GetDirective(string! localName) -> string?
 ArxisStudio.Markup.Xaml.XamlElement.GetDirectiveAttribute(string! localName) -> ArxisStudio.Markup.Xaml.XamlAttribute?
+ArxisStudio.Markup.Xaml.XamlElement.Identity.get -> string?
+ArxisStudio.Markup.Xaml.XamlElement.IndexInContent.get -> int
 ArxisStudio.Markup.Xaml.XamlElement.IsEmpty.get -> bool
 ArxisStudio.Markup.Xaml.XamlElement.IsPropertyElementSyntax.get -> bool
 ArxisStudio.Markup.Xaml.XamlElement.IsUnclosed.get -> bool
+ArxisStudio.Markup.Xaml.XamlElement.MemberElements.get -> System.Collections.Generic.IEnumerable<ArxisStudio.Markup.Xaml.XamlElement!>!
 ArxisStudio.Markup.Xaml.XamlElement.MemberName.get -> string?
 ArxisStudio.Markup.Xaml.XamlElement.Name.get -> ArxisStudio.Markup.Xaml.XamlQualifiedName
 ArxisStudio.Markup.Xaml.XamlElement.NameSpan.get -> ArxisStudio.Markup.TextSpan
@@ -75,6 +96,11 @@ ArxisStudio.Markup.Xaml.XamlElement.NamespaceDeclarations.get -> System.Collecti
 ArxisStudio.Markup.Xaml.XamlElement.NamespaceUri.get -> string?
 ArxisStudio.Markup.Xaml.XamlElement.OwnerName.get -> string?
 ArxisStudio.Markup.Xaml.XamlElement.StartTagSpan.get -> ArxisStudio.Markup.TextSpan
+ArxisStudio.Markup.Xaml.XamlElementPath
+ArxisStudio.Markup.Xaml.XamlElementPath.Equals(ArxisStudio.Markup.Xaml.XamlElementPath? other) -> bool
+ArxisStudio.Markup.Xaml.XamlElementPath.Parent.get -> ArxisStudio.Markup.Xaml.XamlElementPath?
+ArxisStudio.Markup.Xaml.XamlElementPath.Resolve(ArxisStudio.Markup.Xaml.XamlDocument! document) -> ArxisStudio.Markup.Xaml.XamlElement?
+ArxisStudio.Markup.Xaml.XamlElementPath.Steps.get -> System.Collections.Immutable.ImmutableArray<ArxisStudio.Markup.Xaml.XamlPathStep>
 ArxisStudio.Markup.Xaml.XamlFormattingOptions
 ArxisStudio.Markup.Xaml.XamlFormattingOptions.AttributeQuote.get -> char
 ArxisStudio.Markup.Xaml.XamlFormattingOptions.AttributeQuote.init -> void
@@ -140,6 +166,15 @@ ArxisStudio.Markup.Xaml.XamlParseOptions.BaseUri.init -> void
 ArxisStudio.Markup.Xaml.XamlParseOptions.DocumentUri.get -> System.Uri?
 ArxisStudio.Markup.Xaml.XamlParseOptions.DocumentUri.init -> void
 ArxisStudio.Markup.Xaml.XamlParseOptions.XamlParseOptions() -> void
+ArxisStudio.Markup.Xaml.XamlPathStep
+ArxisStudio.Markup.Xaml.XamlPathStep.Deconstruct(out string? MemberName, out int Index) -> void
+ArxisStudio.Markup.Xaml.XamlPathStep.Equals(ArxisStudio.Markup.Xaml.XamlPathStep other) -> bool
+ArxisStudio.Markup.Xaml.XamlPathStep.Index.get -> int
+ArxisStudio.Markup.Xaml.XamlPathStep.Index.init -> void
+ArxisStudio.Markup.Xaml.XamlPathStep.MemberName.get -> string?
+ArxisStudio.Markup.Xaml.XamlPathStep.MemberName.init -> void
+ArxisStudio.Markup.Xaml.XamlPathStep.XamlPathStep() -> void
+ArxisStudio.Markup.Xaml.XamlPathStep.XamlPathStep(string? MemberName, int Index) -> void
 ArxisStudio.Markup.Xaml.XamlProcessingInstruction
 ArxisStudio.Markup.Xaml.XamlProcessingInstruction.IsXmlDeclaration.get -> bool
 ArxisStudio.Markup.Xaml.XamlProcessingInstruction.Kind.get -> ArxisStudio.Markup.Xaml.XamlProcessingInstructionKind
@@ -249,6 +284,21 @@ ArxisStudio.Markup.Xaml.XamlUri
 ArxisStudio.Markup.Xaml.XamlValue
 ArxisStudio.Markup.Xaml.XamlValue.XamlValue() -> void
 ArxisStudio.Markup.Xaml.XamlValue.XamlValue(ArxisStudio.Markup.Xaml.XamlValue! original) -> void
+ArxisStudio.Markup.Xaml.XamlWorkspace
+ArxisStudio.Markup.Xaml.XamlWorkspace.Apply(ArxisStudio.Markup.Xaml.XamlDocumentEditor! editor, string! description) -> ArxisStudio.Markup.Xaml.XamlDocument!
+ArxisStudio.Markup.Xaml.XamlWorkspace.Apply(string! description, params ArxisStudio.Markup.Xaml.XamlDocumentEditor![]! editors) -> System.Collections.Immutable.ImmutableArray<ArxisStudio.Markup.Xaml.XamlDocument!>
+ArxisStudio.Markup.Xaml.XamlWorkspace.CanRedo.get -> bool
+ArxisStudio.Markup.Xaml.XamlWorkspace.CanUndo.get -> bool
+ArxisStudio.Markup.Xaml.XamlWorkspace.Dispose() -> void
+ArxisStudio.Markup.Xaml.XamlWorkspace.DocumentChanged -> System.EventHandler<ArxisStudio.Markup.Xaml.XamlDocumentChangedEventArgs!>?
+ArxisStudio.Markup.Xaml.XamlWorkspace.GetDocument(ArxisStudio.Markup.MarkupDocumentId id) -> ArxisStudio.Markup.Xaml.XamlDocument!
+ArxisStudio.Markup.Xaml.XamlWorkspace.OpenAsync(System.Uri! uri, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.ValueTask<ArxisStudio.Markup.Xaml.XamlDocument!>
+ArxisStudio.Markup.Xaml.XamlWorkspace.Redo() -> bool
+ArxisStudio.Markup.Xaml.XamlWorkspace.RedoDescription.get -> string?
+ArxisStudio.Markup.Xaml.XamlWorkspace.Undo() -> bool
+ArxisStudio.Markup.Xaml.XamlWorkspace.UndoDescription.get -> string?
+ArxisStudio.Markup.Xaml.XamlWorkspace.Workspace.get -> ArxisStudio.Markup.MarkupWorkspace!
+ArxisStudio.Markup.Xaml.XamlWorkspace.XamlWorkspace(ArxisStudio.Markup.MarkupWorkspace! workspace) -> void
 ArxisStudio.Markup.Xaml.XamlWriteMode
 ArxisStudio.Markup.Xaml.XamlWriteMode.Format = 1 -> ArxisStudio.Markup.Xaml.XamlWriteMode
 ArxisStudio.Markup.Xaml.XamlWriteMode.Preserve = 0 -> ArxisStudio.Markup.Xaml.XamlWriteMode
@@ -301,6 +351,9 @@ const ArxisStudio.Markup.Xaml.XamlNamespaces.Xmlns = "http://www.w3.org/2000/xml
 const ArxisStudio.Markup.Xaml.XamlUri.AvaloniaResourceScheme = "avares" -> string!
 override ArxisStudio.Markup.Xaml.XamlAttribute.ToString() -> string!
 override ArxisStudio.Markup.Xaml.XamlElement.ToString() -> string!
+override ArxisStudio.Markup.Xaml.XamlElementPath.Equals(object? obj) -> bool
+override ArxisStudio.Markup.Xaml.XamlElementPath.GetHashCode() -> int
+override ArxisStudio.Markup.Xaml.XamlElementPath.ToString() -> string!
 override ArxisStudio.Markup.Xaml.XamlLiteralValue.<Clone>$() -> ArxisStudio.Markup.Xaml.XamlLiteralValue!
 override ArxisStudio.Markup.Xaml.XamlLiteralValue.Equals(object? obj) -> bool
 override ArxisStudio.Markup.Xaml.XamlLiteralValue.GetHashCode() -> int
@@ -319,6 +372,7 @@ override ArxisStudio.Markup.Xaml.XamlObjectElementValue.Equals(object? obj) -> b
 override ArxisStudio.Markup.Xaml.XamlObjectElementValue.GetHashCode() -> int
 override ArxisStudio.Markup.Xaml.XamlObjectElementValue.ToString() -> string!
 override ArxisStudio.Markup.Xaml.XamlObjectElementValue.ToXamlText() -> string!
+override ArxisStudio.Markup.Xaml.XamlPathStep.GetHashCode() -> int
 override ArxisStudio.Markup.Xaml.XamlQualifiedName.GetHashCode() -> int
 override ArxisStudio.Markup.Xaml.XamlQualifiedName.ToString() -> string!
 override ArxisStudio.Markup.Xaml.XamlResourceGraphResult.Equals(object? obj) -> bool
@@ -344,6 +398,8 @@ static ArxisStudio.Markup.Xaml.XamlDocument.Parse(ArxisStudio.Markup.SourceText!
 static ArxisStudio.Markup.Xaml.XamlDocument.Parse(ArxisStudio.Markup.SourceText! text, ArxisStudio.Markup.Xaml.XamlParseOptions? options) -> ArxisStudio.Markup.Xaml.XamlDocument!
 static ArxisStudio.Markup.Xaml.XamlDocument.Parse(string! text) -> ArxisStudio.Markup.Xaml.XamlDocument!
 static ArxisStudio.Markup.Xaml.XamlDocument.Parse(string! text, ArxisStudio.Markup.Xaml.XamlParseOptions? options) -> ArxisStudio.Markup.Xaml.XamlDocument!
+static ArxisStudio.Markup.Xaml.XamlElementPath.Of(ArxisStudio.Markup.Xaml.XamlElement! element) -> ArxisStudio.Markup.Xaml.XamlElementPath!
+static ArxisStudio.Markup.Xaml.XamlElementPath.Root.get -> ArxisStudio.Markup.Xaml.XamlElementPath!
 static ArxisStudio.Markup.Xaml.XamlFormattingOptions.Default.get -> ArxisStudio.Markup.Xaml.XamlFormattingOptions!
 static ArxisStudio.Markup.Xaml.XamlLiteralValue.FromPlainText(string! text) -> ArxisStudio.Markup.Xaml.XamlLiteralValue!
 static ArxisStudio.Markup.Xaml.XamlLiteralValue.operator !=(ArxisStudio.Markup.Xaml.XamlLiteralValue? left, ArxisStudio.Markup.Xaml.XamlLiteralValue? right) -> bool
@@ -356,6 +412,8 @@ static ArxisStudio.Markup.Xaml.XamlNamespaceContext.Empty.get -> ArxisStudio.Mar
 static ArxisStudio.Markup.Xaml.XamlObjectElementValue.operator !=(ArxisStudio.Markup.Xaml.XamlObjectElementValue? left, ArxisStudio.Markup.Xaml.XamlObjectElementValue? right) -> bool
 static ArxisStudio.Markup.Xaml.XamlObjectElementValue.operator ==(ArxisStudio.Markup.Xaml.XamlObjectElementValue? left, ArxisStudio.Markup.Xaml.XamlObjectElementValue? right) -> bool
 static ArxisStudio.Markup.Xaml.XamlParseOptions.Default.get -> ArxisStudio.Markup.Xaml.XamlParseOptions!
+static ArxisStudio.Markup.Xaml.XamlPathStep.operator !=(ArxisStudio.Markup.Xaml.XamlPathStep left, ArxisStudio.Markup.Xaml.XamlPathStep right) -> bool
+static ArxisStudio.Markup.Xaml.XamlPathStep.operator ==(ArxisStudio.Markup.Xaml.XamlPathStep left, ArxisStudio.Markup.Xaml.XamlPathStep right) -> bool
 static ArxisStudio.Markup.Xaml.XamlQualifiedName.Parse(string! text) -> ArxisStudio.Markup.Xaml.XamlQualifiedName
 static ArxisStudio.Markup.Xaml.XamlQualifiedName.Unprefixed(string! localName) -> ArxisStudio.Markup.Xaml.XamlQualifiedName
 static ArxisStudio.Markup.Xaml.XamlQualifiedName.operator !=(ArxisStudio.Markup.Xaml.XamlQualifiedName left, ArxisStudio.Markup.Xaml.XamlQualifiedName right) -> bool
@@ -383,5 +441,7 @@ virtual ArxisStudio.Markup.Xaml.XamlSyntaxNode.IsSynthesized.get -> bool
 virtual ArxisStudio.Markup.Xaml.XamlValue.EqualityContract.get -> System.Type!
 virtual ArxisStudio.Markup.Xaml.XamlValue.Equals(ArxisStudio.Markup.Xaml.XamlValue? other) -> bool
 virtual ArxisStudio.Markup.Xaml.XamlValue.PrintMembers(System.Text.StringBuilder! builder) -> bool
+~override ArxisStudio.Markup.Xaml.XamlPathStep.Equals(object obj) -> bool
+~override ArxisStudio.Markup.Xaml.XamlPathStep.ToString() -> string
 ~override ArxisStudio.Markup.Xaml.XamlQualifiedName.Equals(object obj) -> bool
 ~override ArxisStudio.Markup.Xaml.XamlToken.Equals(object obj) -> bool

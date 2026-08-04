@@ -7,7 +7,7 @@ describes at the same time, lets a user change either, and never damages the fil
 designer is the obvious such tool, but so is a hot-reload host, a linter, a refactoring command, or
 a migration script.
 
-Written against **v0.1.0-preview**. Every example here uses only published API.
+Written against **v0.2.0-preview.1**. Every example here uses only published API.
 
 ## The guides
 
@@ -37,7 +37,7 @@ markup — a formatter, a linter, a codemod — needs `ArxisStudio.Markup.Xaml` 
 Avalonia at all.
 
 ```xml
-<PackageReference Include="ArxisStudio.Markup.Xaml.Loader" Version="0.1.0-preview" />
+<PackageReference Include="ArxisStudio.Markup.Xaml.Loader" Version="0.2.0-preview.1" />
 ```
 
 ## Three rules everything here follows

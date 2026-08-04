@@ -23,9 +23,18 @@ public sealed class PackagingTests
         ("IsPackable", "a package that is not packable ships as nothing at all"),
         ("GenerateDocumentationFile", "the contract requires XML documentation on all public APIs"),
         ("IncludeSymbols", "a preview with no symbols cannot be stepped into by whoever reports a bug"),
+        ("SymbolPackageFormat", "symbols in the old format cannot be published to nuget.org"),
         ("PackageLicenseExpression", "an unlicensed package cannot legally be used"),
         ("PackageReadmeFile", "a package with no readme says nothing on its gallery page"),
         ("VersionPrefix", "an unversioned package cannot be referenced"),
+
+        // Source Link is three properties and no code, which is exactly the kind of thing that
+        // disappears in a build-file tidy-up without anything failing. What it costs is that
+        // nobody can step from a package into the commit it was built from.
+        ("RepositoryUrl", "symbols with no repository cannot be resolved back to source"),
+        ("RepositoryType", "the repository kind is what tells a debugger how to fetch the source"),
+        ("PublishRepositoryUrl", "without it the repository URL stays local and never reaches the package"),
+        ("PackageProjectUrl", "a package with no home page gives an installer nowhere to read about it"),
     ];
 
     [Fact]
