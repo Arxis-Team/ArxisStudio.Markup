@@ -104,17 +104,32 @@ the document — see `docs/adr/0005-resource-includes.md` for why. That leaves f
   through a public static `Parse` — which is how Avalonia types such as `Thickness` and
   `CornerRadius` are read, since they declare no converter. A member whose type offers neither is
   refused with a diagnostic rather than handed a string it would throw on.
+- **There is no generic rollback, and the result says so rather than implying otherwise.** An
+  update reports one of three outcomes. `RejectedCleanly` means no live object was written and the
+  session is exactly as usable as it was; `RequiresNewSession` means writing had begun before it
+  stopped, so the objects are part-way to a document the session never adopted. The second is not
+  recoverable here: what ran was user code — setters, converters, collection mutations, control
+  code — with side effects nothing can reverse on its behalf. The session marks itself, refuses
+  every later mutation with `AXM3043`, and keeps the offered document as `PendingDocument` so a
+  caller can build the replacement session from it.
 - **A setter that refuses a value of the right type stops the run where it is.** Everything that can
   be checked is checked before anything is written — the element still has an object, the member
   exists and can be written, the text converts to something the member holds — so the ordinary case
-  costs nothing. A validating setter refusing afterwards is reported and the update says it was not
-  applied, but changes already made are not undone. Recreating the session is what certainly
-  restores agreement.
+  costs nothing and a refusal on the first write is clean. A validating setter refusing *after* an
+  earlier write of the same update has landed is `RequiresNewSession`.
 - **A refused rebuild can leave the objects part-way.** Every fragment is built before any object
   is touched, so a fragment that will not build refuses the update cleanly; but the replacements
   themselves are applied one after another, and one that fails after another has succeeded stops
-  there. The document is left alone, so the two disagree until the caller reloads. Recreating the
-  session is the only thing that certainly restores agreement.
+  there and is reported as `RequiresNewSession`. Collections are the reason this is not obvious:
+  moving content out of a rebuilt copy and into the original empties one before it fills the other,
+  and a failure between the two is not a refusal however it is spelled. Where a collection refuses
+  *before* it has lost anything — an items control reading `ItemsSource` is the usual one — that is
+  told apart by counting, and stays a clean refusal.
+- **Cancelling an update is only clean before it writes.** A token cancelled while the update is
+  still comparing, projecting or building fragments leaves nothing touched. One cancelled after the
+  writes have landed leaves the objects ahead of the document, so the session is marked as needing
+  recreation and the `OperationCanceledException` is raised on top of that — the caller gets the
+  cancellation it asked for and `State` says what it cost.
 - **Duplicating carries `x:Key`.** The names inside a copy are taken out by default, because a name
   scope refuses a second `x:Name` and the copy would not load. A key is not a name and is left as
   written, so duplicating a keyed resource produces two entries under one key, which a resource

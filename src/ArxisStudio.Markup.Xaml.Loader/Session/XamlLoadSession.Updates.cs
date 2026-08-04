@@ -23,10 +23,20 @@ namespace ArxisStudio.Markup.Xaml.Loader;
 /// without a build.
 /// </para>
 /// <para>
-/// An update that cannot be applied leaves the objects exactly as they were. The document that
-/// was offered is kept as <see cref="PendingDocument"/> rather than dropped, because the usual
-/// reason an update fails is that the author is halfway through typing it, and the next keystroke
-/// is the correction.
+/// Almost every update that cannot be applied leaves the objects exactly as they were: the
+/// document is compared, the includes are resolved, every fragment is built and every value
+/// converted before the first live object is touched, so a refusal usually costs nothing. The
+/// document that was offered is kept as <see cref="PendingDocument"/> rather than dropped,
+/// because the usual reason an update fails is that the author is halfway through typing it, and
+/// the next keystroke is the correction.
+/// </para>
+/// <para>
+/// What cannot be checked in advance is user code. A validating setter may refuse a value of the
+/// right type after an earlier write has landed, and a collection may refuse to take back what
+/// was moved out of it. An update that gets that far and then stops is
+/// <see cref="XamlUpdateOutcome.RequiresNewSession"/>: the objects agree with neither document,
+/// nothing here can undo arbitrary side effects, and the session refuses every later mutation
+/// rather than compounding the disagreement.
 /// </para>
 /// </remarks>
 public sealed partial class XamlLoadSession
@@ -55,7 +65,8 @@ public sealed partial class XamlLoadSession
     /// <remarks>
     /// A refused update is not a discarded one. This is what was refused, so a caller can show
     /// it, diff it, or hand back a corrected version of it; it is cleared as soon as an update
-    /// lands.
+    /// lands. After an update stopped part-way it is also the document to build the replacement
+    /// session from, since it is the one the caller was trying to reach.
     /// </remarks>
     public XamlDocument? PendingDocument { get; private set; }
 
@@ -67,12 +78,18 @@ public sealed partial class XamlLoadSession
     /// <returns>What the update did, and everything noticed on the way.</returns>
     /// <exception cref="ArgumentNullException"><paramref name="updated"/> is <see langword="null"/>.</exception>
     /// <exception cref="ObjectDisposedException">The session has been disposed.</exception>
+    /// <exception cref="OperationCanceledException">The token was cancelled.</exception>
     public async ValueTask<XamlUpdateResult> ApplyDocumentUpdateAsync(
         XamlDocument updated,
         CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(updated);
         ObjectDisposedException.ThrowIf(_disposed, this);
+
+        if (Unusable(updated) is { } unusable)
+        {
+            return unusable;
+        }
 
         var diagnostics = new List<MarkupDiagnostic>();
 
@@ -88,7 +105,7 @@ public sealed partial class XamlLoadSession
                 [],
                 diagnostics,
                 XamlLoaderDiagnosticCodes.UpdateRejected,
-                "The document offered does not parse, so the objects were left as they were.");
+                "The document offered does not parse, so nothing was written to the objects.");
         }
 
         ImmutableArray<XamlDocumentChange> changes = XamlDocumentDiff.Compare(Document, updated);
@@ -96,17 +113,21 @@ public sealed partial class XamlLoadSession
 
         if (strategy == XamlUpdateStrategy.RecreateSession)
         {
+            // Nothing was written, so this session is as usable as it was — it is the new
+            // document that cannot be reached from here, which Strategy is what says.
             return Refuse(
                 updated,
                 strategy,
                 changes,
                 diagnostics,
                 XamlLoaderDiagnosticCodes.UpdateRequiresNewSession,
-                "The root element or x:Class changed. The objects were left as they were; create a " +
-                "new session from the new document.");
+                "The root element or x:Class changed. Nothing was written to the objects, and this " +
+                "session goes on describing the document it loaded; create a new session to load the " +
+                "new one.");
         }
 
-        return await ApplyAsync(updated, strategy, changes, diagnostics, cancellationToken).ConfigureAwait(false);
+        return await ApplyAsync(updated, strategy, changes, diagnostics, cancellationToken)
+            .ConfigureAwait(false);
     }
 
     /// <summary>
@@ -123,12 +144,18 @@ public sealed partial class XamlLoadSession
     /// <returns>What the update did, and everything noticed on the way.</returns>
     /// <exception cref="ArgumentNullException"><paramref name="resourceUri"/> is <see langword="null"/>.</exception>
     /// <exception cref="ObjectDisposedException">The session has been disposed.</exception>
+    /// <exception cref="OperationCanceledException">The token was cancelled.</exception>
     public async ValueTask<XamlUpdateResult> ApplySourceUpdateAsync(
         Uri resourceUri,
         CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(resourceUri);
         ObjectDisposedException.ThrowIf(_disposed, this);
+
+        if (Unusable() is { } unusable)
+        {
+            return unusable;
+        }
 
         var diagnostics = new List<MarkupDiagnostic>();
 
@@ -141,17 +168,17 @@ public sealed partial class XamlLoadSession
         {
             return new XamlUpdateResult
             {
-                Applied = true,
+                Outcome = XamlUpdateOutcome.Applied,
                 Strategy = XamlUpdateStrategy.None,
                 Changes = [],
                 Diagnostics = [.. diagnostics],
             };
         }
 
-        // The included content is not part of the document, so there is no element of it to set
-        // a property on. What has to be built again is whatever element of the document the
-        // include was expanded inside — every one of them, because which include's expansion
-        // changed is not a question the projected text answers.
+        // The included content is not part of the document, so there is no element of it to
+        // set a property on. What has to be built again is whatever element of the document
+        // the include was expanded inside — every one of them, because which include's
+        // expansion changed is not a question the projected text answers.
         var hosts = new List<XamlElement>();
         bool atRoot = false;
 
@@ -180,10 +207,10 @@ public sealed partial class XamlLoadSession
             });
         }
 
-        // An include with nothing between it and the root — a theme file is nothing else — has no
-        // smaller element to rebuild. What is rebuilt is then the root's content rather than the
-        // root: the object itself stays, because the session is built around it and the caller
-        // holds it, and only what is inside it is built again.
+        // An include with nothing between it and the root — a theme file is nothing else — has
+        // no smaller element to rebuild. What is rebuilt is then the root's content rather than
+        // the root: the object itself stays, because the session is built around it and the
+        // caller holds it, and only what is inside it is built again.
         if (atRoot && Document.Root is { } root)
         {
             builder.Add(new XamlDocumentChange(XamlUpdateStrategy.ReplaceResource, root, root, null));
@@ -200,10 +227,12 @@ public sealed partial class XamlLoadSession
                 diagnostics,
                 XamlLoaderDiagnosticCodes.UpdateRequiresNewSession,
                 $"'{XamlUri.ToDisplayString(resourceUri)}' is reached by no element of this document " +
-                "that can be rebuilt. Create a new session from the same document.");
+                "that can be rebuilt. Nothing was written to the objects; create a new session from " +
+                "the same document to pick the file up.");
         }
 
-        return await ApplyAsync(Document, XamlUpdateStrategy.ReplaceResource, changes, diagnostics, cancellationToken)
+        return await ApplyAsync(
+                Document, XamlUpdateStrategy.ReplaceResource, changes, diagnostics, cancellationToken)
             .ConfigureAwait(false);
     }
 
@@ -272,11 +301,11 @@ public sealed partial class XamlLoadSession
                     .ConfigureAwait(false)));
         }
 
-        bool applied = await _dispatcher
+        XamlMutationOutcome written = await _dispatcher
             .InvokeAsync(() => Write(changes, fragments, diagnostics), cancellationToken)
             .ConfigureAwait(false);
 
-        if (!applied)
+        if (written == XamlMutationOutcome.Refused)
         {
             return Refuse(
                 updated,
@@ -284,9 +313,72 @@ public sealed partial class XamlLoadSession
                 changes,
                 diagnostics,
                 XamlLoaderDiagnosticCodes.UpdateNotApplied,
-                "The update could not be applied, and the objects were left as they were.");
+                "The update could not be applied. Nothing was written to the objects, so they still " +
+                "describe the document this session loaded.");
         }
 
+        if (written == XamlMutationOutcome.Inconsistent)
+        {
+            return Break(updated, strategy, changes, diagnostics);
+        }
+
+        // Past here the objects have moved. Anything that goes wrong from now on — including the
+        // token being cancelled — leaves them describing something no document says, so the
+        // session is marked before the failure is allowed out.
+        try
+        {
+            return await FinishAsync(updated, strategy, changes, projection, diagnostics, cancellationToken)
+                .ConfigureAwait(false);
+        }
+        catch (Exception)
+        {
+            RequireRecreation();
+
+            throw;
+        }
+    }
+
+    /// <summary>Adopts the new document once its changes are on the objects.</summary>
+    private async ValueTask<XamlUpdateResult> FinishAsync(
+        XamlDocument updated,
+        XamlUpdateStrategy strategy,
+        ImmutableArray<XamlDocumentChange> changes,
+        TextProjection projection,
+        List<MarkupDiagnostic> diagnostics,
+        CancellationToken cancellationToken)
+    {
+        Adopt(updated, projection);
+
+        // Design values are re-applied from the document rather than patched one at a time.
+        // Nothing re-evaluates on an update, so the document is the only place that says what
+        // they are now, and applying all of them is the same walk a design-mode load does.
+        if (Options.Mode == XamlLoadMode.Design)
+        {
+            await _dispatcher
+                .InvokeAsync<object?>(
+                    () =>
+                    {
+                        XamlDesignValues.Apply(
+                            updated, Objects, RootObject, Environment.MemberResolver, diagnostics);
+
+                        return null;
+                    },
+                    cancellationToken)
+                .ConfigureAwait(false);
+        }
+
+        return new XamlUpdateResult
+        {
+            Outcome = XamlUpdateOutcome.Applied,
+            Strategy = strategy,
+            Changes = changes,
+            Diagnostics = [.. diagnostics],
+        };
+    }
+
+    /// <summary>Moves the session onto the document its objects now describe.</summary>
+    private void Adopt(XamlDocument updated, TextProjection projection)
+    {
         // What survives the change keeps the object it already had, paired by where it sits.
         // Rebuilding that from Avalonia's recorded positions would read them against a document
         // they predate, and an update that added a line would break every one after it.
@@ -313,52 +405,28 @@ public sealed partial class XamlLoadSession
         {
             _fragments.Remove(stale);
         }
-
-        // Design values are re-applied from the document rather than patched one at a time.
-        // Nothing re-evaluates on an update, so the document is the only place that says what
-        // they are now, and applying all of them is the same walk a design-mode load does.
-        if (Options.Mode == XamlLoadMode.Design)
-        {
-            await _dispatcher
-                .InvokeAsync<object?>(
-                    () =>
-                    {
-                        XamlDesignValues.Apply(updated, Objects, RootObject, Environment.MemberResolver, diagnostics);
-
-                        return null;
-                    },
-                    cancellationToken)
-                .ConfigureAwait(false);
-        }
-
-        return new XamlUpdateResult
-        {
-            Applied = true,
-            Strategy = strategy,
-            Changes = changes,
-            Diagnostics = [.. diagnostics],
-        };
     }
 
     /// <summary>
-    /// Writes every change onto the objects, or reports why it stopped.
+    /// Writes every change onto the objects, or reports how far it got before it stopped.
     /// </summary>
     /// <remarks>
     /// <para>
     /// Everything that can be checked is checked before anything is written: that each element
     /// still has an object, that each member exists and can be written, and that the text converts
     /// to something the member can hold. A change refused at that point costs nothing, because
-    /// nothing has been done yet.
+    /// nothing has been done yet, and the run reports
+    /// <see cref="XamlMutationOutcome.Refused"/>.
     /// </para>
     /// <para>
-    /// What cannot be checked in advance is a setter that refuses a value of the right type. That
-    /// is reported and stops the run, which may leave earlier changes of the same update applied —
-    /// there is no way back from a rebuilt subtree. The result says the update was not applied, and
-    /// a caller that cannot live with the uncertainty should build a new session from the document
-    /// it wanted.
+    /// What cannot be checked in advance is user code: a setter that refuses a value of the right
+    /// type, a collection that will not take back what was moved out of it. Once one step has
+    /// written to a live object, a later step that merely refuses is no longer a refusal — the
+    /// objects have moved and the document cannot follow them — so from that point every failure
+    /// is <see cref="XamlMutationOutcome.Inconsistent"/> and the session must be replaced.
     /// </para>
     /// </remarks>
-    private bool Write(
+    private XamlMutationOutcome Write(
         ImmutableArray<XamlDocumentChange> changes,
         List<(XamlDocumentChange Change, TextProjection Projection)> fragments,
         List<MarkupDiagnostic> diagnostics)
@@ -385,14 +453,14 @@ public sealed partial class XamlLoadSession
                     MarkupDiagnosticSeverity.Error,
                     Document.Uri));
 
-                return false;
+                return XamlMutationOutcome.Refused;
             }
 
             (object? fresh, Uri? runtimeUri) = Build(fragment, diagnostics);
 
             if (fresh is null)
             {
-                return false;
+                return XamlMutationOutcome.Refused;
             }
 
             rebuilds.Add((change, previous, fresh, runtimeUri));
@@ -424,7 +492,7 @@ public sealed partial class XamlLoadSession
                         MarkupDiagnosticSeverity.Error,
                         Document.Uri));
 
-                    return false;
+                    return XamlMutationOutcome.Refused;
                 }
 
                 // The elements of the loaded document, in the order the new one gives them, and
@@ -445,7 +513,7 @@ public sealed partial class XamlLoadSession
                     MarkupDiagnosticSeverity.Error,
                     Document.Uri));
 
-                return false;
+                return XamlMutationOutcome.Refused;
             }
 
             if (Objects.GetObject(element) is not { } target)
@@ -457,7 +525,7 @@ public sealed partial class XamlLoadSession
                     Document.Uri,
                     element.NameSpan));
 
-                return false;
+                return XamlMutationOutcome.Refused;
             }
 
             XamlMemberDescriptor member = Environment.MemberResolver.Resolve(target.GetType(), name);
@@ -471,7 +539,7 @@ public sealed partial class XamlLoadSession
                     Document.Uri,
                     element.NameSpan));
 
-                return false;
+                return XamlMutationOutcome.Refused;
             }
 
             XamlAttribute? written = updatedElement.GetAttribute(XamlQualifiedName.Parse(name));
@@ -489,35 +557,45 @@ public sealed partial class XamlLoadSession
                     Document.Uri,
                     written?.Span ?? element.NameSpan));
 
-                return false;
+                return XamlMutationOutcome.Refused;
             }
 
             writes.Add((target, member, value.Value));
         }
 
+        // Nothing above this line has touched a live object; everything below it does. Once one
+        // step has, a later step that merely refuses can no longer be reported as a refusal.
+        var mutated = false;
+
         // Before anything is rebuilt: a reorder moves the objects that already exist, and a
         // rebuild that ran first would have taken one of them out of the collection to be moved.
         foreach ((XamlElement parent, IReadOnlyList<XamlElement> order) in reorders)
         {
-            if (!XamlObjectReplacement.Reorder(
-                Objects, parent, order, Environment.MemberResolver, diagnostics))
+            XamlMutationOutcome reordered = XamlObjectReplacement.Reorder(
+                Objects, parent, order, Environment.MemberResolver, diagnostics);
+
+            if (reordered != XamlMutationOutcome.Applied)
             {
-                return false;
+                return Worsen(reordered, mutated, diagnostics, Document.Uri);
             }
+
+            mutated = true;
         }
 
         foreach ((XamlDocumentChange change, object previous, object fresh, Uri? runtimeUri) in rebuilds)
         {
-            bool replaced = change.ReplacesObject
+            XamlMutationOutcome replaced = change.ReplacesObject
                 ? XamlObjectReplacement.Replace(
                     Objects, change.OldElement!, previous, fresh, Environment.MemberResolver, diagnostics)
                 : XamlObjectReplacement.ReplaceContent(
                     previous, fresh, change.OldElement!, Environment.MemberResolver, diagnostics);
 
-            if (!replaced)
+            if (replaced != XamlMutationOutcome.Applied)
             {
-                return false;
+                return Worsen(replaced, mutated, diagnostics, Document.Uri);
             }
+
+            mutated = true;
 
             if (runtimeUri is not null)
             {
@@ -557,11 +635,45 @@ public sealed partial class XamlLoadSession
                     MarkupDiagnosticSeverity.Error,
                     Document.Uri));
 
-                return false;
+                // One property set, which either happened or did not: the object is as it was.
+                // Whether that leaves the session usable depends on what ran before it.
+                return Worsen(XamlMutationOutcome.Refused, mutated, diagnostics, Document.Uri);
             }
+
+            mutated = true;
         }
 
-        return true;
+        return XamlMutationOutcome.Applied;
+    }
+
+    /// <summary>
+    /// Reads a step's own answer against how far the run had already got.
+    /// </summary>
+    /// <remarks>
+    /// A step that refused touched nothing, which is only the same as the update having touched
+    /// nothing while no earlier step has written. Once one has, the objects have moved and the
+    /// document cannot follow them, so the honest answer is that this session describes neither.
+    /// </remarks>
+    private static XamlMutationOutcome Worsen(
+        XamlMutationOutcome step,
+        bool mutated,
+        List<MarkupDiagnostic> diagnostics,
+        Uri? documentUri)
+    {
+        if (step != XamlMutationOutcome.Refused || !mutated)
+        {
+            return step;
+        }
+
+        diagnostics.Add(MarkupDiagnostic.Synchronization(
+            XamlLoaderDiagnosticCodes.SessionRequiresRecreation,
+            "The change above was refused after earlier changes of the same update had already been " +
+            "written, so the objects carry part of the new document and the session's document carries " +
+            "none of it.",
+            MarkupDiagnosticSeverity.Error,
+            documentUri));
+
+        return XamlMutationOutcome.Inconsistent;
     }
 
     /// <summary>
@@ -670,7 +782,15 @@ public sealed partial class XamlLoadSession
             or XamlUpdateStrategy.ReloadTemplate
             or XamlUpdateStrategy.ReloadSubtree;
 
-    /// <summary>Records an update that was not applied, keeping the document it was offered.</summary>
+    /// <summary>
+    /// Records an update that was refused before anything was written, keeping the document it
+    /// was offered.
+    /// </summary>
+    /// <remarks>
+    /// Only for failures that certainly touched no live object. Everything that reaches one goes
+    /// through <see cref="Break"/> instead, because a refusal is a promise about the objects and
+    /// this one cannot be made twice.
+    /// </remarks>
     private XamlUpdateResult Refuse(
         XamlDocument updated,
         XamlUpdateStrategy strategy,
@@ -691,10 +811,88 @@ public sealed partial class XamlLoadSession
 
         return new XamlUpdateResult
         {
-            Applied = false,
+            Outcome = XamlUpdateOutcome.RejectedCleanly,
             Strategy = strategy,
             Changes = changes,
             Diagnostics = [.. diagnostics],
+        };
+    }
+
+    /// <summary>
+    /// Records an update that stopped after it had begun writing, and closes the session to
+    /// further changes.
+    /// </summary>
+    /// <remarks>
+    /// The document is kept as <see cref="PendingDocument"/> because it is what a replacement
+    /// session should be built from: it is the state the caller was trying to reach, and the one
+    /// the objects are now part-way towards.
+    /// </remarks>
+    private XamlUpdateResult Break(
+        XamlDocument updated,
+        XamlUpdateStrategy strategy,
+        ImmutableArray<XamlDocumentChange> changes,
+        List<MarkupDiagnostic> diagnostics)
+    {
+        PendingDocument = updated;
+
+        RequireRecreation();
+
+        diagnostics.Add(MarkupDiagnostic.Synchronization(
+            XamlLoaderDiagnosticCodes.SessionRequiresRecreation,
+            "The update stopped after it had begun writing to the objects, so they describe neither " +
+            "the document this session loaded nor the one offered, and no further change will be " +
+            "accepted. Create a new session from PendingDocument and discard this one.",
+            MarkupDiagnosticSeverity.Error,
+            updated.Uri));
+
+        return new XamlUpdateResult
+        {
+            Outcome = XamlUpdateOutcome.RequiresNewSession,
+            Strategy = strategy,
+            Changes = changes,
+            Diagnostics = [.. diagnostics],
+        };
+    }
+
+    /// <summary>
+    /// Refuses a mutation outright when a previous one already left the session describing
+    /// nothing, or <see langword="null"/> when the session is still worth using.
+    /// </summary>
+    /// <remarks>
+    /// Deterministic on purpose: once the objects and the document disagree, every further change
+    /// would be written onto a tree nobody can describe, and the second failure would be harder to
+    /// explain than the first.
+    /// </remarks>
+    /// <param name="offered">
+    /// The document this call was given, kept only when nothing else has been. A session left
+    /// unusable by a cancelled update has no pending document of its own, and the next thing a
+    /// caller offers is a better answer to "what should I load instead" than nothing.
+    /// </param>
+    private XamlUpdateResult? Unusable(XamlDocument? offered = null)
+    {
+        if (State == XamlSessionState.Usable)
+        {
+            return null;
+        }
+
+        // Not through Break: the state is already set, and a document offered after the fact must
+        // not displace the one the session was actually left part-way towards.
+        PendingDocument ??= offered;
+
+        return new XamlUpdateResult
+        {
+            Outcome = XamlUpdateOutcome.RequiresNewSession,
+            Strategy = XamlUpdateStrategy.RecreateSession,
+            Changes = [],
+            Diagnostics =
+            [
+                MarkupDiagnostic.Synchronization(
+                    XamlLoaderDiagnosticCodes.SessionRequiresRecreation,
+                    "An earlier update stopped after it had begun writing to the objects. This session " +
+                    "accepts no further change; create a new session from the document you want.",
+                    MarkupDiagnosticSeverity.Error,
+                    Document.Uri),
+            ],
         };
     }
 }

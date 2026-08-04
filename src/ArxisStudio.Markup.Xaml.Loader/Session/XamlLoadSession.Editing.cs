@@ -166,6 +166,11 @@ public sealed partial class XamlLoadSession
         ArgumentNullException.ThrowIfNull(property);
         VerifyAccess();
 
+        if (UnusableForEdit() is { } unusable)
+        {
+            return unusable;
+        }
+
         XamlMemberDescriptor member = Environment.MemberResolver.Resolve(target.GetType(), property);
 
         if (Reject(member, property, out XamlEditResult? rejected))
@@ -200,8 +205,17 @@ public sealed partial class XamlLoadSession
         catch (Exception)
         {
             // The object was changed and the document was not. Putting the object back is the
-            // only way to leave the two agreeing.
-            target.SetValue(property, previous);
+            // only way to leave the two agreeing — and where the property will not take its own
+            // old value back, nothing here can make them agree, so the session says so rather
+            // than letting the next edit be written onto a tree that describes nothing.
+            try
+            {
+                target.SetValue(property, previous);
+            }
+            catch (Exception)
+            {
+                RequireRecreation();
+            }
 
             throw;
         }
@@ -230,6 +244,11 @@ public sealed partial class XamlLoadSession
         ArgumentNullException.ThrowIfNull(property);
         ArgumentNullException.ThrowIfNull(value);
         VerifyAccess();
+
+        if (UnusableForEdit() is { } unusable)
+        {
+            return unusable;
+        }
 
         XamlMemberDescriptor member = Environment.MemberResolver.Resolve(target.GetType(), property);
 
@@ -272,6 +291,30 @@ public sealed partial class XamlLoadSession
         return new XamlEditResult { Applied = true, Diagnostics = [.. diagnostics] };
     }
 
+    /// <summary>
+    /// Refuses an edit outright when an earlier update left the session describing nothing.
+    /// </summary>
+    /// <remarks>
+    /// The same refusal the update path makes, in the shape an edit answers with. Named apart from
+    /// it because the two live in different halves of this class and differ only by return type,
+    /// which is exactly the pair a reader mistakes for one method.
+    /// </remarks>
+    private XamlEditResult? UnusableForEdit() =>
+        State == XamlSessionState.Usable
+            ? null
+            : new XamlEditResult
+            {
+                Applied = false,
+                Diagnostics =
+                [
+                    MarkupDiagnostic.Synchronization(
+                        XamlLoaderDiagnosticCodes.SessionRequiresRecreation,
+                        "An earlier update stopped after it had begun writing to the objects. This session " +
+                        "accepts no further change; create a new session from the document you want.",
+                        MarkupDiagnosticSeverity.Error,
+                        Document.Uri),
+                ],
+            };
     /// <summary>Rejects an edit the member itself rules out.</summary>
     private XamlEditResult? RejectedOrNull(XamlMemberDescriptor member, AvaloniaProperty property) =>
         member.Kind switch

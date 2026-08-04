@@ -202,7 +202,6 @@ ArxisStudio.Markup.Xaml.Loader.XamlTypeResolver.ResolveAsync(ArxisStudio.Markup.
 ArxisStudio.Markup.Xaml.Loader.XamlTypeResolver.XamlTypeResolver(ArxisStudio.Markup.Xaml.Loader.IXamlAssemblyResolver! assemblyResolver, System.Collections.Generic.IEnumerable<System.Reflection.Assembly!>? searchAssemblies = null) -> void
 ArxisStudio.Markup.Xaml.Loader.XamlUpdateResult
 ArxisStudio.Markup.Xaml.Loader.XamlUpdateResult.Applied.get -> bool
-ArxisStudio.Markup.Xaml.Loader.XamlUpdateResult.Applied.init -> void
 ArxisStudio.Markup.Xaml.Loader.XamlUpdateResult.Changes.get -> System.Collections.Immutable.ImmutableArray<ArxisStudio.Markup.Xaml.Loader.XamlDocumentChange!>
 ArxisStudio.Markup.Xaml.Loader.XamlUpdateResult.Changes.init -> void
 ArxisStudio.Markup.Xaml.Loader.XamlUpdateResult.Diagnostics.get -> System.Collections.Immutable.ImmutableArray<ArxisStudio.Markup.MarkupDiagnostic!>

@@ -113,4 +113,10 @@ public static class XamlLoaderDiagnosticCodes
 
     /// <summary>An update was refused because the document offered does not parse.</summary>
     public const string UpdateRejected = "AXM3042";
+
+    /// <summary>
+    /// An update failed after it had begun writing to live objects, so the session no longer
+    /// describes any document and must be replaced.
+    /// </summary>
+    public const string SessionRequiresRecreation = "AXM3043";
 }

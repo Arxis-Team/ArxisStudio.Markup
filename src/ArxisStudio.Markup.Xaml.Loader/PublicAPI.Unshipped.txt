@@ -2,15 +2,26 @@
 ArxisStudio.Markup.Xaml.Loader.XamlLoadEnvironment.MemberResolver.get -> ArxisStudio.Markup.Xaml.Loader.XamlMemberResolver!
 ArxisStudio.Markup.Xaml.Loader.XamlLoadEnvironment.MemberResolver.init -> void
 ArxisStudio.Markup.Xaml.Loader.XamlLoadSession.GetMembers(object! target) -> System.Collections.Immutable.ImmutableArray<ArxisStudio.Markup.Xaml.Loader.XamlMemberDescriptor!>
+ArxisStudio.Markup.Xaml.Loader.XamlLoadSession.State.get -> ArxisStudio.Markup.Xaml.Loader.XamlSessionState
 ArxisStudio.Markup.Xaml.Loader.XamlMemberDescriptor.ConvertFromText(string! text) -> ArxisStudio.Markup.Xaml.Loader.XamlValueConversionResult
 ArxisStudio.Markup.Xaml.Loader.XamlMemberResolver.Enumerate(System.Type! targetType) -> System.Collections.Immutable.ImmutableArray<ArxisStudio.Markup.Xaml.Loader.XamlMemberDescriptor!>
 ArxisStudio.Markup.Xaml.Loader.XamlMemberResolver.FindContent(System.Type! targetType) -> ArxisStudio.Markup.Xaml.Loader.XamlMemberDescriptor?
+ArxisStudio.Markup.Xaml.Loader.XamlSessionState
+ArxisStudio.Markup.Xaml.Loader.XamlSessionState.RequiresNewSession = 1 -> ArxisStudio.Markup.Xaml.Loader.XamlSessionState
+ArxisStudio.Markup.Xaml.Loader.XamlSessionState.Usable = 0 -> ArxisStudio.Markup.Xaml.Loader.XamlSessionState
+ArxisStudio.Markup.Xaml.Loader.XamlUpdateOutcome
+ArxisStudio.Markup.Xaml.Loader.XamlUpdateOutcome.Applied = 0 -> ArxisStudio.Markup.Xaml.Loader.XamlUpdateOutcome
+ArxisStudio.Markup.Xaml.Loader.XamlUpdateOutcome.RejectedCleanly = 1 -> ArxisStudio.Markup.Xaml.Loader.XamlUpdateOutcome
+ArxisStudio.Markup.Xaml.Loader.XamlUpdateOutcome.RequiresNewSession = 2 -> ArxisStudio.Markup.Xaml.Loader.XamlUpdateOutcome
+ArxisStudio.Markup.Xaml.Loader.XamlUpdateResult.Outcome.get -> ArxisStudio.Markup.Xaml.Loader.XamlUpdateOutcome
+ArxisStudio.Markup.Xaml.Loader.XamlUpdateResult.Outcome.init -> void
 ArxisStudio.Markup.Xaml.Loader.XamlValueConversionResult
 ArxisStudio.Markup.Xaml.Loader.XamlValueConversionResult.Equals(ArxisStudio.Markup.Xaml.Loader.XamlValueConversionResult other) -> bool
 ArxisStudio.Markup.Xaml.Loader.XamlValueConversionResult.Error.get -> string?
 ArxisStudio.Markup.Xaml.Loader.XamlValueConversionResult.Succeeded.get -> bool
 ArxisStudio.Markup.Xaml.Loader.XamlValueConversionResult.Value.get -> object?
 ArxisStudio.Markup.Xaml.Loader.XamlValueConversionResult.XamlValueConversionResult() -> void
+const ArxisStudio.Markup.Xaml.Loader.XamlLoaderDiagnosticCodes.SessionRequiresRecreation = "AXM3043" -> string!
 override ArxisStudio.Markup.Xaml.Loader.XamlValueConversionResult.GetHashCode() -> int
 static ArxisStudio.Markup.Xaml.Loader.XamlValueConversionResult.FromError(string! error) -> ArxisStudio.Markup.Xaml.Loader.XamlValueConversionResult
 static ArxisStudio.Markup.Xaml.Loader.XamlValueConversionResult.FromValue(object? value) -> ArxisStudio.Markup.Xaml.Loader.XamlValueConversionResult

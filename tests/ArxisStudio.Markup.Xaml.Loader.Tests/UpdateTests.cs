@@ -592,7 +592,10 @@ public sealed class UpdateTests
             "  <StackPanel><TextBlock Text=\"first\" /><NoSuchControl /></StackPanel>\n" +
             "</Border>");
 
-        Assert.False(result.Applied);
+        // Every fragment is built before any object is touched, so this costs nothing and the
+        // session is still the one it was.
+        Assert.Equal(XamlUpdateOutcome.RejectedCleanly, result.Outcome);
+        Assert.Equal(XamlSessionState.Usable, session.State);
         Assert.Single(panel.Children);
         Assert.NotNull(session.PendingDocument);
     }

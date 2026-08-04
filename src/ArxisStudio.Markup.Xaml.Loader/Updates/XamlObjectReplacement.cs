@@ -21,6 +21,14 @@ namespace ArxisStudio.Markup.Xaml.Loader;
 /// Nothing here guesses. A slot it cannot identify is reported, and the update that needed it is
 /// refused, because putting a rebuilt style in the wrong place is worse than not updating.
 /// </para>
+/// <para>
+/// Every step says whether it refused before touching anything or stopped part-way through
+/// changing it. The difference is the whole of what a caller can do next: a refusal leaves a
+/// session that still describes its document, and a half-made change leaves one that describes
+/// nothing. Collections are the reason the distinction is not obvious — moving content out of a
+/// rebuilt copy and into the original empties one before it fills the other, and a failure
+/// between the two is not a refusal however it is reported.
+/// </para>
 /// </remarks>
 internal static class XamlObjectReplacement
 {
@@ -31,8 +39,8 @@ internal static class XamlObjectReplacement
     /// <param name="fresh">The object to put in its place.</param>
     /// <param name="members">What decides which member of the holder the element sits in.</param>
     /// <param name="diagnostics">Collects a report when there is nowhere to put it.</param>
-    /// <returns><see langword="true"/> if the object was replaced.</returns>
-    internal static bool Replace(
+    /// <returns>Whether the object was replaced, refused, or left part-way.</returns>
+    internal static XamlMutationOutcome Replace(
         XamlObjectMap objects,
         XamlElement element,
         object previous,
@@ -52,21 +60,23 @@ internal static class XamlObjectReplacement
 
         object? slot = memberName is null ? owner : Read(owner, memberName, members);
 
-        if (slot is IResourceDictionary dictionary && ReplaceInDictionary(dictionary, previous, fresh))
+        if (slot is IResourceDictionary dictionary
+            && ReplaceInDictionary(dictionary, previous, fresh) is { } inDictionary)
         {
-            return true;
+            return Report(element, diagnostics, inDictionary, "the dictionary would not take it");
         }
 
-        if (slot is not null && ReplaceInList(slot, previous, fresh))
+        if (slot is not null && ReplaceInList(slot, previous, fresh) is { } inList)
         {
-            return true;
+            return Report(element, diagnostics, inList, $"{slot.GetType().Name} would not take it");
         }
 
         // A single-valued slot: a Template, a Content, a Child. Setting it is the replacement.
         if (memberName is not null)
         {
-            return Write(owner, memberName, fresh, members, diagnostics)
-                || Fail(element, diagnostics, $"{memberName} could not be written");
+            return Report(
+                element, diagnostics, Write(owner, memberName, fresh, members, diagnostics),
+                $"{memberName} could not be written");
         }
 
         // Unnamed content goes to the member Avalonia marks [Content] — Children on a panel,
@@ -77,15 +87,16 @@ internal static class XamlObjectReplacement
         {
             object? held = Read(owner, content.Name, members);
 
-            if (held is not null && ReplaceInList(held, previous, fresh))
+            if (held is not null && ReplaceInList(held, previous, fresh) is { } inContent)
             {
-                return true;
+                return Report(element, diagnostics, inContent, $"{content.Name} would not take it");
             }
 
             if (ReferenceEquals(held, previous))
             {
-                return Write(owner, content.Name, fresh, members, diagnostics)
-                    || Fail(element, diagnostics, $"{content.Name} could not be written");
+                return Report(
+                    element, diagnostics, Write(owner, content.Name, fresh, members, diagnostics),
+                    $"{content.Name} could not be written");
             }
         }
 
@@ -101,7 +112,8 @@ internal static class XamlObjectReplacement
     /// </para>
     /// <para>
     /// Everything that can fail is resolved before the first item moves, so a reorder that cannot
-    /// be applied has not half-applied itself.
+    /// be applied has not half-applied itself. A collection that throws once the moves have begun
+    /// is the exception, and is reported as one.
     /// </para>
     /// </remarks>
     /// <param name="objects">Which element each object came from.</param>
@@ -109,8 +121,8 @@ internal static class XamlObjectReplacement
     /// <param name="order">Its children as they were, in the order the new document gives them.</param>
     /// <param name="members">What decides which member holds the children.</param>
     /// <param name="diagnostics">Collects a report when the order cannot be applied.</param>
-    /// <returns><see langword="true"/> if the children were reordered.</returns>
-    internal static bool Reorder(
+    /// <returns>Whether the children were reordered, refused, or left part-way.</returns>
+    internal static XamlMutationOutcome Reorder(
         XamlObjectMap objects,
         XamlElement parent,
         IReadOnlyList<XamlElement> order,
@@ -134,8 +146,14 @@ internal static class XamlObjectReplacement
             wanted.Add(target);
         }
 
-        return Rearrange(slot, wanted)
-            || FailOrder(parent, diagnostics, $"{slot.GetType().Name} does not say how to move an item");
+        return Rearrange(slot, wanted) switch
+        {
+            XamlMutationOutcome.Applied => XamlMutationOutcome.Applied,
+            XamlMutationOutcome.Refused => FailOrder(
+                parent, diagnostics, $"{slot.GetType().Name} does not say how to move an item"),
+            _ => BrokeOrder(
+                parent, diagnostics, $"{slot.GetType().Name} threw part-way through the moves"),
+        };
     }
 
     /// <summary>Finds the collection an element's children live in.</summary>
@@ -169,13 +187,14 @@ internal static class XamlObjectReplacement
     /// Through the collection's own <c>Move</c>, which is what Avalonia's lists offer and what
     /// keeps a control attached to its parent throughout. Writing the positions instead would put
     /// one control in two places for as long as it took to write the second, which is how Avalonia
-    /// is made to throw.
+    /// is made to throw. A <c>Move</c> takes an item out and puts it back, so one that throws has
+    /// already changed the collection whether or not it finished.
     /// </remarks>
-    private static bool Rearrange(object slot, List<object> order)
+    private static XamlMutationOutcome Rearrange(object slot, List<object> order)
     {
         if (slot is not IEnumerable items)
         {
-            return false;
+            return XamlMutationOutcome.Refused;
         }
 
         var current = new List<object?>();
@@ -189,7 +208,7 @@ internal static class XamlObjectReplacement
         // somewhere, and nothing here knows where. That is a reorder this cannot promise.
         if (current.Count != order.Count)
         {
-            return false;
+            return XamlMutationOutcome.Refused;
         }
 
         MethodInfo? move = slot.GetType().GetMethod(
@@ -197,7 +216,7 @@ internal static class XamlObjectReplacement
 
         if (move is null)
         {
-            return false;
+            return XamlMutationOutcome.Refused;
         }
 
         var positions = new int[order.Count];
@@ -208,11 +227,12 @@ internal static class XamlObjectReplacement
 
             if (positions[target] < 0)
             {
-                return false;
+                return XamlMutationOutcome.Refused;
             }
         }
 
-        // Resolved above, applied here: by this point nothing left can refuse.
+        // Resolved above, applied here: by this point nothing left can refuse, and anything that
+        // throws anyway has already moved something.
         for (int target = 0; target < order.Count; target++)
         {
             int position = current.FindIndex(target, item => ReferenceEquals(item, order[target]));
@@ -222,7 +242,14 @@ internal static class XamlObjectReplacement
                 continue;
             }
 
-            move.Invoke(slot, [position, target]);
+            try
+            {
+                move.Invoke(slot, [position, target]);
+            }
+            catch (Exception error) when (Ordinary(error))
+            {
+                return XamlMutationOutcome.Inconsistent;
+            }
 
             object? item = current[position];
 
@@ -230,7 +257,7 @@ internal static class XamlObjectReplacement
             current.Insert(target, item);
         }
 
-        return true;
+        return XamlMutationOutcome.Applied;
     }
 
     /// <summary>Rebuilds what an element holds without disturbing the object it is.</summary>
@@ -244,8 +271,8 @@ internal static class XamlObjectReplacement
     /// <param name="element">The element, for diagnostics.</param>
     /// <param name="members">What decides which member the type calls its content.</param>
     /// <param name="diagnostics">Collects a report when the content cannot be moved across.</param>
-    /// <returns><see langword="true"/> if the content was rebuilt.</returns>
-    internal static bool ReplaceContent(
+    /// <returns>Whether the content was rebuilt, refused, or left part-way.</returns>
+    internal static XamlMutationOutcome ReplaceContent(
         object target,
         object fresh,
         XamlElement element,
@@ -266,36 +293,63 @@ internal static class XamlObjectReplacement
             return MoveContent(target, fresh, content, members, element, diagnostics);
         }
 
-        switch (target)
+        return target is IResourceDictionary dictionary && fresh is IResourceDictionary rebuilt
+            ? Refill(dictionary, rebuilt, element, diagnostics)
+            : Fail(element, diagnostics, $"{target.GetType().Name} does not say what it holds");
+    }
+
+    /// <summary>Replaces everything a resource dictionary holds with what a rebuilt one holds.</summary>
+    /// <remarks>
+    /// Merged dictionaries are not entries. A file that only merges other files has all of its
+    /// content there and none of it under a key, so copying the keys alone would leave the old
+    /// content in place and call it an update.
+    /// </remarks>
+    private static XamlMutationOutcome Refill(
+        IResourceDictionary dictionary,
+        IResourceDictionary rebuilt,
+        XamlElement element,
+        List<MarkupDiagnostic> diagnostics)
+    {
+        int before = dictionary.Count;
+
+        try
         {
-            case IResourceDictionary dictionary when fresh is IResourceDictionary rebuilt:
-                dictionary.Clear();
+            dictionary.Clear();
+        }
+        catch (Exception error) when (Ordinary(error))
+        {
+            return dictionary.Count == before
+                ? Fail(element, diagnostics, $"the dictionary refused to be emptied: {error.Message}")
+                : Broke(element, diagnostics, $"the dictionary threw while being emptied: {error.Message}");
+        }
 
-                foreach (object key in rebuilt.Keys.ToArray())
-                {
-                    dictionary[key] = rebuilt[key];
-                }
+        // From here the dictionary has been emptied, so anything that goes wrong has already
+        // changed it and no report can call the objects untouched.
+        try
+        {
+            foreach (object key in rebuilt.Keys.ToArray())
+            {
+                dictionary[key] = rebuilt[key];
+            }
 
-                // Merged dictionaries are not entries. A file that only merges other files has
-                // all of its content there and none of it under a key, so copying the keys alone
-                // would leave the old content in place and call it an update.
-                IResourceProvider[] merged = [.. rebuilt.MergedDictionaries];
+            IResourceProvider[] merged = [.. rebuilt.MergedDictionaries];
 
-                dictionary.MergedDictionaries.Clear();
+            dictionary.MergedDictionaries.Clear();
 
-                // Taken out of the copy first, for the same reason a control is: a provider that
-                // two dictionaries both hold has an owner that is no longer true.
-                rebuilt.MergedDictionaries.Clear();
+            // Taken out of the copy first, for the same reason a control is: a provider that
+            // two dictionaries both hold has an owner that is no longer true.
+            rebuilt.MergedDictionaries.Clear();
 
-                foreach (IResourceProvider provider in merged)
-                {
-                    dictionary.MergedDictionaries.Add(provider);
-                }
+            foreach (IResourceProvider provider in merged)
+            {
+                dictionary.MergedDictionaries.Add(provider);
+            }
 
-                return true;
-
-            default:
-                return Fail(element, diagnostics, $"{target.GetType().Name} does not say what it holds");
+            return XamlMutationOutcome.Applied;
+        }
+        catch (Exception error) when (Ordinary(error))
+        {
+            return Broke(element, diagnostics, $"the emptied dictionary would not take it back: {error.Message}");
         }
     }
 
@@ -305,7 +359,7 @@ internal static class XamlObjectReplacement
     /// parent, and adding it to a second while the first still holds it is how Avalonia is made to
     /// throw.
     /// </remarks>
-    private static bool MoveContent(
+    private static XamlMutationOutcome MoveContent(
         object target,
         object fresh,
         XamlMemberDescriptor content,
@@ -316,47 +370,44 @@ internal static class XamlObjectReplacement
         object? held = Read(target, content.Name, members);
         object? rebuilt = Read(fresh, content.Name, members);
 
-        try
+        if (held is IEnumerable && rebuilt is IEnumerable)
         {
-            if (held is IEnumerable && rebuilt is IEnumerable)
+            return MoveItems(held!, rebuilt!) switch
             {
-                return MoveItems(held!, rebuilt!)
-                    || Fail(element, diagnostics, $"{content.Name} would not take its content back");
-            }
+                XamlMutationOutcome.Applied => XamlMutationOutcome.Applied,
 
-            if (!content.CanWrite)
-            {
-                return Fail(
-                    element,
-                    diagnostics,
-                    $"{content.Name} is neither a list nor writable, so its content cannot be moved");
-            }
-
-            // Taken out of the copy first, and only where that matters: something in the logical
-            // world belongs to one parent, and writing it onto the original while the copy still
-            // holds it is how Avalonia is made to throw. A value that is nobody's child — a
-            // string, a number — has no such rule, and a member that refuses null must not fail
-            // the update over one.
-            if (rebuilt is ILogical
-                && !Write(fresh, content.Name, null, members, Quiet))
-            {
-                return Fail(
-                    element, diagnostics, $"{content.Name} could not be cleared on the rebuilt copy");
-            }
-
-            return Write(target, content.Name, rebuilt, members, diagnostics)
-                || Fail(element, diagnostics, $"{content.Name} could not be written");
+                // A collection that refuses to be written through — an items control whose items
+                // come from ItemsSource says exactly this — is an ordinary answer to an ordinary
+                // edit, and the caller is told rather than shown an exception out of an update.
+                XamlMutationOutcome.Refused => Fail(
+                    element, diagnostics, $"{content.Name} would not take its content back"),
+                _ => Broke(
+                    element, diagnostics, $"{content.Name} was emptied and would not take its content back"),
+            };
         }
-        catch (Exception error) when (error is InvalidOperationException
-            or NotSupportedException
-            or ArgumentException
-            or InvalidCastException)
+
+        if (!content.CanWrite)
         {
-            // A collection that refuses to be written through — an ItemsControl whose items come
-            // from ItemsSource says exactly this — is an ordinary answer to an ordinary edit, and
-            // the caller is told rather than shown an exception out of an update.
-            return Fail(element, diagnostics, $"{content.Name} refused the content: {error.Message}");
+            return Fail(
+                element,
+                diagnostics,
+                $"{content.Name} is neither a list nor writable, so its content cannot be moved");
         }
+
+        // Taken out of the copy first, and only where that matters: something in the logical
+        // world belongs to one parent, and writing it onto the original while the copy still
+        // holds it is how Avalonia is made to throw. A value that is nobody's child — a
+        // string, a number — has no such rule, and a member that refuses null must not fail
+        // the update over one. The copy is not live, so failing here changes nothing.
+        if (rebuilt is ILogical
+            && Write(fresh, content.Name, null, members, Quiet) != XamlMutationOutcome.Applied)
+        {
+            return Fail(element, diagnostics, $"{content.Name} could not be cleared on the rebuilt copy");
+        }
+
+        return Report(
+            element, diagnostics, Write(target, content.Name, rebuilt, members, diagnostics),
+            $"{content.Name} could not be written");
     }
 
     /// <summary>Diagnostics nobody reads, for a step whose failure is reported by its caller.</summary>
@@ -364,63 +415,124 @@ internal static class XamlObjectReplacement
 
     /// <summary>Moves the items of one collection into another, whichever list interface it has.</summary>
     /// <remarks>
-    /// Avalonia's own collections implement <c>IList&lt;T&gt;</c> and not always the non-generic
-    /// <see cref="IList"/> — <c>Styles</c> is one — so the two are tried in turn rather than the
-    /// easy one alone.
+    /// Emptied before anything is added: an item that belongs to one parent cannot be handed to a
+    /// second while the first still holds it. That ordering is also why this can fail in two
+    /// different ways — a collection that refuses to be emptied has changed nothing, and one that
+    /// refuses to be filled has already lost what it held.
     /// </remarks>
-    private static bool MoveItems(object into, object from)
+    private static XamlMutationOutcome MoveItems(object into, object from)
     {
-        object?[] items = [.. ((IEnumerable)from).Cast<object?>()];
+        object?[] items;
 
-        // Emptied before anything is added: an item that belongs to one parent cannot be handed
-        // to a second while the first still holds it.
-        return Empty(from) && Empty(into) && items.All(item => Append(into, item));
+        try
+        {
+            items = [.. ((IEnumerable)from).Cast<object?>()];
+        }
+        catch (Exception error) when (Ordinary(error))
+        {
+            return XamlMutationOutcome.Refused;
+        }
+
+        // The rebuilt copy, which nothing outside this update has ever seen. Emptying it changes
+        // nothing a caller could observe, so a refusal here is still a clean one.
+        if (Clear(from) != XamlMutationOutcome.Applied)
+        {
+            return XamlMutationOutcome.Refused;
+        }
+
+        XamlMutationOutcome emptied = Clear(into);
+
+        if (emptied != XamlMutationOutcome.Applied)
+        {
+            return emptied;
+        }
+
+        return items.All(item => Append(into, item))
+            ? XamlMutationOutcome.Applied
+            : XamlMutationOutcome.Inconsistent;
     }
 
     /// <summary>Empties a collection through whichever list interface it has.</summary>
-    private static bool Empty(object collection)
+    /// <remarks>
+    /// A collection that refuses is told apart from one that stopped part-way by counting it:
+    /// Avalonia's own refusals — an items control reading <c>ItemsSource</c> — throw before
+    /// removing anything, and that is a refusal a caller can be told about and carry on from.
+    /// </remarks>
+    private static XamlMutationOutcome Clear(object collection)
     {
-        if (collection is IList list)
+        int before = Size(collection);
+
+        try
         {
-            list.Clear();
+            if (collection is IList list)
+            {
+                list.Clear();
 
-            return true;
+                return XamlMutationOutcome.Applied;
+            }
+
+            MethodInfo? clear = collection.GetType()
+                .GetMethod("Clear", BindingFlags.Public | BindingFlags.Instance, []);
+
+            if (clear is null)
+            {
+                return XamlMutationOutcome.Refused;
+            }
+
+            clear.Invoke(collection, []);
+
+            return XamlMutationOutcome.Applied;
         }
-
-        MethodInfo? clear = collection.GetType().GetMethod("Clear", BindingFlags.Public | BindingFlags.Instance, []);
-
-        if (clear is null)
+        catch (Exception error) when (Ordinary(error))
         {
-            return false;
+            return Size(collection) == before
+                ? XamlMutationOutcome.Refused
+                : XamlMutationOutcome.Inconsistent;
         }
+    }
 
-        clear.Invoke(collection, []);
-
-        return true;
+    /// <summary>Counts a collection, or reports -1 for something that cannot be counted.</summary>
+    private static int Size(object collection)
+    {
+        try
+        {
+            return collection is IEnumerable items ? items.Cast<object?>().Count() : -1;
+        }
+        catch (Exception error) when (Ordinary(error))
+        {
+            return -1;
+        }
     }
 
     /// <summary>Adds to a collection through whichever list interface it has.</summary>
     private static bool Append(object collection, object? item)
     {
-        if (collection is IList list)
+        try
         {
-            list.Add(item);
+            if (collection is IList list)
+            {
+                list.Add(item);
+
+                return true;
+            }
+
+            MethodInfo? add = collection.GetType()
+                .GetMethods(BindingFlags.Public | BindingFlags.Instance)
+                .FirstOrDefault(method => method.Name == "Add" && method.GetParameters().Length == 1);
+
+            if (add is null)
+            {
+                return false;
+            }
+
+            add.Invoke(collection, [item]);
 
             return true;
         }
-
-        MethodInfo? add = collection.GetType()
-            .GetMethods(BindingFlags.Public | BindingFlags.Instance)
-            .FirstOrDefault(method => method.Name == "Add" && method.GetParameters().Length == 1);
-
-        if (add is null)
+        catch (Exception error) when (Ordinary(error))
         {
             return false;
         }
-
-        add.Invoke(collection, [item]);
-
-        return true;
     }
 
     /// <summary>
@@ -441,34 +553,52 @@ internal static class XamlObjectReplacement
             : (objects.GetObject(parent), null);
     }
 
-    private static bool ReplaceInDictionary(IResourceDictionary dictionary, object previous, object fresh)
+    /// <summary>
+    /// Replaces a dictionary entry by reference, or reports that this dictionary does not hold it.
+    /// </summary>
+    private static XamlMutationOutcome? ReplaceInDictionary(
+        IResourceDictionary dictionary,
+        object previous,
+        object fresh)
     {
         foreach (object key in dictionary.Keys.ToArray())
         {
-            if (ReferenceEquals(dictionary[key], previous))
+            if (!ReferenceEquals(dictionary[key], previous))
+            {
+                continue;
+            }
+
+            try
             {
                 dictionary[key] = fresh;
 
-                return true;
+                return XamlMutationOutcome.Applied;
+            }
+            catch (Exception error) when (Ordinary(error))
+            {
+                // The entry was found and the write was attempted, so whether the old value is
+                // still under that key is not something this can claim either way.
+                return XamlMutationOutcome.Inconsistent;
             }
         }
 
-        return false;
+        return null;
     }
 
     /// <summary>
-    /// Replaces an item of a collection, by reference, whichever list interface it offers.
+    /// Replaces an item of a collection, by reference, whichever list interface it offers, or
+    /// reports that this collection does not hold it.
     /// </summary>
     /// <remarks>
     /// Avalonia's own collections — <c>Styles</c>, <c>Controls</c>, a dictionary's merged list —
     /// implement <see cref="IList{T}"/> and not the non-generic <see cref="IList"/>, so testing
     /// for the latter alone finds none of the ones this actually has to put things back into.
     /// </remarks>
-    private static bool ReplaceInList(object slot, object previous, object fresh)
+    private static XamlMutationOutcome? ReplaceInList(object slot, object previous, object fresh)
     {
         if (slot is not IEnumerable items)
         {
-            return false;
+            return null;
         }
 
         int index = 0;
@@ -483,48 +613,78 @@ internal static class XamlObjectReplacement
             index++;
         }
 
-        return false;
+        return null;
     }
 
     /// <summary>Writes one position of a collection through its indexer.</summary>
-    private static bool Set(object slot, int index, object value)
+    /// <remarks>
+    /// A list assignment takes the old item out and puts the new one in, so one that throws has
+    /// already changed the collection whether or not it finished.
+    /// </remarks>
+    private static XamlMutationOutcome Set(object slot, int index, object value)
     {
-        if (slot is IList list)
+        try
         {
-            list[index] = value;
+            if (slot is IList list)
+            {
+                list[index] = value;
 
-            return true;
+                return XamlMutationOutcome.Applied;
+            }
+
+            PropertyInfo? indexer = slot.GetType()
+                .GetProperties(BindingFlags.Public | BindingFlags.Instance)
+                .FirstOrDefault(property =>
+                    property.CanWrite && property.GetIndexParameters() is [{ ParameterType.Name: nameof(Int32) }]);
+
+            if (indexer is null)
+            {
+                return XamlMutationOutcome.Refused;
+            }
+
+            indexer.SetValue(slot, value, [index]);
+
+            return XamlMutationOutcome.Applied;
         }
-
-        PropertyInfo? indexer = slot.GetType()
-            .GetProperties(BindingFlags.Public | BindingFlags.Instance)
-            .FirstOrDefault(property =>
-                property.CanWrite && property.GetIndexParameters() is [{ ParameterType.Name: nameof(Int32) }]);
-
-        if (indexer is null)
+        catch (Exception error) when (Ordinary(error))
         {
-            return false;
+            return XamlMutationOutcome.Inconsistent;
         }
-
-        indexer.SetValue(slot, value, [index]);
-
-        return true;
     }
 
+    /// <summary>Reads a member, treating a getter that throws as an answer of nothing.</summary>
+    /// <remarks>
+    /// Reading calls a control library's own code, which may throw for reasons that have nothing
+    /// to do with this update. It changes nothing either way, so the caller carries on to whatever
+    /// it would have done had the member not been there.
+    /// </remarks>
     private static object? Read(object owner, string memberName, XamlMemberResolver members)
     {
         XamlMemberDescriptor member = members.Resolve(owner.GetType(), memberName);
 
-        return member switch
+        try
         {
-            { AvaloniaProperty: { } property } when owner is Avalonia.AvaloniaObject avaloniaObject =>
-                avaloniaObject.GetValue(property),
-            { ClrProperty.CanRead: true } => member.ClrProperty!.GetValue(owner),
-            _ => null,
-        };
+            return member switch
+            {
+                { AvaloniaProperty: { } property } when owner is Avalonia.AvaloniaObject avaloniaObject =>
+                    avaloniaObject.GetValue(property),
+                { ClrProperty.CanRead: true } => member.ClrProperty!.GetValue(owner),
+                _ => null,
+            };
+        }
+        catch (Exception error) when (Ordinary(error))
+        {
+            return null;
+        }
     }
 
-    private static bool Write(
+    /// <summary>Writes a member, treating a setter that refuses as a refusal rather than a fault.</summary>
+    /// <remarks>
+    /// One property set, which either happened or did not. A setter that validates and throws has
+    /// refused the value; that is an ordinary answer and leaves the object as it was, which is why
+    /// this never reports a half-made change.
+    /// </remarks>
+    private static XamlMutationOutcome Write(
         object owner,
         string memberName,
         object? value,
@@ -535,27 +695,63 @@ internal static class XamlObjectReplacement
 
         if (!member.IsResolved || member.IsReadOnly || !member.CanWrite)
         {
-            return false;
+            return XamlMutationOutcome.Refused;
         }
 
         try
         {
             XamlDesignValues.Write(owner, member, value);
 
-            return true;
+            return XamlMutationOutcome.Applied;
         }
-        catch (Exception error) when (error is InvalidCastException or ArgumentException or InvalidOperationException)
+        catch (Exception error) when (Ordinary(error))
         {
+            // A CLR property and an attached accessor pair are written by reflection, which wraps
+            // whatever the setter threw; the message a caller reads should be the setter's.
+            Exception refusal = (error as TargetInvocationException)?.InnerException ?? error;
+
             diagnostics.Add(MarkupDiagnostic.Synchronization(
                 XamlLoaderDiagnosticCodes.IncompatibleValue,
-                $"The rebuilt value could not be assigned to {owner.GetType().Name}.{memberName}: {error.Message}",
+                $"The rebuilt value could not be assigned to {owner.GetType().Name}.{memberName}: {refusal.Message}",
                 MarkupDiagnosticSeverity.Error));
 
-            return false;
+            return XamlMutationOutcome.Refused;
         }
     }
 
-    private static bool FailOrder(XamlElement element, List<MarkupDiagnostic> diagnostics, string reason)
+    /// <summary>
+    /// The failures that belong to the document rather than to a broken invariant.
+    /// </summary>
+    /// <remarks>
+    /// A setter refusing a value, a collection refusing to be written through, a getter that
+    /// throws: an update is a thing a user does to a document, and none of these is a reason to
+    /// throw out of one. Anything else — a null reference inside a control, an out-of-memory —
+    /// is not an answer about the document and is left to propagate.
+    /// </remarks>
+    private static bool Ordinary(Exception error) =>
+        error is InvalidOperationException
+            or NotSupportedException
+            or ArgumentException
+            or InvalidCastException
+            or TargetInvocationException;
+
+    /// <summary>Turns a step's outcome into the reported one, describing a refusal.</summary>
+    private static XamlMutationOutcome Report(
+        XamlElement element,
+        List<MarkupDiagnostic> diagnostics,
+        XamlMutationOutcome outcome,
+        string reason) =>
+        outcome switch
+        {
+            XamlMutationOutcome.Applied => XamlMutationOutcome.Applied,
+            XamlMutationOutcome.Refused => Fail(element, diagnostics, reason),
+            _ => Broke(element, diagnostics, reason),
+        };
+
+    private static XamlMutationOutcome FailOrder(
+        XamlElement element,
+        List<MarkupDiagnostic> diagnostics,
+        string reason)
     {
         diagnostics.Add(MarkupDiagnostic.Synchronization(
             XamlLoaderDiagnosticCodes.UpdateNotApplied,
@@ -564,10 +760,29 @@ internal static class XamlObjectReplacement
             element.Document.Uri,
             element.NameSpan));
 
-        return false;
+        return XamlMutationOutcome.Refused;
     }
 
-    private static bool Fail(XamlElement element, List<MarkupDiagnostic> diagnostics, string reason)
+    private static XamlMutationOutcome BrokeOrder(
+        XamlElement element,
+        List<MarkupDiagnostic> diagnostics,
+        string reason)
+    {
+        diagnostics.Add(MarkupDiagnostic.Synchronization(
+            XamlLoaderDiagnosticCodes.SessionRequiresRecreation,
+            $"The children of <{element.Name}> were part-way through being reordered when {reason}. " +
+            "Some have moved and some have not.",
+            MarkupDiagnosticSeverity.Error,
+            element.Document.Uri,
+            element.NameSpan));
+
+        return XamlMutationOutcome.Inconsistent;
+    }
+
+    private static XamlMutationOutcome Fail(
+        XamlElement element,
+        List<MarkupDiagnostic> diagnostics,
+        string reason)
     {
         diagnostics.Add(MarkupDiagnostic.Synchronization(
             XamlLoaderDiagnosticCodes.UpdateNotApplied,
@@ -576,6 +791,22 @@ internal static class XamlObjectReplacement
             element.Document.Uri,
             element.NameSpan));
 
-        return false;
+        return XamlMutationOutcome.Refused;
+    }
+
+    private static XamlMutationOutcome Broke(
+        XamlElement element,
+        List<MarkupDiagnostic> diagnostics,
+        string reason)
+    {
+        diagnostics.Add(MarkupDiagnostic.Synchronization(
+            XamlLoaderDiagnosticCodes.SessionRequiresRecreation,
+            $"<{element.Name}> was part-way through being replaced when {reason}. " +
+            "What it holds now describes neither document.",
+            MarkupDiagnosticSeverity.Error,
+            element.Document.Uri,
+            element.NameSpan));
+
+        return XamlMutationOutcome.Inconsistent;
     }
 }

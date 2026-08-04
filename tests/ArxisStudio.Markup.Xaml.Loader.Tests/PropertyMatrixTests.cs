@@ -647,8 +647,18 @@ public sealed class PropertyMatrixTests
         XamlUpdateResult result = await session.ApplyDocumentUpdateAsync(
             updated, TestContext.Current.CancellationToken);
 
-        Assert.False(result.Applied);
+        // Cleanly: Items refuses before it has removed anything, so the objects are exactly as
+        // they were and the session goes on working. A refusal that had emptied the collection
+        // first would be a different answer, and has to be reported as one.
+        Assert.Equal(XamlUpdateOutcome.RejectedCleanly, result.Outcome);
+        Assert.Equal(XamlSessionState.Usable, session.State);
         Assert.Contains(result.Diagnostics, static d => d.Severity == MarkupDiagnosticSeverity.Error);
+
+        Assert.True(
+            (await session.ApplyDocumentUpdateAsync(
+                session.Document.SetAttribute(
+                    session.Document.Root!, XamlQualifiedName.Parse("Width"), "120"),
+                TestContext.Current.CancellationToken)).Applied);
     }
 
     [AvaloniaFact]

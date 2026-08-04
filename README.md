@@ -1174,6 +1174,28 @@ If an update fails:
 - do not silently discard the new source document;
 - allow a later corrected update.
 
+"When possible" is not a hedge to be resolved by optimism: it is a distinction the result has to
+carry, because only the caller can act on it. Everything that can be checked is checked before the
+first live write, so nearly every failure touches nothing. What cannot be checked in advance is
+user code — a setter that validates, a collection that will not take back what was moved out of
+it — and one of those failing after an earlier write of the same update has landed cannot be
+undone, because the side effects were arbitrary. An update therefore reports which of three things
+happened, and a boolean is not enough:
+
+```csharp
+public enum XamlUpdateOutcome
+{
+    Applied,
+    RejectedCleanly,      // no live object was written; the session is still good
+    RequiresNewSession,   // writing had begun; the session describes neither document
+}
+```
+
+`RequiresNewSession` must mark the session, refuse every later mutation deterministically with a
+stable code, keep the offered document as `PendingDocument` for the replacement session to be built
+from, and never be described in words that claim the objects are unchanged. Do not promise generic
+rollback for arbitrary user code.
+
 #### Runtime diagnostics
 
 Loader diagnostics should cover at least:

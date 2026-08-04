@@ -8,10 +8,11 @@ anything and without recreating what did not have to be recreated.
 ```csharp
 XamlUpdateResult result = await session.ApplyDocumentUpdateAsync(edited, token);
 
-result.Applied;      // whether the objects were changed
-result.Strategy;     // the largest thing it took
+result.Outcome;      // what it did to the objects: applied, refused, or stopped part-way
+result.Strategy;     // the largest thing it would have taken
 result.Changes;      // what was found, in document order
 result.Diagnostics;
+result.Applied;      // Outcome == Applied, for a caller that only wants to know whether to redraw
 ```
 
 The comparison is over the syntax tree rather than the text, which is the point of having a
@@ -19,22 +20,57 @@ lossless one: reindenting a file, adding a comment or reflowing an attribute acr
 changes every offset in it and changes nothing about the objects it describes. Those updates come
 back as `Strategy.None` with no changes at all.
 
-An update that cannot be applied leaves the objects exactly as they were, and the document that was
-offered is kept rather than dropped — the usual reason an update fails is that the author is
-halfway through typing it, and the next keystroke is the correction:
+## What a failed update did
+
+`Outcome` and `Strategy` answer two different questions, and a caller needs both. `Strategy` is
+what the change *would have* taken; `Outcome` is what actually happened to the objects.
+
+| `XamlUpdateOutcome` | The objects | The session |
+| --- | --- | --- |
+| `Applied` | moved to the new document | fine |
+| `RejectedCleanly` | untouched | fine; try again with the next version |
+| `RequiresNewSession` | part-way to the new document | **unusable**; build a new one |
+
+`RejectedCleanly` is the ordinary failure and by far the common one. Everything that can be
+checked is checked before the first live write: the document is compared, includes are resolved,
+every fragment is built and every value converted. So a document caught halfway through being
+typed, a value a member cannot hold, and a fragment that will not build all cost nothing at all.
+The document that was offered is kept rather than dropped, because the next keystroke is usually
+the correction:
 
 ```csharp
-if (!result.Applied && session.PendingDocument is { } refused)
+if (result.Outcome == XamlUpdateOutcome.RejectedCleanly && session.PendingDocument is { } refused)
 {
-    Show(result.Diagnostics, refused);
+    Show(result.Diagnostics, refused);   // and go on using the session
 }
 ```
 
 That covers values as well as syntax. `Margin="6,0,0,0"` is converted the way the same text is
 converted at load — through the member's `TypeConverter`, or through the static `Parse` that Avalonia
 types such as `Thickness` and `CornerRadius` are read by instead. Text the member cannot hold is an
-ordinary user error: a diagnostic with the attribute's span, `Applied` false, the objects untouched,
-and nothing thrown.
+ordinary user error: a diagnostic with the attribute's span, `RejectedCleanly`, the objects
+untouched, and nothing thrown.
+
+`RequiresNewSession` is what cannot be checked in advance: **user code**. A validating setter may
+refuse a value of the right type after an earlier write has already landed, and a collection may
+refuse to take back what was moved out of it. There is no generic rollback for that — what ran
+were constructors, setters, converters and control code with side effects nothing here can
+reverse — so instead of guessing, the session says so:
+
+```csharp
+if (result.Outcome == XamlUpdateOutcome.RequiresNewSession)
+{
+    // session.State is now XamlSessionState.RequiresNewSession, and every further
+    // update or edit on it is refused with AXM3043.
+    session = await XamlLoadSession.CreateAsync(session.PendingDocument!, environment, options, token);
+}
+```
+
+`PendingDocument` is kept for exactly this: it is the state the caller was trying to reach and the
+one the objects are part-way towards. Correct whatever the diagnostics report, then load it.
+
+Reading a session in this state still works — a tool has to be able to show what it was holding —
+but nothing that changes it does.
 
 A tool with a property field should ask before it writes — `XamlMemberDescriptor.ConvertFromText`
 is the same conversion with no side effects, so half a value never reaches the undo history. See
@@ -60,7 +96,10 @@ larger.
 | `RecreateSession` | The root element or `x:Class` changed; make a new session |
 
 `RecreateSession` is refused rather than attempted: the caller holds the root object and a session
-is built around it, so there is nowhere to put a new one.
+is built around it, so there is nowhere to put a new one. It is refused *cleanly* — nothing is
+written, and the session goes on describing the document it loaded until you replace it. This is
+the case where the two properties differ most: `Outcome` says the session is fine, `Strategy` says
+the new document is out of its reach.
 
 ```csharp
 if (result.Strategy == XamlUpdateStrategy.RecreateSession)
@@ -152,17 +191,32 @@ XamlDocument edited = workspace.Apply(
 // 2. Bring the objects in line.
 XamlUpdateResult result = await session.ApplyDocumentUpdateAsync(edited, token);
 
-// 3. Keep the two in agreement whatever happened.
-if (result.Applied)
+// 3. Keep the two in agreement whatever happened. Which of the three happened decides how.
+switch (result.Outcome)
 {
-    await File.WriteAllTextAsync(path, session.Document.GetText(), token);
-}
-else
-{
-    workspace.Undo();      // the document goes back to what the objects still show
-    Show(result.Diagnostics);
+    case XamlUpdateOutcome.Applied:
+        await File.WriteAllTextAsync(path, session.Document.GetText(), token);
+        break;
+
+    case XamlUpdateOutcome.RejectedCleanly:
+        workspace.Undo();      // the document goes back to what the objects still show
+        Show(result.Diagnostics);
+        break;
+
+    case XamlUpdateOutcome.RequiresNewSession:
+        // Undoing would be a lie: the objects moved and cannot be moved back. Reload instead,
+        // and keep the edit — the user meant it, and the new session is built from it.
+        Show(result.Diagnostics);
+        await session.DisposeAsync();
+        session = await XamlLoadSession.CreateAsync(edited, environment, options, token);
+        break;
 }
 ```
+
+The third branch is the one worth writing before you need it. It is rare — it takes a control that
+refuses a value its own type accepts — but a tool that treats every `Applied == false` as
+"undo and carry on" will, on that day, undo a document the objects no longer match and go on
+editing a tree that describes neither.
 
 That last branch is the part worth copying. The document and the objects disagreeing is the one
 state these packages exist to prevent, and a history holding an edit the tree never took would be

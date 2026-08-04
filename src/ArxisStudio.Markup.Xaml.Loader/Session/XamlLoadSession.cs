@@ -92,6 +92,18 @@ public sealed partial class XamlLoadSession : IAsyncDisposable
     /// <summary>Gets the object the document produced.</summary>
     public object RootObject { get; }
 
+    /// <summary>
+    /// Gets whether the objects can still be believed to describe <see cref="Document"/>.
+    /// </summary>
+    /// <remarks>
+    /// <see cref="XamlSessionState.Usable"/> for the whole of an ordinary session's life. It
+    /// becomes <see cref="XamlSessionState.RequiresNewSession"/> only when an update writes to a
+    /// live object and then fails, which is the one thing nothing here can recover from — and from
+    /// then on every mutating operation is refused rather than written onto a tree nobody can
+    /// describe. Reading is still allowed, because a caller has to be able to see what it holds.
+    /// </remarks>
+    public XamlSessionState State { get; private set; } = XamlSessionState.Usable;
+
     /// <summary>Gets everything noticed while loading.</summary>
     public ImmutableArray<MarkupDiagnostic> Diagnostics { get; private set; }
 
@@ -260,6 +272,11 @@ public sealed partial class XamlLoadSession : IAsyncDisposable
 
         return ValueTask.CompletedTask;
     }
+
+    /// <summary>
+    /// Closes the session to further changes, because its objects no longer describe a document.
+    /// </summary>
+    private void RequireRecreation() => State = XamlSessionState.RequiresNewSession;
 
     /// <summary>Hands the projected text to Avalonia's runtime loader.</summary>
     private static object? Load(
