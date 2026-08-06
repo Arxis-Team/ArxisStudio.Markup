@@ -225,6 +225,11 @@ public sealed class XamlDesignSurface : Border, IDisposable
                 break;
 
             case Control control:
+                // Nothing is projected for a root that was hostable as it stood -- it carries its
+                // own resources, styles and variant -- but the insulation still applies: a local
+                // null blocks inheritance, so the host's own view model cannot arrive as this
+                // form's data through a template that happens to be bound to one.
+                _scope.DataContext = null;
                 _scope.Child = control;
                 break;
         }
@@ -329,6 +334,13 @@ public sealed class XamlDesignSurface : Border, IDisposable
         _mirrors.Add(_scope.Bind(
             ThemeVariantScope.RequestedThemeVariantProperty,
             top.GetObservable(TopLevel.RequestedThemeVariantProperty)));
+
+        // The one that is found last and looks like something else entirely. A form's design-time
+        // data is set on its root, because `Design.DataContext` is a property of the window; taking
+        // the content out of the window takes it out of that context too. Without this the bindings
+        // under it go blank and the form measures to nothing, which looks exactly like a form that
+        // failed to load -- and worse, whatever the host was bound to arrives in its place.
+        _mirrors.Add(_scope.Bind(DataContextProperty, top.GetObservable(DataContextProperty)));
 
         if (top is Window window)
         {

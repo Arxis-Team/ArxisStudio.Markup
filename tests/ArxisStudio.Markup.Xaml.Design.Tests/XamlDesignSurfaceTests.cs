@@ -315,6 +315,64 @@ public sealed class XamlDesignSurfaceTests
         Assert.Equal(ThemeVariant.Light, Find<TextBlock>(session, "Text").ActualThemeVariant);
     }
 
+    // -- The context the content would otherwise lose, or inherit wrongly -------------------------
+
+    [AvaloniaFact]
+    public async Task Attach_CarriesTheRootsDataContext()
+    {
+        await using XamlLoadSession session = await LoadAsync(Form());
+
+        var window = session.GetRoot<Window>();
+
+        window.DataContext = "the form's own";
+
+        using var surface = new XamlDesignSurface();
+
+        surface.Attach(session);
+
+        Assert.Equal("the form's own", Find<TextBlock>(session, "Text").DataContext);
+    }
+
+    /// <summary>
+    /// A form must not be shown the host's data.
+    /// </summary>
+    /// <remarks>
+    /// The stand-in usually sits in a template bound to whatever the host is showing, and a data
+    /// context inherits down the tree it is in. Without a local value here, a form that declares no
+    /// design-time data of its own would quietly render against the designer's view model, and the
+    /// bindings that happened to match would look like they were working.
+    /// </remarks>
+    [AvaloniaFact]
+    public async Task TheHostsDataContext_DoesNotReachTheForm()
+    {
+        await using XamlLoadSession session = await LoadAsync(Form());
+
+        using var surface = new XamlDesignSurface();
+
+        surface.Attach(session);
+        surface.DataContext = "the designer's";
+
+        Host(surface);
+
+        Assert.Null(Find<TextBlock>(session, "Text").DataContext);
+    }
+
+    [AvaloniaFact]
+    public async Task TheHostsDataContext_DoesNotReachANonTopLevelRootEither()
+    {
+        await using XamlLoadSession session = await LoadAsync(
+            $"<UserControl xmlns=\"{Avalonia}\" xmlns:x=\"{Xaml}\"><TextBlock x:Name=\"Text\" /></UserControl>");
+
+        using var surface = new XamlDesignSurface();
+
+        surface.Attach(session);
+        surface.DataContext = "the designer's";
+
+        Host(surface);
+
+        Assert.Null(session.GetRoot<UserControl>().DataContext);
+    }
+
     // -- Chrome is data ---------------------------------------------------------------------------
 
     [AvaloniaFact]
