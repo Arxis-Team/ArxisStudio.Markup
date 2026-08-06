@@ -175,8 +175,46 @@ public sealed class XamlObjectMap
         }
 
         map.Walk(document, root, XamlObjectOrigin.Document, new HashSet<object>(ReferenceEqualityComparer.Instance));
+        map.PairTheRoot(document, root);
 
         return map;
+    }
+
+    /// <summary>
+    /// Pairs the document's root element with the object it produced, when nothing else did.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// Every other pair is deduced: Avalonia records where it built an object, and the walk reads
+    /// that position back into the document. The root of an <c>x:Class</c> document has no such
+    /// position, and cannot — the instance is created before the markup is loaded and handed over
+    /// already made, which is the whole purpose of the class. So the one element whose object is
+    /// known without evidence was the one element with no entry, and a document of five elements
+    /// mapped four.
+    /// </para>
+    /// <para>
+    /// It is not deduced here either. <paramref name="root"/> is the object this document produced
+    /// and <c>document.Root</c> is the element that describes it; that is what both arguments mean.
+    /// Asserting it costs nothing and closes the case that matters most to a designer, where a click
+    /// on a form's background found nothing and the form's own properties were unreachable.
+    /// </para>
+    /// <para>
+    /// Only when the walk left both sides free. A root that already paired keeps what it deduced,
+    /// and an element already claimed by another object is not taken from it — either would be this
+    /// method overruling evidence with an assumption, which is the opposite of its purpose.
+    /// </para>
+    /// </remarks>
+    private void PairTheRoot(XamlDocument document, object root)
+    {
+        if (document.Root is not { } element
+            || _elementsByObject.TryGetValue(root, out _)
+            || _objectsByElement.ContainsKey(element))
+        {
+            return;
+        }
+
+        _elementsByObject.AddOrUpdate(root, element);
+        _objectsByElement[element] = root;
     }
 
     /// <summary>

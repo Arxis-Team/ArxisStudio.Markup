@@ -2,6 +2,7 @@ using System;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
+using ArxisStudio.Markup.Xaml;
 using ArxisStudio.Markup.Xaml.Loader.TestControls;
 using Avalonia.Controls;
 using Avalonia.Headless.XUnit;
@@ -70,6 +71,42 @@ public sealed class RootClassTests
 
         // The document itself still says what its author wrote.
         Assert.Contains("Click=\"NotWrittenYet\"", session.Document.GetText(), StringComparison.Ordinal);
+    }
+
+    /// <summary>
+    /// The root of an <c>x:Class</c> document is in the object map like everything else.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// It was not, and the reason is the whole point of <c>x:Class</c>: the instance is created
+    /// first and handed to Avalonia already made, so Avalonia never records where it built it — and
+    /// the map pairs an object to an element by exactly that recorded position. Every child paired
+    /// and the root did not, which measures as a document of five elements mapping four.
+    /// </para>
+    /// <para>
+    /// A designer feels this immediately. Clicking a form's background selects nothing, and the
+    /// properties of the form itself — a window's Title, a control's size — are the ones nothing can
+    /// reach.
+    /// </para>
+    /// </remarks>
+    [AvaloniaFact]
+    public async Task TheRootOfAnXClassDocumentIsMappedToItsElement()
+    {
+        await using XamlLoadSession session = await XamlLoadSession.CreateAsync(
+            Parse(ViewXaml(content: "  <Button Content=\"Save\" />\n")),
+            Environment(),
+            cancellationToken: TestContext.Current.CancellationToken);
+
+        XamlElement root = Assert.IsType<XamlElement>(session.Document.Root);
+
+        Assert.Same(session.RootObject, session.Objects.GetObject(root));
+        Assert.Same(root, session.Objects.GetElement(session.RootObject));
+
+        // The child was never the problem, and saying so keeps this test honest about which half
+        // of the pairing it is defending.
+        XamlElement button = Assert.Single(root.ContentElements);
+
+        Assert.NotNull(session.Objects.GetObject(button));
     }
 
     [AvaloniaFact]
