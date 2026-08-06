@@ -9,6 +9,30 @@ what happened, not a description of what is.
 The three rules in [`README.md`](README.md) are never traded away for any of it: the document stays
 the source of truth, an unchanged document round-trips byte for byte, and unknown content survives.
 
+## Unreleased
+
+### A fourth package: `ArxisStudio.Markup.Xaml.Design`
+
+The commonest document in any Avalonia application is a window, and a `Window` is a `TopLevel`:
+Avalonia parents it at construction, so the object the loader correctly produces for
+`MainWindow.axaml` is an object nothing can display. Every host that shows forms has had to invent
+the same detach-and-transplant, and discover in the same order that the content then loses the
+window's styles, resources, background, theme variant and inherited text properties — and last,
+that it loses the window's `DataContext`, which looks like a form that failed to load rather than
+like the cause.
+
+`XamlDesignSurface` is that answer written once. It borrows what Avalonia will not let two elements
+have at once — the content, the resource dictionary and the styles — and gives all of it back on
+detach; it binds background, size and theme variant, so an edit through the session shows without a
+rebuild; and it publishes the window's chrome as data for a host to draw from. The root is
+untouched, so the object map, `x:Class`, member resolution and every edit path are exactly as they
+were.
+
+It hosts and does not select: no adorner, no handle, no input, no inspector. See
+[ADR 0012](docs/adr/0012-hosting-a-top-level-root-is-a-package-beside-the-loader.md).
+
+No existing public API changed.
+
 ## 0.2.0-preview.2
 
 What a review of the previous release found. Four things, all of them cases where the code was

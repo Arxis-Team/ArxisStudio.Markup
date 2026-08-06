@@ -88,12 +88,23 @@ all take the `Window` and the write lands in the document; none of them knows a 
 What is missing is the other direction — the edit does not show, because what is on screen is the
 stand-in and what was painted is the window.
 
-So the surrogate mirrors the root rather than copying it once. `Resources` is a settable property
-and is shared by reference, so a resource added to the window appears in the surrogate's lookup
-immediately; `Styles` is itself an `IStyle` and is nested by reference for the same reason; the
-scalar properties — `Background`, `Width`, `Height`, `RequestedThemeVariant` and the inherited text
-properties — are bound. An edit then shows without rebuilding anything, which also means without
-losing focus or scroll position inside the form.
+So the surrogate mirrors the root rather than copying it once. The scalar properties —
+`Background`, `Width`, `Height` and `RequestedThemeVariant` — are bound, so an edit shows without
+rebuilding anything, which also means without losing focus or scroll position inside the form.
+
+Resources and styles cannot be bound, and implementing this established that they cannot be shared
+either. Avalonia allows a resource dictionary exactly one owner and says so — "The
+ResourceDictionary already has a parent" — and it seals the interfaces a forwarder would have to
+implement, with a member literally named *this interface is not implementable by user code*. Both
+refusals are right: the dictionary belongs to the window, and the window still exists.
+
+So they are **borrowed**: moved onto the stand-in for as long as it is attached, and given back on
+detach, alongside the content that has to move for the same reason. Moving rather than copying is
+not a compromise but the better answer — merged dictionaries and theme dictionaries are separate
+objects with owners of their own, so a copy reaches only the entries it can enumerate and flattens
+away exactly the structure a themed form depends on, silently. One surface owns a root at a time,
+and while it is held the root reports none of the three. The document is unchanged and still says
+what it says, which is what every edit path reads.
 
 One category cannot be mirrored, because the surrogate has no title bar to mirror it onto: `Title`,
 `Icon`, `WindowDecorations`, `CanResize`, `WindowState` are properties of the window *as a window*.
@@ -146,5 +157,9 @@ drawn in the wrong place and the new code belongs to a host or an editor, not he
   nothing about selection. Neither gains a dependency on the other.
 - The loader's public surface is unchanged, so this can be built without touching a contract anything
   already depends on.
-- Nothing is implemented yet. This ADR records where the work goes and why the obvious alternative —
-  a second root on the session — was rejected, so that neither is re-argued from scratch.
+- `XamlDesignSurface` implements this, with 22 tests. Two of them assert the premise rather than the
+  code — a window really cannot be hosted, and its content really does lose the window's resources
+  when taken out of it — because both were found by experiment and are expensive to rediscover.
+- The architecture tests gained a fourth package: the dependency direction, the Avalonia rule and
+  the documentation and description requirements all now cover it. A package the guards do not
+  enumerate is a package with no guards.
