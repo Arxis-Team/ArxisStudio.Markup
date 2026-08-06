@@ -5,6 +5,7 @@ using ArxisStudio.Markup.Xaml.Loader;
 using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Controls.Primitives;
+using Avalonia.Data;
 using Avalonia.Headless.XUnit;
 using Avalonia.Media;
 using Avalonia.Styling;
@@ -192,6 +193,34 @@ public sealed class XamlDesignSurfaceTests
         surface.Attach(session);
 
         Assert.Equal(Colors.Red, Assert.IsAssignableFrom<ISolidColorBrush>(surface.Background).Color);
+    }
+
+    /// <summary>
+    /// A background the document did not ask for is not the form's background.
+    /// </summary>
+    /// <remarks>
+    /// A window always ends up with one — the application hosting the designer supplies a themed
+    /// default — so binding straight through would paint every undecided form in the tool's own
+    /// colour and claim it was the form's. The priority used here is what a theme uses.
+    /// </remarks>
+    [AvaloniaFact]
+    public async Task AThemedDefaultBackground_IsNotShown_ButALocalOneIs()
+    {
+        await using XamlLoadSession session = await LoadAsync(Form());
+
+        var window = session.GetRoot<Window>();
+
+        window.SetValue(TemplatedControl.BackgroundProperty, Brushes.Black, BindingPriority.Style);
+
+        using var surface = new XamlDesignSurface();
+
+        surface.Attach(session);
+
+        Assert.Null(surface.Background);
+
+        window.SetValue(TemplatedControl.BackgroundProperty, Brushes.Lime);
+
+        Assert.Equal(Colors.Lime, Assert.IsAssignableFrom<ISolidColorBrush>(surface.Background).Color);
     }
 
     [AvaloniaFact]

@@ -3,7 +3,10 @@ using System.Collections.Generic;
 using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Controls.Primitives;
+using Avalonia.Data;
+using Avalonia.Diagnostics;
 using Avalonia.Media;
+using Avalonia.Reactive;
 using Avalonia.Styling;
 using ArxisStudio.Markup.Xaml.Loader;
 
@@ -252,6 +255,8 @@ public sealed class XamlDesignSurface : Border, IDisposable
 
         Return();
 
+        ClearValue(BackgroundProperty);
+
         Root = null;
         IsTopLevel = false;
         HasContent = false;
@@ -292,6 +297,23 @@ public sealed class XamlDesignSurface : Border, IDisposable
         }
     }
 
+    /// <summary>
+    /// Shows the root's background when the document gave it one, and nothing otherwise.
+    /// </summary>
+    /// <remarks>
+    /// Where the value came from is the whole question, and <c>IsSet</c> does not answer it — it is
+    /// true for a themed value as much as for a declared one. The priority does answer it, and
+    /// reading a priority is what <c>GetDiagnostic</c> is for. Anything weaker than a local value
+    /// was supplied by the application the designer itself is running under, and showing it would
+    /// paint every undecided form in the tool's own colour while claiming it was the form's.
+    /// </remarks>
+    private void ShowBackground(TopLevel top)
+    {
+        AvaloniaPropertyValue declared = top.GetDiagnostic(TemplatedControl.BackgroundProperty);
+
+        Background = declared.Priority <= BindingPriority.LocalValue ? declared.Value as IBrush : null;
+    }
+
     /// <summary>Gives all of it back, in the reverse order it was taken.</summary>
     private void Return()
     {
@@ -327,7 +349,15 @@ public sealed class XamlDesignSurface : Border, IDisposable
     /// <summary>Binds and shares everything the content would have inherited from the root.</summary>
     private void Project(TopLevel top)
     {
-        _mirrors.Add(this.Bind(BackgroundProperty, top.GetObservable(TemplatedControl.BackgroundProperty)));
+        // Not bound straight through, because a root that declares no background still has one:
+        // the application the designer is itself running under supplies a themed default, and
+        // painting that would show every undecided form in the tool's own colour while claiming it
+        // was the form's. Only a value the document set is a value to show, and a host's own card
+        // shows through when there is none.
+        _mirrors.Add(top.GetPropertyChangedObservable(TemplatedControl.BackgroundProperty)
+            .Subscribe(new AnonymousObserver<AvaloniaPropertyChangedEventArgs>(_ => ShowBackground(top))));
+
+        ShowBackground(top);
         _mirrors.Add(this.Bind(WidthProperty, top.GetObservable(WidthProperty)));
         _mirrors.Add(this.Bind(HeightProperty, top.GetObservable(HeightProperty)));
 
