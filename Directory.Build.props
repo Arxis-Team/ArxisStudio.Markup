@@ -35,15 +35,16 @@
     <ShouldUnsetParentConfigurationAndPlatform>false</ShouldUnsetParentConfigurationAndPlatform>
   </PropertyGroup>
 
-  <!-- Reproducible builds. -->
+  <!--
+    Nothing here is published. The three libraries under src/ are consumed by project reference,
+    so `dotnet pack` should produce nothing rather than three packages nobody asked for — and
+    saying so once here is better than four copies of it saying so per directory.
+  -->
   <PropertyGroup>
-    <Deterministic>true</Deterministic>
-    <ContinuousIntegrationBuild Condition="'$(CI)' == 'true'">true</ContinuousIntegrationBuild>
-    <EmbedUntrackedSources>true</EmbedUntrackedSources>
+    <IsPackable>false</IsPackable>
   </PropertyGroup>
 
   <PropertyGroup>
-    <Authors>ArxisStudio</Authors>
     <Company>ArxisStudio</Company>
     <Product>ArxisStudio.Markup</Product>
     <Copyright>Copyright (c) ArxisStudio</Copyright>

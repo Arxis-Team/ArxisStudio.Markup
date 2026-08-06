@@ -14,7 +14,6 @@ Development proceeds one milestone at a time. Do not skip ahead; do not start ru
 dotnet restore
 dotnet build -c Release -warnaserror
 dotnet test -c Release
-dotnet pack -c Release            # three packages from src/
 
 # one test project
 dotnet test tests/ArxisStudio.Markup.Tests -c Release

@@ -18,7 +18,9 @@ The current development scope is limited to the markup libraries described in th
 
 Milestones 0 to 14 are implemented, and every item under *Definition of done for the first preview release* holds. The state at the end of Milestone 11 is tagged `v0.1.0-preview`; milestones 12 to 14 came after it, and the current version is `0.2.0-preview.2`. This document stays the contract: the milestones below are the plan, not a record of what happened.
 
-Documentation for people building on these packages lives in [`docs/api/`](docs/api/README.md), what changed between releases is in [`CHANGELOG.md`](CHANGELOG.md), and what the packages deliberately do not do is in [`docs/limitations.md`](docs/limitations.md).
+The three libraries are consumed by **project reference**. They are not published to NuGet, the repository builds no packages, and it runs no CI workflow of its own; the version above names a state of the source rather than something installable. Milestone 11 below asked for preview packages, and that is the one item of the plan deliberately not carried out.
+
+Documentation for people building on these libraries lives in [`docs/api/`](docs/api/README.md), what changed between releases is in [`CHANGELOG.md`](CHANGELOG.md), and what they deliberately do not do is in [`docs/limitations.md`](docs/limitations.md).
 
 The initial package family consists of:
 

@@ -1,6 +1,10 @@
 # Changelog
 
-What changed between releases of the three packages, which are versioned and released together.
+What changed between versions of the three libraries, which are versioned together.
+
+They are consumed by project reference and are not published to NuGet. Entries below
+`0.2.0-preview.2` describe a time when they were, and are left as written: they are a record of
+what happened, not a description of what is.
 
 The three rules in [`README.md`](README.md) are never traded away for any of it: the document stays
 the source of truth, an unchanged document round-trips byte for byte, and unknown content survives.
@@ -64,6 +68,19 @@ straight to the next waiter rather than dropped for whoever wakes first, a lock 
 enough to move a link in a list and never across an `await`, a lease released exactly once, and a
 non-blocking `TryEnter` for the synchronous edits which also refuses while anyone is *waiting*.
 Cancelling a waiter removes that one turn and can never release ownership it did not hold.
+
+### No longer published, and no CI of its own
+
+The three libraries are referenced as projects rather than installed as packages, so everything
+that existed to make a package went with the packaging: the licence expression, the packed readme
+and licence file, the tags, the symbol package, the repository and Source Link metadata, and the
+architecture test that guarded them. `dotnet pack` now produces nothing anywhere in the repository
+rather than three packages nobody asked for. The GitHub Actions workflow is gone with them.
+
+What stayed is what was never about distribution: warnings as errors, the architecture tests that
+enforce the package boundaries, XML documentation on public APIs, and the `PublicAPI.*.txt`
+tracking — that one is a review discipline, and an addition to the public surface should still show
+up in a diff somebody reads.
 
 ### Migrating
 

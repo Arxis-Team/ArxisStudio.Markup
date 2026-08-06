@@ -7,7 +7,7 @@ describes at the same time, lets a user change either, and never damages the fil
 designer is the obvious such tool, but so is a hot-reload host, a linter, a refactoring command, or
 a migration script.
 
-Written against **v0.2.0-preview.2**. Every example here uses only published API.
+Written against **0.2.0-preview.2**. Every example here uses only public API.
 
 ## The guides
 
@@ -36,8 +36,10 @@ Reference the highest one you need; it brings the others with it. A tool that on
 markup — a formatter, a linter, a codemod — needs `ArxisStudio.Markup.Xaml` and never loads
 Avalonia at all.
 
+These are not published packages. Reference the projects:
+
 ```xml
-<PackageReference Include="ArxisStudio.Markup.Xaml.Loader" Version="0.2.0-preview.2" />
+<ProjectReference Include="../ArxisStudio.Markup/src/ArxisStudio.Markup.Xaml.Loader/ArxisStudio.Markup.Xaml.Loader.csproj" />
 ```
 
 ## Three rules everything here follows

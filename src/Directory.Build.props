@@ -3,52 +3,28 @@
   <Import Project="$([MSBuild]::GetPathOfFileAbove('Directory.Build.props', '$(MSBuildThisFileDirectory)../'))" />
 
   <!--
-    The one place the three shipping packages are versioned. They are released together and
-    reference each other by this exact version, so a package built from a different definition
-    could only ever be wrong.
+    The one place the three libraries are versioned. They are developed and referenced together,
+    so a version set anywhere else could only ever disagree with this one. Nothing is published:
+    the version stamps the assemblies and gives CHANGELOG.md something to name.
   -->
   <PropertyGroup>
     <VersionPrefix>0.2.0</VersionPrefix>
     <VersionSuffix>preview.2</VersionSuffix>
   </PropertyGroup>
 
-  <PropertyGroup>
-    <IsPackable>true</IsPackable>
-    <GenerateDocumentationFile>true</GenerateDocumentationFile>
-    <IncludeSymbols>true</IncludeSymbols>
-    <SymbolPackageFormat>snupkg</SymbolPackageFormat>
-    <PackageLicenseExpression>MIT</PackageLicenseExpression>
-    <PackageReadmeFile>README.md</PackageReadmeFile>
-    <PackageTags>avalonia;xaml;axaml;markup;round-trip;parser</PackageTags>
-  </PropertyGroup>
-
   <!--
-    Where the source of a package came from, and how to get back to it. RepositoryUrl and
-    RepositoryCommit are what Source Link writes into the symbols, so a consumer stepping into
-    one of these packages lands in the commit it was built from rather than in decompiled IL.
-    PublishRepositoryUrl is what puts the URL in the package rather than leaving it local.
-
-    Source Link itself needs no PackageReference: the .NET SDK carries the GitHub provider and
-    turns it on for a repository with a git directory. What it does need is a build that is
-    deterministic and knows its own remote, which is the rest of this and the root props file.
+    The contract requires XML documentation on all public APIs, and a consumer referencing these
+    projects gets it in the IDE from the file beside the assembly.
   -->
   <PropertyGroup>
-    <PackageProjectUrl>https://github.com/Arxis-Team/ArxisStudio.Markup</PackageProjectUrl>
-    <RepositoryUrl>https://github.com/Arxis-Team/ArxisStudio.Markup.git</RepositoryUrl>
-    <RepositoryType>git</RepositoryType>
-    <PublishRepositoryUrl>true</PublishRepositoryUrl>
-    <EnableSourceLink>true</EnableSourceLink>
+    <GenerateDocumentationFile>true</GenerateDocumentationFile>
   </PropertyGroup>
-
-  <ItemGroup>
-    <None Include="$(MSBuildThisFileDirectory)../README.md" Pack="true" PackagePath="\" Visible="false" />
-    <None Include="$(MSBuildThisFileDirectory)../LICENSE" Pack="true" PackagePath="\" Visible="false" />
-  </ItemGroup>
 
   <!--
     Public API surface tracking. New public API must be declared in the project's
-    PublicAPI.Unshipped.txt or the build fails. Enabled from milestone 0 while the
-    surface is still empty, so no retrospective inventory is ever needed.
+    PublicAPI.Unshipped.txt or the build fails. This is a review discipline rather than a
+    distribution one — it is what makes an addition to the surface show up in a diff somebody
+    reads — so it stays now that nothing is published.
   -->
   <ItemGroup>
     <PackageReference Include="Microsoft.CodeAnalysis.PublicApiAnalyzers" PrivateAssets="all" IncludeAssets="runtime; build; native; contentfiles; analyzers; buildtransitive" />
