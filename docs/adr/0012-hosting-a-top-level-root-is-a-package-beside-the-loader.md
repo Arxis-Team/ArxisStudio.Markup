@@ -78,6 +78,37 @@ an update rebuilt the root.
 edit path work exactly as they do now. The document is still the truth; only the presentation gets a
 stand-in.
 
+### A projection, not a snapshot
+
+The question that settles the shape is: what happens when the inspector edits a property of the
+window itself?
+
+The edit needs nothing new. The map has the root, so `GetMembers`, `GetValueInfo` and `SetValue`
+all take the `Window` and the write lands in the document; none of them knows a surrogate exists.
+What is missing is the other direction — the edit does not show, because what is on screen is the
+stand-in and what was painted is the window.
+
+So the surrogate mirrors the root rather than copying it once. `Resources` is a settable property
+and is shared by reference, so a resource added to the window appears in the surrogate's lookup
+immediately; `Styles` is itself an `IStyle` and is nested by reference for the same reason; the
+scalar properties — `Background`, `Width`, `Height`, `RequestedThemeVariant` and the inherited text
+properties — are bound. An edit then shows without rebuilding anything, which also means without
+losing focus or scroll position inside the form.
+
+One category cannot be mirrored, because the surrogate has no title bar to mirror it onto: `Title`,
+`Icon`, `WindowDecorations`, `CanResize`, `WindowState` are properties of the window *as a window*.
+The surrogate publishes them as data — this root is a `TopLevel` and declares these — and the host
+draws chrome from them. That is still hosting; it is not selecting, and the boundary below is
+unaffected.
+
+### One writer for size
+
+`Width` and `Height` acquire two candidate writers: the projection from the document, and the
+host's resize gesture. Only one of them may write, and it is the document. A resize edits the
+document through the session and the projection picks the new value up; the surrogate never writes
+back. The alternative is a feedback loop in which the form shivers on every frame of a drag, which
+is a classic failure of this kind of tool and is much easier to avoid than to debug.
+
 ### The loader does not change
 
 Worth stating, because it is what makes the split cheap. A host already re-reads the session after
@@ -106,7 +137,8 @@ drawn in the wrong place and the new code belongs to a host or an editor, not he
   deletes it.
 - A host that shows `Window`-rooted documents stops writing its own detach-and-transplant, and stops
   discovering the `DataContext` consequence the hard way. FormsDesigner's `FormViewModel` becomes a
-  caller instead of an implementation.
+  caller instead of an implementation, and its size handling changes: it seeds the card from
+  `root.Width` once today and then lets the canvas own it, which drifts from the document silently.
 - Forms are shown as they are written: their own styles, resources, background, theme variant and
   inherited text properties reach the surface. That is the whole point — a designer that shows
   something other than what the document says is worse than no designer.
