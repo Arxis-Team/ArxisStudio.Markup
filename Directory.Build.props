@@ -17,6 +17,24 @@
     <EnforceCodeStyleInBuild>true</EnforceCodeStyleInBuild>
   </PropertyGroup>
 
+  <!--
+    Carry the configuration into project references.
+
+    MSBuild decides a reference's configuration from the configuration table of the solution being
+    built, and defaults to *unsetting* it for any project that table does not mention. Building this
+    repository through its own solution that never happens, because every project is in it. Building
+    it as a referenced dependency of another repository's solution, none of them is: the reference
+    that enters here keeps whatever configuration it was given, and every reference below it falls
+    back to the default and builds Debug.
+
+    The result is a Release build that quietly links Debug assemblies, which is why this is set
+    here rather than worked around by whoever is consuming the repository. A consumer cannot reach
+    inside this project graph to fix it.
+  -->
+  <PropertyGroup>
+    <ShouldUnsetParentConfigurationAndPlatform>false</ShouldUnsetParentConfigurationAndPlatform>
+  </PropertyGroup>
+
   <!-- Reproducible builds. -->
   <PropertyGroup>
     <Deterministic>true</Deterministic>
