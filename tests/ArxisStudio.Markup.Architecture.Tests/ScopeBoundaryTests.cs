@@ -24,15 +24,6 @@ public sealed class ScopeBoundaryTests
         "MSBuild",
     ];
 
-    /// <summary>
-    /// Analyzers that only run at build time and ship no runtime code, so they do not
-    /// bring the forbidden capability into the packages.
-    /// </summary>
-    private static readonly string[] AllowedExceptions =
-    [
-        "Microsoft.CodeAnalysis.PublicApiAnalyzers",
-    ];
-
     [Fact]
     public void Packages_DoNotReferenceProjectSystemOrCompilerInfrastructure()
     {
@@ -42,7 +33,6 @@ public sealed class ScopeBoundaryTests
         {
             offenders.AddRange(
                 RepositoryLayout.PackageReferencesOf(package)
-                    .Where(static id => !AllowedExceptions.Contains(id, StringComparer.Ordinal))
                     .Where(static id => ForbiddenPackagePrefixes.Any(
                         prefix => id.StartsWith(prefix, StringComparison.Ordinal)))
                     .Select(id => $"{package} -> {id}"));

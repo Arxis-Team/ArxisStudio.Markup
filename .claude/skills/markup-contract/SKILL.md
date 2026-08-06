@@ -57,7 +57,7 @@ Also verify the three invariants held:
 
 ## 5. Public API surface
 
-`PublicApiAnalyzers` fails the build on undeclared public API. Every addition belongs in the owning project's `PublicAPI.Unshipped.txt`. Review that file's diff deliberately — it is the reviewable summary of what this milestone added to the public surface.
+Nothing tracks it any more — there is no `PublicAPI.*.txt` and no analyzer enforcing one — so read the diff for it yourself. Go through every new or changed `public` type and member and ask whether each one is meant to be part of the surface, whether its nullable annotations say what they should, and whether `docs/api/` still describes it. Say what was added in the commit message; that is now the only record.
 
 ## 6. Deviations
 

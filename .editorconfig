@@ -39,11 +39,6 @@ csharp_style_prefer_readonly_struct = true:suggestion
 # Public API must be documented (contract: "Add XML documentation to all public APIs").
 dotnet_diagnostic.CS1591.severity = warning
 
-# Public API surface tracking.
-dotnet_diagnostic.RS0016.severity = error
-dotnet_diagnostic.RS0017.severity = error
-dotnet_diagnostic.RS0037.severity = none
-
 [{tests,benchmarks,samples}/**/*.cs]
 # Public API documentation is required of the shipping packages only.
 dotnet_diagnostic.CS1591.severity = none

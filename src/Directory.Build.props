@@ -20,16 +20,4 @@
     <GenerateDocumentationFile>true</GenerateDocumentationFile>
   </PropertyGroup>
 
-  <!--
-    Public API surface tracking. New public API must be declared in the project's
-    PublicAPI.Unshipped.txt or the build fails. This is a review discipline rather than a
-    distribution one — it is what makes an addition to the surface show up in a diff somebody
-    reads — so it stays now that nothing is published.
-  -->
-  <ItemGroup>
-    <PackageReference Include="Microsoft.CodeAnalysis.PublicApiAnalyzers" PrivateAssets="all" IncludeAssets="runtime; build; native; contentfiles; analyzers; buildtransitive" />
-    <AdditionalFiles Include="PublicAPI.Shipped.txt" />
-    <AdditionalFiles Include="PublicAPI.Unshipped.txt" />
-  </ItemGroup>
-
 </Project>

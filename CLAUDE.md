@@ -74,9 +74,8 @@ Do not use `XDocument` as the round-trip representation — it cannot preserve t
 
 - Central package management: every version lives in `Directory.Packages.props`, `PackageReference` elements carry no `Version`.
 - Nullable enabled, warnings as errors, implicit usings disabled, XML docs required on public APIs.
-- `Microsoft.CodeAnalysis.PublicApiAnalyzers` is active: new public API must be added to the owning project's `PublicAPI.Unshipped.txt` or the build fails. Run `tools/sync-public-api.py <project>` to derive that file from the build rather than writing it by hand — `dotnet format analyzers --diagnostics RS0016` looks like the official route and stops converging part-way. Review the resulting diff: it is the reviewable summary of what the change added to the public surface.
-- The surface in `PublicAPI.Shipped.txt` is a promise. Removing or renaming an entry there is a breaking change and belongs in a diff someone read on purpose; the sync tool refuses to do it and says so. Adding goes to `Unshipped` as usual.
-- Public API documentation lives in `docs/api/`. A change to the published surface that leaves those guides describing something else is not finished.
+- The public surface is not tracked in a file. There is no `PublicAPI.*.txt` and no analyzer enforcing one, so what a change adds to the surface is visible only in the diff of the code itself — read it with that in mind, and say in the commit message what was added.
+- Public API documentation lives in `docs/api/`. A change to the public surface that leaves those guides describing something else is not finished.
 - Prefer immutable public models. Keep reflection behind cached resolver services. No global mutable state, no service locators.
 - Add a test with every functional change; add a failing test before fixing a bug.
 - Small commits with one architectural purpose each.

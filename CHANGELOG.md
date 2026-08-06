@@ -77,10 +77,15 @@ and licence file, the tags, the symbol package, the repository and Source Link m
 architecture test that guarded them. `dotnet pack` now produces nothing anywhere in the repository
 rather than three packages nobody asked for. The GitHub Actions workflow is gone with them.
 
+The `PublicAPI.Shipped.txt` / `PublicAPI.Unshipped.txt` tracking went too, with the analyzer that
+enforced it, the test that guarded the wiring and the tool that maintained the files. It existed to
+make the published surface a promise; with nothing published there is no promise to keep, and the
+ceremony cost more than it was worth. What a change adds to the public API is now visible in the
+diff of the code, and nowhere else.
+
 What stayed is what was never about distribution: warnings as errors, the architecture tests that
-enforce the package boundaries, XML documentation on public APIs, and the `PublicAPI.*.txt`
-tracking — that one is a review discipline, and an addition to the public surface should still show
-up in a diff somebody reads.
+enforce the package boundaries, and XML documentation on public APIs, which a project reference
+delivers to the IDE from the file beside the assembly.
 
 ### Migrating
 
