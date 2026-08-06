@@ -27,6 +27,56 @@ public sealed class ResourcesAndTemplatesTests
     private static readonly Uri PaletteUri = new("file:///Themes/Palette.axaml");
     private static readonly Uri StylesUri = new("file:///Themes/Styles.axaml");
 
+    /// <summary>
+    /// Pins the theme-dictionary lookup limitation, so that the day it stops being true is a day
+    /// somebody hears about.
+    /// </summary>
+    /// <remarks>
+    /// The load is not what is limited — the dictionaries arrive keyed by real variants and the
+    /// tree reports the variant the document asked for. It is the lookup: the overload that is
+    /// supposed to use the element's own variant does not find what the overload that is told the
+    /// variant finds, on the same element in the same moment. Recorded in `docs/limitations.md`,
+    /// asserted here so the record cannot quietly go stale.
+    /// </remarks>
+    [AvaloniaFact]
+    public async Task AResourceInAThemeDictionary_IsFoundOnlyWhenTheVariantIsStated()
+    {
+        const string xaml = """
+            <Window xmlns="https://github.com/avaloniaui"
+                    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+                    RequestedThemeVariant="Dark">
+              <Window.Resources>
+                <ResourceDictionary>
+                  <ResourceDictionary.ThemeDictionaries>
+                    <ResourceDictionary x:Key="Light">
+                      <SolidColorBrush x:Key="Paper">#FFFFFF</SolidColorBrush>
+                    </ResourceDictionary>
+                    <ResourceDictionary x:Key="Dark">
+                      <SolidColorBrush x:Key="Paper">#000000</SolidColorBrush>
+                    </ResourceDictionary>
+                  </ResourceDictionary.ThemeDictionaries>
+                </ResourceDictionary>
+              </Window.Resources>
+              <TextBlock x:Name="Text" />
+            </Window>
+            """;
+
+        await using XamlLoadSession session = await Load(xaml, Setup().Environment);
+
+        var window = session.GetRoot<Window>();
+        Control text = window.FindControl<Control>("Text")!;
+
+        // The load is right, and so is the variant the tree reports.
+        Assert.Equal(2, window.Resources.ThemeDictionaries.Count);
+        Assert.Equal(ThemeVariant.Dark, text.ActualThemeVariant);
+
+        // Told the variant it already has, the lookup succeeds.
+        Assert.True(text.TryFindResource("Paper", text.ActualThemeVariant, out _));
+
+        // Left to find it, it does not. This is the limitation, and this line is the whole of it.
+        Assert.False(text.TryFindResource("Paper", out _));
+    }
+
     private static (XamlLoadEnvironment Environment, InMemoryResourceResolver Resources) Setup()
     {
         var resources = new InMemoryResourceResolver();

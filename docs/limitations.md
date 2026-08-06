@@ -185,6 +185,14 @@ the document — see `docs/adr/0005-resource-includes.md` for why. That leaves f
 
 ## Everything else
 
+- **A resource in a theme dictionary needs the variant stated.** Everything about the load is
+  right: the theme dictionaries arrive keyed by real `ThemeVariant`s, and `ActualThemeVariant` on
+  the loaded tree is whatever the document asked for. But the ambient overload of Avalonia's
+  `TryFindResource(key, out value)` does not find such a resource on a tree this library loaded and
+  nobody has shown, while `TryFindResource(key, element.ActualThemeVariant, out value)` finds it —
+  same element, same moment. Why the ambient overload does not pick the element's own variant up
+  has not been established, so nothing here works around it. A host that looks resources up on a
+  loaded document should state the variant.
 - **No sandbox.** Loading a document runs constructors, setters, type converters, markup
   extensions and any custom control code the document reaches. A caller loading XAML it did not
   write is running code it did not write, and this library makes no attempt to prevent that.
