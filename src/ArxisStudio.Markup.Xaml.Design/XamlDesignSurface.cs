@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Runtime.CompilerServices;
 using Avalonia;
 using Avalonia.Controls;
+using Avalonia.Controls.Presenters;
 using Avalonia.Controls.Primitives;
 using Avalonia.Data;
 using Avalonia.Diagnostics;
@@ -65,7 +66,7 @@ namespace ArxisStudio.Markup.Xaml.Design;
 /// <c>docs/adr/0012-hosting-a-top-level-root-is-a-package-beside-the-loader.md</c>.
 /// </para>
 /// </remarks>
-public sealed class XamlDesignSurface : Border, IDisposable
+public sealed class XamlDesignSurface : Border, IStyleHost, IDisposable
 {
     /// <summary>Defines the <see cref="Root"/> property.</summary>
     public static readonly DirectProperty<XamlDesignSurface, object?> RootProperty =
@@ -138,6 +139,31 @@ public sealed class XamlDesignSurface : Border, IDisposable
 
     /// <summary>Creates a surface with nothing attached to it.</summary>
     public XamlDesignSurface() => Child = _scope;
+
+    /// <summary>
+    /// Where the form looks for styles, which is the application and not the tool showing it.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// Styles cascade down the tree an element is in, and the tree a form is in belongs to the
+    /// designer. So the designer's own look reached the form: its <c>TextBlock</c> rule set the
+    /// font of every label in the document, its <c>TextBox</c> rule gave every field the tool's
+    /// height and border, and a form was shown wearing the designer's clothes rather than its own.
+    /// A designer that renders a form differently from the application that will run it has failed
+    /// at the one thing it is for.
+    /// </para>
+    /// <para>
+    /// Cutting the chain outright would be worse: the form would lose the application's theme too,
+    /// and controls with no theme have no template and draw nothing at all. So the chain skips
+    /// what is between — the item, the canvas, the window — and resumes at the application, which
+    /// is the one style host a form legitimately shares with the tool.
+    /// </para>
+    /// <para>
+    /// A host whose own styles must reach the form can still put them on the surface: everything
+    /// below this point is inside it, and <see cref="Attach"/> keeps the root's styles there too.
+    /// </para>
+    /// </remarks>
+    IStyleHost? IStyleHost.StylingParent => Application.Current;
 
     /// <summary>The object the attached session produced, or <see langword="null"/> when detached.</summary>
     /// <remarks>
@@ -329,12 +355,21 @@ public sealed class XamlDesignSurface : Border, IDisposable
         // with its own ContentTemplate, is content that renders perfectly well outside a designer.
         // Dropping it would draw a blank card that nothing could tell apart from an empty form, so
         // it is presented the way the window would have presented it.
-        _scope.Child = _borrowed switch
+        Control? hosted = _borrowed switch
         {
             Control control => control,
             null => null,
-            _ => new ContentControl { Content = _borrowed, ContentTemplate = top.ContentTemplate },
+            // A presenter and not a ContentControl: a presenter builds its child itself, where a
+            // control would first need a theme to give it a template — and the form's style chain
+            // now starts at the application, which a host is under no obligation to have themed.
+            _ => new ContentPresenter { Content = _borrowed, ContentTemplate = top.ContentTemplate },
         };
+
+        _scope.Child = hosted;
+
+        // A presenter realises its child when it is measured, and a caller that only wants to know
+        // whether there is anything to show should not have to lay the tree out first.
+        (hosted as ContentPresenter)?.UpdateChild();
 
         // Merged into ours rather than put in its place. Avalonia refuses a second owner, which is
         // why the root has to let go first — but once it has, the dictionary can be merged, and then

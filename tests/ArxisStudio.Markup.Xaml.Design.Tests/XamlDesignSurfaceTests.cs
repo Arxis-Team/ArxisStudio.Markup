@@ -602,6 +602,65 @@ public sealed class XamlDesignSurfaceTests
         Assert.False(surface.HasContent);
     }
 
+    // -- The host's own look stays the host's --------------------------------------------------------
+
+    /// <summary>
+    /// A form is shown wearing its own clothes, not the tool's.
+    /// </summary>
+    /// <remarks>
+    /// Styles cascade down the tree an element is in, and the tree a form is in belongs to whatever
+    /// is showing it — so a designer's own <c>TextBlock</c> rule would set the font of every label
+    /// in every document it opened, and the form would be rendered as the designer looks rather
+    /// than as the application will run it.
+    /// </remarks>
+    [AvaloniaFact]
+    public async Task TheHostsStylesDoNotReachTheForm()
+    {
+        await using XamlLoadSession session = await LoadAsync(Form());
+
+        using var surface = new XamlDesignSurface();
+
+        surface.Attach(session);
+
+        var host = new Window { Content = surface, Width = 900, Height = 600 };
+
+        host.Styles.Add(new Style(x => x.OfType<TextBlock>())
+        {
+            Setters = { new Setter(TextBlock.FontSizeProperty, 42d) },
+        });
+
+        host.Show();
+        host.UpdateLayout();
+
+        // The tool's rule matches its own text and stops at the stand-in.
+        Assert.NotEqual(42d, Find<TextBlock>(session, "Text").FontSize);
+    }
+
+    [AvaloniaFact]
+    public async Task TheFormsOwnStylesStillReachIt()
+    {
+        await using XamlLoadSession session = await LoadAsync(Form(
+            declarations:
+            "<Window.Styles><Style Selector=\"TextBlock\"><Setter Property=\"FontSize\" Value=\"33\" /></Style></Window.Styles>"));
+
+        using var surface = new XamlDesignSurface();
+
+        surface.Attach(session);
+
+        var host = new Window { Content = surface, Width = 900, Height = 600 };
+
+        host.Styles.Add(new Style(x => x.OfType<TextBlock>())
+        {
+            Setters = { new Setter(TextBlock.FontSizeProperty, 42d) },
+        });
+
+        host.Show();
+        host.UpdateLayout();
+
+        // Cutting the tool out must not cut the document out with it.
+        Assert.Equal(33d, Find<TextBlock>(session, "Text").FontSize);
+    }
+
     // -- Thread affinity ----------------------------------------------------------------------------
 
     [AvaloniaFact]
