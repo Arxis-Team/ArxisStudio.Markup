@@ -102,6 +102,73 @@ public sealed class XamlDesignSurfaceTests
         Assert.True(Find<TextBlock>(session, "Text").Bounds.Width > 0);
     }
 
+    /// <summary>
+    /// A templated control inside the form is built, which is more than the form being present.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// A <see cref="TextBlock"/> needs no template and draws from a bare tree, so every hosting test
+    /// above passes for a surface that delivers no styles at all. A <see cref="Button"/> does not: no
+    /// control theme, no template, nothing on screen and no exception either — the form simply loads
+    /// and is invisible.
+    /// </para>
+    /// <para>
+    /// This exists because that shipped. An attempt to keep the host's styles away from the form
+    /// re-declared <c>IStyleHost.StylingParent</c> to skip the tree between here and the application;
+    /// the two tests written for it asked whether the host's styles arrived and whether the form's own
+    /// did, and both passed, because both are satisfied by a form nothing styles. The button is the
+    /// question neither of them asked.
+    /// </para>
+    /// </remarks>
+    [AvaloniaFact]
+    public async Task Attach_LeavesTheFormWhereItsControlThemesCanReachIt()
+    {
+        await using XamlLoadSession session = await LoadAsync(
+            Form(content: "<Button x:Name=\"Press\" Content=\"press\" />"));
+
+        using var surface = new XamlDesignSurface();
+
+        surface.Attach(session);
+
+        Host(surface);
+
+        var button = Find<Button>(session, "Press");
+
+        Assert.NotNull(button.Template);
+        Assert.NotEmpty(button.GetVisualChildren());
+        Assert.True(button.Bounds.Width > 0);
+    }
+
+    /// <summary>The same for a root that is hosted as it stands, which is the commoner form.</summary>
+    /// <remarks>
+    /// A <c>UserControl</c> is itself templated, so under this root the question is asked twice: the
+    /// root has to find its own theme before there is a presenter to put the button in, and a form
+    /// whose root cannot build has content nobody ever sees. This is the shape the sample opens.
+    /// </remarks>
+    [AvaloniaFact]
+    public async Task Attach_LeavesAHostedRootWhereItsControlThemesCanReachIt()
+    {
+        await using XamlLoadSession session = await LoadAsync(
+            $"<UserControl xmlns=\"{Avalonia}\" xmlns:x=\"{Xaml}\" Width=\"400\" Height=\"200\">"
+            + "<StackPanel x:Name=\"Stack\"><Button x:Name=\"Press\" Content=\"press\" /></StackPanel>"
+            + "</UserControl>");
+
+        using var surface = new XamlDesignSurface();
+
+        surface.Attach(session);
+
+        Host(surface);
+
+        var root = session.GetRoot<UserControl>();
+        var stack = Assert.IsType<StackPanel>(root.FindControl<Control>("Stack"));
+        var button = Assert.IsType<Button>(root.FindControl<Control>("Press"));
+
+        Assert.NotEmpty(root.GetVisualChildren());
+        Assert.True(stack.Bounds.Height > 0);
+        Assert.NotNull(button.Template);
+        Assert.True(button.Bounds.Width > 0);
+    }
+
     [AvaloniaFact]
     public async Task Attach_HostsANonTopLevelRootAsItStands()
     {
@@ -600,65 +667,6 @@ public sealed class XamlDesignSurfaceTests
 
         Assert.True(surface.IsTopLevel);
         Assert.False(surface.HasContent);
-    }
-
-    // -- The host's own look stays the host's --------------------------------------------------------
-
-    /// <summary>
-    /// A form is shown wearing its own clothes, not the tool's.
-    /// </summary>
-    /// <remarks>
-    /// Styles cascade down the tree an element is in, and the tree a form is in belongs to whatever
-    /// is showing it — so a designer's own <c>TextBlock</c> rule would set the font of every label
-    /// in every document it opened, and the form would be rendered as the designer looks rather
-    /// than as the application will run it.
-    /// </remarks>
-    [AvaloniaFact]
-    public async Task TheHostsStylesDoNotReachTheForm()
-    {
-        await using XamlLoadSession session = await LoadAsync(Form());
-
-        using var surface = new XamlDesignSurface();
-
-        surface.Attach(session);
-
-        var host = new Window { Content = surface, Width = 900, Height = 600 };
-
-        host.Styles.Add(new Style(x => x.OfType<TextBlock>())
-        {
-            Setters = { new Setter(TextBlock.FontSizeProperty, 42d) },
-        });
-
-        host.Show();
-        host.UpdateLayout();
-
-        // The tool's rule matches its own text and stops at the stand-in.
-        Assert.NotEqual(42d, Find<TextBlock>(session, "Text").FontSize);
-    }
-
-    [AvaloniaFact]
-    public async Task TheFormsOwnStylesStillReachIt()
-    {
-        await using XamlLoadSession session = await LoadAsync(Form(
-            declarations:
-            "<Window.Styles><Style Selector=\"TextBlock\"><Setter Property=\"FontSize\" Value=\"33\" /></Style></Window.Styles>"));
-
-        using var surface = new XamlDesignSurface();
-
-        surface.Attach(session);
-
-        var host = new Window { Content = surface, Width = 900, Height = 600 };
-
-        host.Styles.Add(new Style(x => x.OfType<TextBlock>())
-        {
-            Setters = { new Setter(TextBlock.FontSizeProperty, 42d) },
-        });
-
-        host.Show();
-        host.UpdateLayout();
-
-        // Cutting the tool out must not cut the document out with it.
-        Assert.Equal(33d, Find<TextBlock>(session, "Text").FontSize);
     }
 
     // -- Thread affinity ----------------------------------------------------------------------------
