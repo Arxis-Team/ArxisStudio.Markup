@@ -9,6 +9,8 @@ using Avalonia.Data;
 using Avalonia.Headless.XUnit;
 using Avalonia.Media;
 using Avalonia.Styling;
+using System.Linq;
+using Avalonia.VisualTree;
 using Xunit;
 
 namespace ArxisStudio.Markup.Xaml.Design.Tests;
@@ -450,6 +452,169 @@ public sealed class XamlDesignSurfaceTests
 
         Assert.Equal(800d, window.Width);
         Assert.Equal(Colors.Red, Assert.IsAssignableFrom<ISolidColorBrush>(window.Background).Color);
+    }
+
+    // -- What belongs to the host stays the host's ------------------------------------------------
+
+    [AvaloniaFact]
+    public async Task Attach_KeepsTheSurfacesOwnResources()
+    {
+        await using XamlLoadSession session = await LoadAsync(Form(
+            declarations:
+            "<Window.Resources><SolidColorBrush x:Key=\"Accent\">#FF0000</SolidColorBrush></Window.Resources>"));
+
+        using var surface = new XamlDesignSurface();
+
+        surface.Resources["Frame"] = Brushes.Fuchsia;
+
+        surface.Attach(session);
+
+        // Both at once: the root's while it is held, and the host's throughout.
+        Assert.True(surface.TryFindResource("Accent", out _));
+        Assert.True(surface.TryFindResource("Frame", out _));
+
+        surface.Detach();
+
+        Assert.False(surface.TryFindResource("Accent", out _));
+        Assert.True(surface.TryFindResource("Frame", out _));
+    }
+
+    [AvaloniaFact]
+    public async Task Attach_KeepsTheSurfacesOwnStyles()
+    {
+        await using XamlLoadSession session = await LoadAsync(Form(
+            declarations:
+            "<Window.Styles><Style Selector=\"TextBlock\"><Setter Property=\"FontSize\" Value=\"42\" /></Style></Window.Styles>"));
+
+        using var surface = new XamlDesignSurface();
+
+        var own = new Style();
+
+        surface.Styles.Add(own);
+        surface.Attach(session);
+
+        Assert.Equal(2, surface.Styles.Count);
+
+        surface.Detach();
+
+        // The borrowed one went home; the host's did not go with it.
+        Assert.Single(surface.Styles);
+        Assert.Same(own, surface.Styles[0]);
+        Assert.Single(session.GetRoot<Window>().Styles);
+    }
+
+    // -- One surface owns a root at a time ---------------------------------------------------------
+
+    /// <summary>
+    /// The second surface is refused rather than quietly broken.
+    /// </summary>
+    /// <remarks>
+    /// Unguarded, the second borrows what the first left behind — a null content and an empty
+    /// dictionary — records itself as a donor anyway, and whichever detaches last writes those
+    /// substitutes back and empties the window. The first detach looks like it worked.
+    /// </remarks>
+    [AvaloniaFact]
+    public async Task Attach_RefusesARootAnotherSurfaceIsAlreadyStandingInFor()
+    {
+        await using XamlLoadSession session = await LoadAsync(Form(
+            declarations:
+            "<Window.Resources><SolidColorBrush x:Key=\"Accent\">#FF0000</SolidColorBrush></Window.Resources>"));
+
+        var window = session.GetRoot<Window>();
+        object? content = window.Content;
+
+        using var first = new XamlDesignSurface();
+        using var second = new XamlDesignSurface();
+
+        first.Attach(session);
+
+        Assert.Throws<InvalidOperationException>(() => second.Attach(session));
+
+        // The refusal leaves both the root and the second surface as they were.
+        Assert.Null(second.Root);
+        Assert.False(second.IsTopLevel);
+
+        second.Detach();
+        first.Detach();
+
+        Assert.Same(content, window.Content);
+        Assert.True(window.TryFindResource("Accent", out _));
+    }
+
+    [AvaloniaFact]
+    public async Task Attach_LetsTheSameSurfaceReattachTheSameRoot()
+    {
+        await using XamlLoadSession session = await LoadAsync(Form());
+
+        using var surface = new XamlDesignSurface();
+
+        surface.Attach(session);
+        surface.Attach(session);
+
+        Assert.Same(session.RootObject, surface.Root);
+        Assert.True(surface.HasContent);
+    }
+
+    // -- Content that is not a control --------------------------------------------------------------
+
+    /// <summary>
+    /// A window's content need not be a control, and dropping it would draw a blank card.
+    /// </summary>
+    [AvaloniaFact]
+    public async Task Attach_PresentsContentThatIsNotAControl()
+    {
+        await using XamlLoadSession session = await LoadAsync(
+            $"<Window xmlns=\"{Avalonia}\" xmlns:x=\"{Xaml}\">plain text content</Window>");
+
+        var window = session.GetRoot<Window>();
+
+        Assert.IsType<string>(window.Content);
+
+        using var surface = new XamlDesignSurface();
+
+        surface.Attach(session);
+
+        Assert.True(surface.HasContent);
+
+        Host(surface);
+
+        // Presented the way the window would have presented it, so the text is really on screen.
+        Assert.Contains(
+            surface.GetVisualDescendants().OfType<TextBlock>(),
+            text => text.Text == "plain text content");
+
+        surface.Detach();
+
+        Assert.Same("plain text content", window.Content);
+    }
+
+    [AvaloniaFact]
+    public async Task Attach_ReportsNoContent_WhenTheRootHasNone()
+    {
+        await using XamlLoadSession session = await LoadAsync(
+            $"<Window xmlns=\"{Avalonia}\" xmlns:x=\"{Xaml}\" />");
+
+        using var surface = new XamlDesignSurface();
+
+        surface.Attach(session);
+
+        Assert.True(surface.IsTopLevel);
+        Assert.False(surface.HasContent);
+    }
+
+    // -- Thread affinity ----------------------------------------------------------------------------
+
+    [AvaloniaFact]
+    public async Task Detach_RefusesAThreadThatMayNotTouchTheseObjects()
+    {
+        await using XamlLoadSession session = await LoadAsync(Form());
+
+        using var surface = new XamlDesignSurface();
+
+        surface.Attach(session);
+
+        await Assert.ThrowsAsync<InvalidOperationException>(
+            () => Task.Run(surface.Detach, TestContext.Current.CancellationToken));
     }
 
     // -- Lifetime ---------------------------------------------------------------------------------

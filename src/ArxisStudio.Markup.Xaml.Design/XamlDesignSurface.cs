@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Runtime.CompilerServices;
 using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Controls.Primitives;
@@ -8,6 +9,7 @@ using Avalonia.Diagnostics;
 using Avalonia.Media;
 using Avalonia.Reactive;
 using Avalonia.Styling;
+using Avalonia.Threading;
 using ArxisStudio.Markup.Xaml.Loader;
 
 namespace ArxisStudio.Markup.Xaml.Design;
@@ -122,6 +124,18 @@ public sealed class XamlDesignSurface : Border, IDisposable
     private readonly List<IStyle> _borrowedStyles = [];
     private bool _disposed;
 
+    /// <summary>
+    /// Which surface is standing in for which root.
+    /// </summary>
+    /// <remarks>
+    /// One surface owns a root at a time, and the price of not enforcing it is silent: the second
+    /// surface borrows what the first left behind — a null content and an empty dictionary — and
+    /// records itself as a donor anyway, so whichever detaches last writes those substitutes back
+    /// and empties the window. The first detach looks like it worked, which is what makes it a
+    /// trap rather than an error.
+    /// </remarks>
+    private static readonly ConditionalWeakTable<TopLevel, XamlDesignSurface> StandingIn = [];
+
     /// <summary>Creates a surface with nothing attached to it.</summary>
     public XamlDesignSurface() => Child = _scope;
 
@@ -205,7 +219,10 @@ public sealed class XamlDesignSurface : Border, IDisposable
     /// <param name="session">The session whose root to stand in for.</param>
     /// <exception cref="ArgumentNullException"><paramref name="session"/> is <see langword="null"/>.</exception>
     /// <exception cref="ObjectDisposedException">This surface has been disposed.</exception>
-    /// <exception cref="InvalidOperationException">Called from a thread that may not touch the session.</exception>
+    /// <exception cref="InvalidOperationException">
+    /// Called from a thread that may not touch the session, or another surface is already standing
+    /// in for this root.
+    /// </exception>
     public void Attach(XamlLoadSession session)
     {
         ArgumentNullException.ThrowIfNull(session);
@@ -222,6 +239,16 @@ public sealed class XamlDesignSurface : Border, IDisposable
         switch (Root)
         {
             case TopLevel top:
+                if (StandingIn.TryGetValue(top, out XamlDesignSurface? already)
+                    && !ReferenceEquals(already, this))
+                {
+                    Root = null;
+
+                    throw new InvalidOperationException(
+                        "Another XamlDesignSurface is already standing in for this root. "
+                        + "One surface owns a root at a time; detach the other one first.");
+                }
+
                 IsTopLevel = true;
                 Borrow(top);
                 Project(top);
@@ -241,9 +268,21 @@ public sealed class XamlDesignSurface : Border, IDisposable
     }
 
     /// <summary>Lets go of the attached root, giving back anything taken from it.</summary>
-    /// <remarks>Detaching twice is not an error, and detaching when nothing is attached does nothing.</remarks>
+    /// <remarks>
+    /// <para>Detaching twice is not an error, and detaching when nothing is attached does nothing.</para>
+    /// <para>
+    /// Checked for thread access like <see cref="Attach"/>, and for the same reason: giving a root
+    /// its content, resources and styles back is mutating the same Avalonia objects that taking
+    /// them was. The dispatcher is asked rather than the session, because a host may well have
+    /// disposed the session first — that is the ordinary teardown order — and a disposed session
+    /// answers a thread question with <see cref="ObjectDisposedException"/>.
+    /// </para>
+    /// </remarks>
+    /// <exception cref="InvalidOperationException">Called from a thread that may not touch these objects.</exception>
     public void Detach()
     {
+        Dispatcher.UIThread.VerifyAccess();
+
         foreach (IDisposable mirror in _mirrors)
         {
             mirror.Dispose();
@@ -263,6 +302,7 @@ public sealed class XamlDesignSurface : Border, IDisposable
     }
 
     /// <summary>Detaches, and refuses to attach again.</summary>
+    /// <exception cref="InvalidOperationException">Called from a thread that may not touch these objects.</exception>
     public void Dispose()
     {
         if (_disposed)
@@ -280,13 +320,30 @@ public sealed class XamlDesignSurface : Border, IDisposable
     {
         _donor = top;
 
+        StandingIn.Add(top, this);
+
         _borrowed = top.Content;
         top.Content = null;
-        _scope.Child = _borrowed as Control;
 
+        // A window's content need not be a control: a string, or a view model the window resolves
+        // with its own ContentTemplate, is content that renders perfectly well outside a designer.
+        // Dropping it would draw a blank card that nothing could tell apart from an empty form, so
+        // it is presented the way the window would have presented it.
+        _scope.Child = _borrowed switch
+        {
+            Control control => control,
+            null => null,
+            _ => new ContentControl { Content = _borrowed, ContentTemplate = top.ContentTemplate },
+        };
+
+        // Merged into ours rather than put in its place. Avalonia refuses a second owner, which is
+        // why the root has to let go first — but once it has, the dictionary can be merged, and then
+        // the host's own resources stay reachable the whole time instead of being set aside. A key
+        // both declare resolves to the host's, which is the right way round: the host's are the
+        // frame around the form, not something the form may quietly redefine.
         _borrowedResources = top.Resources;
         top.Resources = new ResourceDictionary();
-        Resources = _borrowedResources;
+        Resources.MergedDictionaries.Add(_borrowedResources);
 
         _borrowedStyles.AddRange(top.Styles);
         top.Styles.Clear();
@@ -307,6 +364,14 @@ public sealed class XamlDesignSurface : Border, IDisposable
     /// was supplied by the application the designer itself is running under, and showing it would
     /// paint every undecided form in the tool's own colour while claiming it was the form's.
     /// </remarks>
+    /// <remarks>
+    /// One transition cannot be seen from here, and it is worth naming rather than pretending
+    /// otherwise: a change of priority that leaves the effective value untouched — a document
+    /// declaring locally the very brush instance a theme was already supplying, or clearing one —
+    /// raises no property-changed notification, so this is not re-run. Avalonia offers no
+    /// observable of a value's priority, only the one-shot <c>GetDiagnostic</c>, so there is
+    /// nothing to subscribe to. Re-attaching re-reads it. Recorded in <c>docs/limitations.md</c>.
+    /// </remarks>
     private void ShowBackground(TopLevel top)
     {
         AvaloniaPropertyValue declared = top.GetDiagnostic(TemplatedControl.BackgroundProperty);
@@ -322,12 +387,13 @@ public sealed class XamlDesignSurface : Border, IDisposable
             return;
         }
 
-        // Released here before being added there: the collection an owner is being taken from has
-        // to let go first, which is the whole reason any of this is a move rather than a share.
-        Styles.Clear();
-
+        // Exactly the borrowed ones, and released here before being added there: the collection an
+        // owner is being taken from has to let go first, which is the whole reason any of this is a
+        // move rather than a share. Clearing the collection would take the host's own styles with
+        // them, and nothing would ever put those back.
         foreach (IStyle style in _borrowedStyles)
         {
+            Styles.Remove(style);
             _donor.Styles.Add(style);
         }
 
@@ -335,12 +401,15 @@ public sealed class XamlDesignSurface : Border, IDisposable
 
         if (_borrowedResources is not null)
         {
-            Resources = new ResourceDictionary();
+            Resources.MergedDictionaries.Remove(_borrowedResources);
             _donor.Resources = _borrowedResources;
+
             _borrowedResources = null;
         }
 
         _donor.Content = _borrowed;
+
+        StandingIn.Remove(_donor);
 
         _donor = null;
         _borrowed = null;
