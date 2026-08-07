@@ -587,6 +587,61 @@ public sealed class ResourcesAndTemplatesTests
         Assert.NotNull(session.GetElement(badge));
     }
 
+    /// <summary>
+    /// The half a templated parent does not catch.
+    /// </summary>
+    /// <remarks>
+    /// A presenter building an <c>AccessText</c> out of string content leaves
+    /// <c>TemplatedParent</c> null, so the rule that catches ordinary template output does not
+    /// catch this one, and inheritance handed it the button's own origin. A caller asking the map
+    /// which controls the user may edit got the button's label among them — offered on a design
+    /// surface as something to select and resize, with no element behind it to say what it was.
+    /// </remarks>
+    [AvaloniaFact]
+    public async Task ALabelAControlBuiltFromItsContentIsNotOfTheDocument()
+    {
+        (XamlLoadEnvironment environment, _) = Setup();
+
+        const string markup = """
+            <ContentPresenter xmlns='https://github.com/avaloniaui' Content='1' Width='120' Height='40' />
+            """;
+
+        await using XamlLoadSession session = await Load(markup, environment);
+
+        var presenter = session.GetRoot<Avalonia.Controls.Presenters.ContentPresenter>();
+
+        presenter.Measure(new Avalonia.Size(1000, 1000));
+        presenter.Arrange(new Avalonia.Rect(0, 0, 120, 40));
+        presenter.UpdateChild();
+
+        TextBlock label = presenter.GetVisualDescendants().OfType<TextBlock>().First();
+
+        // The map has to be rebuilt while the label already exists, which is what an edit does and
+        // what a designer therefore does constantly. Built before it existed, the label is simply
+        // unknown and the lookup's own fallback answers correctly — which is why this only ever
+        // went wrong after the first edit.
+        XamlUpdateResult update = await session.ApplyDocumentUpdateAsync(
+            XamlDocument.Parse(markup.Replace("Width='120'", "Width='160'"),
+                new XamlParseOptions { DocumentUri = ViewUri }),
+            TestContext.Current.CancellationToken);
+
+        Assert.True(update.Applied, string.Join(" | ", update.Diagnostics));
+
+        // The premise: Avalonia records no templated parent for a label a presenter built out of
+        // string content, so the rule that catches ordinary template output is blind to this one.
+        Assert.Null(label.TemplatedParent);
+
+        // Inheritance used to hand it the presenter's own origin, and the map then claimed the
+        // document had declared a label it never mentions. The document's origin is claimed only
+        // where a declaration was found now.
+        Assert.NotEqual(XamlObjectOrigin.Document, session.GetOrigin(label));
+        Assert.Null(session.GetElement(label));
+
+        // What the document did write is unaffected, and still leads back to its own element.
+        Assert.Equal(XamlObjectOrigin.Document, session.GetOrigin(presenter));
+        Assert.NotNull(session.GetElement(presenter));
+    }
+
     [AvaloniaFact]
     public async Task AControlThemeAppliesToTheControlItTargets()
     {

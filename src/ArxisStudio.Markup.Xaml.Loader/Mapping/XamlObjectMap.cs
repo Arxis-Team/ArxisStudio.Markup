@@ -54,6 +54,18 @@ public sealed class XamlObjectMap
 
     private Uri? _documentSourceUri;
 
+    /// <summary>
+    /// The object the document produced, which is of the document whatever else is known about it.
+    /// </summary>
+    /// <remarks>
+    /// Held because the rule below asks whether an object was declared, and the root of an
+    /// <c>x:Class</c> document was not — it is created before the markup loads and handed over
+    /// already made, so Avalonia records no position for it. Everything else with no declaration is
+    /// something the run time produced; the root is the one exception, and it is the same exception
+    /// <see cref="PairTheRoot"/> exists for.
+    /// </remarks>
+    private object? _root;
+
     private XamlObjectMap(
         TextProjection projection,
         IReadOnlyDictionary<Uri, TextProjection> fragments,
@@ -173,6 +185,8 @@ public sealed class XamlObjectMap
             map._elementsByObject.AddOrUpdate(target, element);
             map._carried.Add(target);
         }
+
+        map._root = root;
 
         map.Walk(document, root, XamlObjectOrigin.Document, new HashSet<object>(ReferenceEqualityComparer.Instance));
         map.PairTheRoot(document, root);
@@ -323,10 +337,20 @@ public sealed class XamlObjectMap
         // built. Belonging to a template is a property of the object itself, not of when the
         // walk happened to run, and answering "run-time generated" here would let template
         // output be mistaken for something a caller may edit.
-        return runtimeObject is StyledElement { TemplatedParent: not null }
+        return Undeclared(runtimeObject);
+    }
+
+    /// <summary>What an object is when this document did not declare it.</summary>
+    /// <remarks>
+    /// One rule, asked in two places — of an object the walk reached and could not find a
+    /// declaration for, and of an object the walk never saw at all. Both are the same question, and
+    /// answering it differently in the two places is how an object's provenance would come to
+    /// depend on when it happened to be asked about.
+    /// </remarks>
+    private static XamlObjectOrigin Undeclared(object current) =>
+        current is StyledElement { TemplatedParent: not null }
             ? XamlObjectOrigin.Template
             : XamlObjectOrigin.RuntimeGenerated;
-    }
 
     /// <summary>Gets the document an object was declared in.</summary>
     /// <param name="runtimeObject">The object to look up.</param>
@@ -358,6 +382,23 @@ public sealed class XamlObjectMap
         XamlObjectOrigin origin = DetermineOrigin(
             current,
             declaration.IsFromIncludedDocument ? XamlObjectOrigin.Resource : inherited);
+
+        // Inheritance carries the document's origin down to children, and that is right for
+        // children the document wrote. It is wrong for the rest, and a templated parent does not
+        // catch them all: a presenter building an AccessText out of string content leaves that
+        // property null, so a button's own label arrived here claiming to be of the document, with
+        // no declaration anywhere to say what it was. A caller asking the map which controls the
+        // user may edit got the label among them and had no way to tell.
+        //
+        // So the claim is only made where a declaration was found. Nothing else in the map changes:
+        // an object with no element was never paired to one, and this only stops it answering a
+        // question about provenance with somebody else's answer.
+        if (origin is XamlObjectOrigin.Document
+            && declaration is { Element: null, SourceUri: null }
+            && !ReferenceEquals(current, _root))
+        {
+            origin = Undeclared(current);
+        }
 
         XamlElement? element = declaration.Element;
 

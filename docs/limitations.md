@@ -193,6 +193,13 @@ the document — see `docs/adr/0005-resource-includes.md` for why. That leaves f
   same element, same moment. Why the ambient overload does not pick the element's own variant up
   has not been established, so nothing here works around it. A host that looks resources up on a
   loaded document should state the variant.
+- **An object's origin is what the walk could establish, not a guarantee.** The map claims
+  `XamlObjectOrigin.Document` only where it found a declaration for an object, so a control's own
+  label — the one a `ContentPresenter` builds out of string content, for which Avalonia records no
+  templated parent — reads as run-time generated rather than as something the document wrote. It is
+  still not `Template`: nothing available says which template produced it. A caller asking "may the
+  user edit this?" gets a better answer from `GetElement`, which is `null` for anything the document
+  does not name.
 - **A stand-in cannot see a background change that only changes priority.**
   `XamlDesignSurface` shows a root's `Background` only when the document declared it, which it
   decides from the value's priority. A transition that changes the priority and leaves the effective
