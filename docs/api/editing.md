@@ -74,8 +74,11 @@ editor.UnwrapElement(border);
 panel that declares `<Panel.Resources>` is before its first control and after the resources. A value
 at or beyond the end appends. `element.IndexInContent` is the index an element already sits at, so
 "put it back where it was" needs no counting. Inserting copies the indentation of the sibling it
-lands next to. Inserting into a self-closing element is rejected rather than guessed at — give it a
-start and end tag first.
+lands next to. Inserting into a self-closing element opens it: `<Grid />`
+becomes `<Grid><Button /></Grid>`, with the whitespace before the slash going with the slash. That is
+the element's one lossless expansion rather than a choice among several, and an empty container is
+written self-closing by every convention there is — so a tool that inserts into one would otherwise
+be doing the same tag surgery by hand, against spans, which is what this editor exists to avoid.
 
 `RemoveElement` takes the whole line when the element had that line to itself, so removal does not
 leave its indentation behind as a blank.

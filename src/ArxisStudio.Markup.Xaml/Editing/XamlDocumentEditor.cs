@@ -171,10 +171,7 @@ public sealed class XamlDocumentEditor
     /// <returns>This editor, for chaining.</returns>
     /// <exception cref="ArgumentNullException"><paramref name="parent"/> or <paramref name="xaml"/> is <see langword="null"/>.</exception>
     /// <exception cref="ArgumentOutOfRangeException"><paramref name="index"/> is negative.</exception>
-    /// <exception cref="InvalidOperationException">
-    /// <paramref name="parent"/> belongs to a different document, or is self-closing and so has
-    /// nowhere to put content.
-    /// </exception>
+    /// <exception cref="InvalidOperationException"><paramref name="parent"/> belongs to a different document.</exception>
     public XamlDocumentEditor InsertElement(XamlElement parent, int index, string xaml)
     {
         ArgumentNullException.ThrowIfNull(parent);
@@ -184,14 +181,51 @@ public sealed class XamlDocumentEditor
 
         if (parent.IsEmpty)
         {
-            throw new InvalidOperationException(
-                $"Element '{parent.Name}' is self-closing and has no content to insert into. " +
-                "Give it a start and end tag first.");
+            return OpenAndInsert(parent, xaml);
         }
 
         (int position, string prefix, string suffix) = ContentInsertionPointFor(parent, index);
 
         return Insert(position, prefix + xaml + suffix);
+    }
+
+    /// <summary>
+    /// Gives a self-closing element a content region, and puts the first child into it.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// This used to be refused, on the grounds that where to put content in an element that has
+    /// nowhere to put it was a guess. It is not a guess: an element with no content has exactly one
+    /// lossless expansion, <c>&lt;Grid /&gt;</c> to <c>&lt;Grid&gt;&lt;/Grid&gt;</c>, and nothing
+    /// about the document's meaning changes on the way. What the refusal actually bought was every
+    /// caller writing the same text surgery — find the slash, rewrite the tag, close it by name —
+    /// against spans, which is the one thing an editor exists to keep them away from.
+    /// </para>
+    /// <para>
+    /// It is not a rare shape either. A designer that writes <c>&lt;Grid Width="200" /&gt;</c> and
+    /// then drops a button into it meets it immediately, and so does anybody whose file was written
+    /// by hand: an empty container is written self-closing by every convention there is.
+    /// </para>
+    /// <para>
+    /// The whitespace before the slash goes with it, so <c>&lt;Grid /&gt;</c> closes as
+    /// <c>&lt;Grid&gt;</c> rather than <c>&lt;Grid &gt;</c>. The name is written back exactly as the
+    /// document wrote it, prefix and all, because a closing tag that renames its element is not the
+    /// same document.
+    /// </para>
+    /// </remarks>
+    private XamlDocumentEditor OpenAndInsert(XamlElement parent, string xaml)
+    {
+        int end = parent.StartTagSpan.End;
+        int start = end - 2;
+
+        while (start > parent.NameSpan.End && char.IsWhiteSpace(_document.SourceText[start - 1]))
+        {
+            start--;
+        }
+
+        return Replace(
+            TextSpan.FromBounds(start, end),
+            $">{xaml}</{parent.Name}>");
     }
 
     /// <summary>Inserts a copy of an element as a child of another.</summary>

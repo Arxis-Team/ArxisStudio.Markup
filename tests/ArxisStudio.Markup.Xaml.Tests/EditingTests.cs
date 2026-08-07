@@ -342,13 +342,24 @@ public sealed class EditingTests
         Assert.Contains("Width=\"2\"", result, StringComparison.Ordinal);
     }
 
+    /// <summary>
+    /// Superseded: this used to assert that inserting into a self-closing element threw.
+    /// </summary>
+    /// <remarks>
+    /// The refusal was never protecting anything — an element with no content has exactly one
+    /// lossless expansion — and what it cost was every caller doing the tag surgery itself, against
+    /// spans. See <c>InsertElement_OpensASelfClosingParent</c> below.
+    /// </remarks>
     [Fact]
-    public void InsertingIntoASelfClosingElementIsRejectedRatherThanGuessed()
+    public void InsertingIntoASelfClosingElementOpensIt()
     {
         XamlDocument document = XamlDocument.Parse("<Grid><Button /></Grid>");
 
-        Assert.Throws<InvalidOperationException>(
-            () => document.InsertElement(Element(document, "Button"), 0, "<Border />"));
+        string result = document
+            .InsertElement(Element(document, "Button"), 0, "<Border />")
+            .GetText();
+
+        Assert.Equal("<Grid><Button><Border /></Button></Grid>", result);
     }
 
     [Fact]
@@ -652,4 +663,46 @@ public sealed class EditingTests
             XamlElementPath.Of(member.ContentElements.Single()).Resolve(document));
     }
 
+    /// <summary>
+    /// A self-closing parent is opened rather than refused.
+    /// </summary>
+    /// <remarks>
+    /// An empty container is written self-closing by every convention there is, so a tool that
+    /// inserts into one meets this immediately — a designer that writes <c>&lt;Grid /&gt;</c> and
+    /// then drops a control into it, or anybody whose file was written by hand.
+    /// </remarks>
+    [Fact]
+    public void InsertElement_OpensASelfClosingParent()
+    {
+        XamlDocument document = XamlDocument.Parse("""<Canvas><Grid Width="200" /></Canvas>""");
+
+        XamlElement grid = document.Root!.Elements.First();
+
+        XamlDocument updated = document.Edit()
+            .InsertElement(grid, 0, """<Button Content="1" />""")
+            .Apply();
+
+        // The whitespace before the slash goes with the slash, and the closing tag is written with
+        // the name the document used.
+        Assert.Equal(
+            """<Canvas><Grid Width="200"><Button Content="1" /></Grid></Canvas>""",
+            updated.SourceText.ToString());
+    }
+
+    [Fact]
+    public void InsertElement_OpensASelfClosingParentThatCarriesAPrefix()
+    {
+        XamlDocument document = XamlDocument.Parse(
+            """<c:Panel xmlns:c="urn:c"><c:Inner/></c:Panel>""");
+
+        XamlElement inner = document.Root!.Elements.First();
+
+        XamlDocument updated = document.Edit()
+            .InsertElement(inner, 0, "<Leaf />")
+            .Apply();
+
+        Assert.Equal(
+            """<c:Panel xmlns:c="urn:c"><c:Inner><Leaf /></c:Inner></c:Panel>""",
+            updated.SourceText.ToString());
+    }
 }
