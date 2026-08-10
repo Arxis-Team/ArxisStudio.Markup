@@ -40,6 +40,13 @@ public sealed class XamlLoadEnvironment
     public IXamlRootInstanceFactory? RootInstanceFactory { get; init; }
 
     /// <summary>
+    /// Gets what brackets every compilation, if this environment's assemblies live somewhere the
+    /// process's compiler state has to be brought to. See <see cref="IXamlCompilationScope"/> for
+    /// when that is.
+    /// </summary>
+    public IXamlCompilationScope? CompilationScope { get; init; }
+
+    /// <summary>
     /// Gets the thread that owns the Avalonia objects, defaulting to Avalonia's own UI thread.
     /// </summary>
     public IXamlDispatcher Dispatcher { get; init; } = AvaloniaXamlDispatcher.Instance;

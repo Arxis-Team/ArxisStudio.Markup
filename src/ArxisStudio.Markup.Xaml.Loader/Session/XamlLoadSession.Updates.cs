@@ -763,8 +763,14 @@ public sealed partial class XamlLoadSession
 
         try
         {
-            object fresh = AvaloniaRuntimeXamlLoader.Load(
-                new RuntimeXamlLoaderDocument(name, fragment.Text.ToString()), configuration);
+            object fresh;
+
+            // An update compiles markup exactly as a load does, so it enters the same scope.
+            using (Environment.CompilationScope?.Enter())
+            {
+                fresh = AvaloniaRuntimeXamlLoader.Load(
+                    new RuntimeXamlLoaderDocument(name, fragment.Text.ToString()), configuration);
+            }
 
             // What Avalonia recorded, when it recorded anything: the name given above is the
             // fallback, so a fragment is never keyed by nothing and never keyed by the

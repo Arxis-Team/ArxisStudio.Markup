@@ -208,11 +208,19 @@ public sealed partial class XamlLoadSession : IAsyncDisposable
         // is what the attributes are checked against, so it comes first.
         object? rootInstance = await environment.Dispatcher
             .InvokeAsync(
-                () => XamlRootClass
-                    .CreateInstanceAsync(document, environment, options, diagnostics, cancellationToken)
-                    .AsTask()
-                    .GetAwaiter()
-                    .GetResult(),
+                () =>
+                {
+                    // Inside the compilation scope, because an x:Class constructor is free to load
+                    // markup of its own — a generated InitializeComponent does exactly that.
+                    using (environment.CompilationScope?.Enter())
+                    {
+                        return XamlRootClass
+                            .CreateInstanceAsync(document, environment, options, diagnostics, cancellationToken)
+                            .AsTask()
+                            .GetAwaiter()
+                            .GetResult();
+                    }
+                },
                 cancellationToken)
             .ConfigureAwait(false);
 
@@ -229,7 +237,15 @@ public sealed partial class XamlLoadSession : IAsyncDisposable
             .ConfigureAwait(false);
 
         object? root = await environment.Dispatcher
-            .InvokeAsync(() => Load(document, projection, options, rootInstance, diagnostics), cancellationToken)
+            .InvokeAsync(
+                () =>
+                {
+                    using (environment.CompilationScope?.Enter())
+                    {
+                        return Load(document, projection, options, rootInstance, diagnostics);
+                    }
+                },
+                cancellationToken)
             .ConfigureAwait(false);
 
         if (root is null)
