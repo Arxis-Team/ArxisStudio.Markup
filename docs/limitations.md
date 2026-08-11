@@ -185,6 +185,14 @@ the document — see `docs/adr/0005-resource-includes.md` for why. That leaves f
 
 ## Everything else
 
+- **Converting a value from text leaves a trace in the process.** `XamlValueConversion` reaches a
+  type's converter through `System.ComponentModel.TypeDescriptor`, whose cache is per-type and
+  lives as long as the process — so a host that loads a generation of types, unloads it, and
+  expects the assembly to be collected has to call `TypeDescriptor.Refresh(assembly)` for it.
+  Nothing here can do that on the host's behalf: this library never learns that a load context
+  exists, which is the point of `IXamlCompilationScope` (ADR 0013). `ArxisStudio.ProjectSystem`'s
+  adapter is the reference implementation, and its ADR 0023 records what else such a host has to
+  release before an unload actually takes.
 - **A resource in a theme dictionary needs the variant stated.** Everything about the load is
   right: the theme dictionaries arrive keyed by real `ThemeVariant`s, and `ActualThemeVariant` on
   the loaded tree is whatever the document asked for. But the ambient overload of Avalonia's
