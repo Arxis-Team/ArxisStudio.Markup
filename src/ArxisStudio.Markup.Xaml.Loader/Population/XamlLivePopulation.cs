@@ -74,7 +74,6 @@ public sealed class XamlLivePopulation : IDisposable
     private static HashSet<Type>? t_populating;
 
     private readonly XamlLoadEnvironment _environment;
-    private readonly XamlLivePopulationOptions _options;
     private readonly Dictionary<Type, Registration> _registrations = [];
     private readonly Lock _gate = new();
 
@@ -86,14 +85,12 @@ public sealed class XamlLivePopulation : IDisposable
     /// brackets every compilation — the same environment the documents' own sessions load in, or
     /// the two would disagree about which assemblies a name means.
     /// </param>
-    /// <param name="options">How to populate, or <see langword="null"/> for the defaults.</param>
     /// <exception cref="ArgumentNullException"><paramref name="environment"/> is <see langword="null"/>.</exception>
-    public XamlLivePopulation(XamlLoadEnvironment environment, XamlLivePopulationOptions? options = null)
+    public XamlLivePopulation(XamlLoadEnvironment environment)
     {
         ArgumentNullException.ThrowIfNull(environment);
 
         _environment = environment;
-        _options = options ?? XamlLivePopulationOptions.Default;
     }
 
     /// <summary>
@@ -105,18 +102,6 @@ public sealed class XamlLivePopulation : IDisposable
     /// isolated, because it is arbitrary host code running inside somebody's constructor.
     /// </remarks>
     public event EventHandler<XamlLivePopulationFailedEventArgs>? PopulationFailed;
-
-    /// <summary>Gets how many types currently populate from a live document.</summary>
-    public int Count
-    {
-        get
-        {
-            lock (_gate)
-            {
-                return _registrations.Count;
-            }
-        }
-    }
 
     /// <summary>Whether instances of a type currently populate from a live document.</summary>
     /// <param name="type">The type to ask about.</param>
@@ -316,14 +301,17 @@ public sealed class XamlLivePopulation : IDisposable
     /// </summary>
     private void Populate(Registration registration, object instance)
     {
-        // Cleared by removal between the trampoline reading the field and the delegate running,
-        // or between preparation and the swap. The compiled markup is the honest answer for both.
-        if (Volatile.Read(ref registration.Prepared) is not { } prepared || registration.Removed)
+        // Released between the trampoline reading the override field and this running, which a
+        // host does by removing the type or disposing the registry. The compiled markup is what
+        // the instance would have shown had nothing been registered, so it is the honest answer.
+        if (registration.Removed)
         {
             registration.PopulateFromCompiledMarkup(instance);
 
             return;
         }
+
+        PreparedDocument prepared = Volatile.Read(ref registration.Prepared);
 
         HashSet<Type> populating = t_populating ??= [];
 
@@ -347,8 +335,6 @@ public sealed class XamlLivePopulation : IDisposable
 
         try
         {
-            var diagnostics = new List<MarkupDiagnostic>();
-
             try
             {
                 // Inside the compilation scope for the same reason a session load is: the
@@ -359,7 +345,13 @@ public sealed class XamlLivePopulation : IDisposable
                     var configuration = new RuntimeXamlLoaderConfiguration
                     {
                         LocalAssembly = registration.Type.Assembly,
-                        UseCompiledBindingsByDefault = _options.UseCompiledBindingsByDefault,
+
+                        // Bindings resolve by reflection, whatever the project compiles with.
+                        // The two differ only in strictness — a compiled binding needs a declared
+                        // data type and a reflection binding does not — so a document written for
+                        // the stricter one still populates, and one written for the looser one
+                        // would not survive the reverse.
+                        UseCompiledBindingsByDefault = false,
 
                         // Never design mode: an embedded instance must behave the way its
                         // compiled markup would, and d:DesignWidth applied here would size a
@@ -370,19 +362,6 @@ public sealed class XamlLivePopulation : IDisposable
                         // keeps an outer session's object map honest about objects that are not
                         // its document's to claim.
                         CreateSourceInfo = true,
-                        DiagnosticHandler = diagnostic =>
-                        {
-                            if (diagnostic.Severity == RuntimeXamlDiagnosticSeverity.Warning)
-                            {
-                                diagnostics.Add(MarkupDiagnostic.Load(
-                                    XamlLoaderDiagnosticCodes.LivePopulationFailed,
-                                    $"{diagnostic.Id}: {diagnostic.Title}",
-                                    MarkupDiagnosticSeverity.Warning,
-                                    prepared.Document.Uri));
-                            }
-
-                            return diagnostic.Severity;
-                        },
                     };
 
                     AvaloniaRuntimeXamlLoader.Load(
@@ -398,14 +377,12 @@ public sealed class XamlLivePopulation : IDisposable
                 // the instance shows now — stale beats blank, and the event says which it was.
                 registration.PopulateFromCompiledMarkup(instance);
 
-                diagnostics.Add(MarkupDiagnostic.Load(
+                Report(registration, prepared, MarkupDiagnostic.Load(
                     XamlLoaderDiagnosticCodes.LivePopulationFailed,
                     $"Populating '{registration.Type.FullName}' from its live document failed: " +
                     $"{error.Message} The instance shows the compiled markup.",
                     MarkupDiagnosticSeverity.Error,
                     prepared.Document.Uri));
-
-                Report(registration, prepared, [.. diagnostics]);
             }
         }
         finally
@@ -452,8 +429,16 @@ public sealed class XamlLivePopulation : IDisposable
         private readonly FieldInfo _field;
         private readonly MethodInfo _trampoline;
 
-        /// <summary>The prepared document, replaced whole on every registration. Read volatile.</summary>
-        public PreparedDocument? Prepared;
+        /// <summary>
+        /// The prepared document, replaced whole on every registration and never cleared.
+        /// </summary>
+        /// <remarks>
+        /// Read and written through <see cref="Volatile"/>, because a registration is replaced on
+        /// whichever thread the host edits on and read on whichever thread constructs a control.
+        /// A released registration says so through <see cref="Removed"/>; this field always holds
+        /// the last document handed over.
+        /// </remarks>
+        public PreparedDocument Prepared;
 
         public Registration(
             XamlLivePopulation owner,
@@ -471,6 +456,7 @@ public sealed class XamlLivePopulation : IDisposable
             Override = instance => owner.Populate(this, instance);
         }
 
+        /// <summary>The compiled type whose instances this registration populates.</summary>
         public Type Type { get; }
 
         /// <summary>The delegate installed into the override field.</summary>

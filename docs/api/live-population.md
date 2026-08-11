@@ -1,7 +1,7 @@
 # Live population
 
-`ArxisStudio.Markup.Xaml.Loader` · `XamlLivePopulation`, `XamlLivePopulationOptions`,
-`XamlLivePopulationResult`, `XamlLivePopulationFailedEventArgs`
+`ArxisStudio.Markup.Xaml.Loader` · `XamlLivePopulation`, `XamlLivePopulationResult`,
+`XamlLivePopulationFailedEventArgs`
 
 A session keeps *its own* document current on screen. This page is about everybody else's: a
 control placed inside a document — `<views:MyControl />` — is constructed by Avalonia, and its
