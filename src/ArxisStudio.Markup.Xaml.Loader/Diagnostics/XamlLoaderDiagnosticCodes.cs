@@ -124,4 +124,27 @@ public static class XamlLoaderDiagnosticCodes
     /// A mutation was attempted while another one owned the session, and this one does not wait.
     /// </summary>
     public const string SessionBusy = "AXM3044";
+
+    /// <summary>
+    /// A type offered for live population carries no compiled markup to stand in for, so there is
+    /// nothing to override.
+    /// </summary>
+    public const string NotPopulatable = "AXM3050";
+
+    /// <summary>
+    /// Populating an instance from its live document failed, and the instance was populated from
+    /// the compiled markup instead.
+    /// </summary>
+    public const string LivePopulationFailed = "AXM3051";
+
+    /// <summary>
+    /// Live documents form a cycle of controls each placing the other, and the inner instance was
+    /// populated from the compiled markup to break it.
+    /// </summary>
+    public const string LivePopulationCycle = "AXM3052";
+
+    /// <summary>
+    /// The document's <c>x:Class</c> names a different type than the one it was registered for.
+    /// </summary>
+    public const string LivePopulationClassMismatch = "AXM3053";
 }
