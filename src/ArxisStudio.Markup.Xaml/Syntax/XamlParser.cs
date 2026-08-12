@@ -26,6 +26,18 @@ internal sealed class XamlParser
     private readonly ImmutableArray<XamlToken> _tokens;
     private readonly List<MarkupDiagnostic> _diagnostics = [];
 
+    /// <summary>
+    /// The elements being filled, outermost first, so an end tag can be asked whose it is.
+    /// </summary>
+    /// <remarks>
+    /// An end tag that matches nothing open is a typo rather than an ancestor's, and the two want
+    /// opposite recoveries: an ancestor's tag is left for the ancestor, a typo is taken as this
+    /// element's close. Without the stack every mismatch was the first kind, so one misspelled
+    /// tag reported the element unclosed, its parent unclosed, and the tag itself unexpected —
+    /// three complaints, none of them the one a person could act on.
+    /// </remarks>
+    private readonly List<XamlQualifiedName> _open = [];
+
     private int _index;
 
     private XamlParser(SourceText text, Uri? documentUri, ImmutableArray<XamlToken> tokens)
@@ -129,7 +141,12 @@ internal sealed class XamlParser
                 isEmpty: true, attributes, [], context, []);
         }
 
+        _open.Add(name);
+
         ImmutableArray<XamlSyntaxNode> content = ParseContent(context, name);
+
+        _open.RemoveAt(_open.Count - 1);
+
         (TextSpan? endTagSpan, XamlQualifiedName? endTagName) = TryParseEndTag(name, start, nameSpan);
 
         int end = endTagSpan?.End ?? (content.Length > 0 ? content[^1].Span.End : startTagEnd);
@@ -162,17 +179,28 @@ internal sealed class XamlParser
 
         (XamlQualifiedName actual, _) = ParseName(XamlDiagnosticCodes.ExpectedElementName, report: false);
 
-        if (actual != expected)
+        if (actual != expected && _open.Contains(actual))
         {
             // It belongs to an ancestor. Rewinding lets the enclosing level claim it instead of
             // this one swallowing a tag that was never its own.
             _index = probe;
             Report(
                 XamlDiagnosticCodes.UnclosedElement,
-                $"Element '{expected}' is closed by '</{actual}>', which does not match.",
+                $"Element '{expected}' is never closed; '</{actual}>' closes an element around it.",
                 TextSpan.FromBounds(elementStart, start));
 
             return (null, null);
+        }
+
+        if (actual != expected)
+        {
+            // Nothing open is called that, so it closes this element and is misspelled. Taking it
+            // keeps the recovery local: one diagnostic, at the tag, and the tree the author
+            // plainly meant.
+            Report(
+                XamlDiagnosticCodes.MismatchedEndTag,
+                $"Element '{expected}' is closed by '</{actual}>', which names a different element.",
+                TextSpan.FromBounds(start, Current.Span.End));
         }
 
         while (!AtEnd && Current.Kind is XamlTokenKind.Whitespace or XamlTokenKind.NewLine or XamlTokenKind.Skipped)

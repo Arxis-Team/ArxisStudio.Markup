@@ -250,6 +250,17 @@ public sealed partial class XamlLoadSession : IAsyncDisposable
 
         if (root is null)
         {
+            // Said in one code, whatever else was collected. The reasons are various — an
+            // unresolvable x:Class, a constructor that threw, markup Avalonia would not compile —
+            // and every one of them has left its own diagnostic above; this is the one a caller
+            // can route on without reading them, and the one that makes "there is no session"
+            // a statement rather than an absence.
+            diagnostics.Add(MarkupDiagnostic.Load(
+                XamlLoaderDiagnosticCodes.NoRootObject,
+                "The document produced no object.",
+                MarkupDiagnosticSeverity.Error,
+                document.Uri));
+
             return (null, new XamlLoadResult { RootObject = null, Diagnostics = [.. diagnostics] });
         }
 

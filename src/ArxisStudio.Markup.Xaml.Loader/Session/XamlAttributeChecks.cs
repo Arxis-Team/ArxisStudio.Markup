@@ -49,8 +49,29 @@ internal static class XamlAttributeChecks
             cancellationToken.ThrowIfCancellationRequested();
 
             // A property element is a member of its parent, not a type of its own.
-            if (element.IsPropertyElementSyntax || element.NamespaceUri is not { } namespaceUri)
+            if (element.IsPropertyElementSyntax)
             {
+                continue;
+            }
+
+            if (element.NamespaceUri is not { } namespaceUri)
+            {
+                // A prefix nothing declares is worth saying out loud. Avalonia's own failure for
+                // it names the element and not the prefix, and the load stops there, so a
+                // document one missing xmlns away from working reported something else entirely.
+                // An unprefixed name resolves against whatever default is in scope and is not
+                // this diagnostic's business.
+                if (element.Name.Prefix is { } prefix)
+                {
+                    diagnostics.Add(MarkupDiagnostic.Resolution(
+                        XamlLoaderDiagnosticCodes.UndeclaredPrefix,
+                        $"The prefix '{prefix}' on '{element.Name}' is not declared anywhere in scope. "
+                            + $"Declare it with an xmlns:{prefix} attribute.",
+                        MarkupDiagnosticSeverity.Error,
+                        document.Uri,
+                        element.NameSpan));
+                }
+
                 continue;
             }
 

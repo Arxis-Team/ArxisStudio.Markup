@@ -112,6 +112,52 @@ public sealed class LoadSessionTests
         Assert.NotEmpty(result.Diagnostics);
     }
 
+    /// <summary>
+    /// A load that produced nothing says so under one code, whatever else it collected.
+    /// </summary>
+    /// <remarks>
+    /// The reasons are various and each leaves its own diagnostic; this is the one a caller can
+    /// route on without reading them, and it is what makes "there is no session" a statement
+    /// rather than an absence.
+    /// </remarks>
+    [AvaloniaFact]
+    public async Task ALoadThatProducedNothingSaysSo()
+    {
+        XamlDocument document = Parse($"<NotAControl xmlns=\"{AvaloniaNamespace}\" />");
+
+        (XamlLoadSession? session, XamlLoadResult result) = await XamlLoadSession.TryCreateAsync(
+            document, Environment(), cancellationToken: TestContext.Current.CancellationToken);
+
+        Assert.Null(session);
+        Assert.Contains(
+            result.Diagnostics,
+            static d => d.Code == XamlLoaderDiagnosticCodes.NoRootObject && d.IsError);
+    }
+
+    /// <summary>
+    /// A prefix nothing declares is named as such, rather than as whatever fails next.
+    /// </summary>
+    /// <remarks>
+    /// Avalonia's own failure for it names the element, so a document one missing <c>xmlns</c>
+    /// away from working reported something else entirely.
+    /// </remarks>
+    [AvaloniaFact]
+    public async Task AnUndeclaredPrefixIsNamed()
+    {
+        XamlDocument document = Parse(
+            $"<StackPanel xmlns=\"{AvaloniaNamespace}\">\n  <nobody:Thing />\n</StackPanel>");
+
+        (_, XamlLoadResult result) = await XamlLoadSession.TryCreateAsync(
+            document, Environment(), cancellationToken: TestContext.Current.CancellationToken);
+
+        MarkupDiagnostic undeclared = Assert.Single(
+            result.Diagnostics, static d => d.Code == XamlLoaderDiagnosticCodes.UndeclaredPrefix);
+
+        Assert.True(undeclared.IsError);
+        Assert.Contains("nobody", undeclared.Message, StringComparison.Ordinal);
+        Assert.NotNull(undeclared.Span);
+    }
+
     [AvaloniaFact]
     public async Task ACustomControlWithoutItsAssemblyIsReportedRatherThanThrown()
     {

@@ -250,6 +250,41 @@ public sealed class EditingTests
             () => first.SetAttribute(Element(second, "Button"), XamlQualifiedName.Parse("Width"), "1"));
     }
 
+    /// <summary>
+    /// Both refusals say so in a code as well as in an exception message.
+    /// </summary>
+    /// <remarks>
+    /// The exception is what stops the caller, because both are the caller's mistake rather than
+    /// the document's. The diagnostic is what a host shows: it carries a code to route on and,
+    /// for overlapping edits, the span of the change that collided.
+    /// </remarks>
+    [Fact]
+    public void ARefusedEditIsAlsoADiagnostic()
+    {
+        XamlDocument document = Parse();
+        XamlElement button = Named(document, "SaveButton");
+
+        XamlDocumentEditor overlapping = document.Edit()
+            .SetAttribute(button, XamlQualifiedName.Parse("Width"), "480")
+            .RemoveAttribute(button, XamlQualifiedName.Parse("Width"));
+
+        Assert.Throws<InvalidOperationException>(overlapping.Apply);
+
+        MarkupDiagnostic conflict = Assert.Single(overlapping.Diagnostics);
+
+        Assert.Equal(XamlDiagnosticCodes.ConflictingEdits, conflict.Code);
+        Assert.True(conflict.IsError);
+        Assert.NotNull(conflict.Span);
+
+        XamlDocument other = Parse("<Other><Button /></Other>");
+        XamlDocumentEditor foreign = document.Edit();
+
+        Assert.Throws<InvalidOperationException>(
+            () => foreign.SetAttribute(Element(other, "Button"), XamlQualifiedName.Parse("Width"), "1"));
+
+        Assert.Equal(XamlDiagnosticCodes.ForeignNode, Assert.Single(foreign.Diagnostics).Code);
+    }
+
     [Fact]
     public void AStaleNodeFromAnEarlierVersionIsRejected()
     {

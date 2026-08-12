@@ -53,6 +53,34 @@ public sealed class MalformedInputTests
         Assert.Equal("</a>", document.SourceText.GetText(document.Root.EndTagSpan!.Value));
     }
 
+    /// <summary>
+    /// A misspelled end tag closes the element it was meant to close, and says so once.
+    /// </summary>
+    /// <remarks>
+    /// The alternative is what the parser used to do: treat every mismatch as an ancestor's tag,
+    /// which for a typo meant the element was reported unclosed, its parent was reported
+    /// unclosed, and the tag itself was reported unexpected — three diagnostics, none of them
+    /// naming the misspelling, and a tree with the content in the wrong place.
+    /// </remarks>
+    [Fact]
+    public void AMisspelledEndTagClosesItsElementAndIsReportedOnce()
+    {
+        const string source = "<a><b></c></a>";
+
+        XamlDocument document = XamlDocument.Parse(source);
+
+        Assert.Equal(source, document.GetText());
+        Assert.Equal(
+            [XamlDiagnosticCodes.MismatchedEndTag],
+            CodesOf(source));
+
+        XamlElement inner = document.DescendantElements().Single(static e => e.Name.LocalName == "b");
+
+        Assert.False(inner.IsUnclosed);
+        Assert.Equal("</c>", document.SourceText.GetText(inner.EndTagSpan!.Value));
+        Assert.NotNull(document.Root!.EndTagSpan);
+    }
+
     [Fact]
     public void AStrayEndTagIsReportedAndKept()
     {

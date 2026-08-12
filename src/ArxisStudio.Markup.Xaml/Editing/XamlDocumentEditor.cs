@@ -41,7 +41,15 @@ public sealed class XamlDocumentEditor
     /// <summary>Gets a value indicating whether any edit has been recorded.</summary>
     public bool HasChanges => _changes.Count > 0;
 
-    /// <summary>Gets the diagnostics raised while recording edits.</summary>
+    /// <summary>
+    /// Gets the diagnostics raised while recording edits.
+    /// </summary>
+    /// <remarks>
+    /// The two refusals below, said in a form a tool can route on. They are also thrown, because
+    /// both are the caller's mistake rather than the document's and an edit that silently did
+    /// nothing would be worse — this is the same fact with a code and a span attached, for a host
+    /// that catches the exception and wants to show something better than its message.
+    /// </remarks>
     public ImmutableArray<MarkupDiagnostic> Diagnostics => [.. _diagnostics];
 
     /// <summary>
@@ -531,9 +539,18 @@ public sealed class XamlDocumentEditor
         {
             if (ordered[index].Span.Start < ordered[index - 1].Span.End)
             {
-                throw new InvalidOperationException(
+                string message =
                     $"Two edits change overlapping regions of the document ({ordered[index - 1].Span} " +
-                    $"and {ordered[index].Span}). Apply them in separate operations.");
+                    $"and {ordered[index].Span}). Apply them in separate operations.";
+
+                _diagnostics.Add(MarkupDiagnostic.Parse(
+                    XamlDiagnosticCodes.ConflictingEdits,
+                    message,
+                    MarkupDiagnosticSeverity.Error,
+                    _document.Uri,
+                    ordered[index].Span));
+
+                throw new InvalidOperationException(message);
             }
         }
 
@@ -574,12 +591,18 @@ public sealed class XamlDocumentEditor
     /// <summary>Rejects nodes that came from a different parse of a different text.</summary>
     private void Validate(XamlSyntaxNode node)
     {
-        if (!ReferenceEquals(node.Document, _document))
+        if (ReferenceEquals(node.Document, _document))
         {
-            throw new InvalidOperationException(
-                $"{node} belongs to a different document. Its spans point into different text, " +
-                "so editing with it would corrupt this one. Find the node again in this document.");
+            return;
         }
+
+        string message = $"{node} belongs to a different document. Its spans point into different " +
+            "text, so editing with it would corrupt this one. Find the node again in this document.";
+
+        _diagnostics.Add(MarkupDiagnostic.Parse(
+            XamlDiagnosticCodes.ForeignNode, message, MarkupDiagnosticSeverity.Error, _document.Uri));
+
+        throw new InvalidOperationException(message);
     }
 
     /// <summary>Finds where a new attribute goes: after the last one, or after the element name.</summary>
