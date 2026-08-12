@@ -206,23 +206,36 @@ public sealed partial class XamlLoadSession : IAsyncDisposable
         // populates an instance the caller supplies rather than creating one for it. This also
         // gives Avalonia the object whose methods the document's event handlers name — and it
         // is what the attributes are checked against, so it comes first.
-        object? rootInstance = await environment.Dispatcher
-            .InvokeAsync(
-                () =>
-                {
-                    // Inside the compilation scope, because an x:Class constructor is free to load
-                    // markup of its own — a generated InitializeComponent does exactly that.
-                    using (environment.CompilationScope?.Enter())
-                    {
-                        return XamlRootClass
-                            .CreateInstanceAsync(document, environment, options, diagnostics, cancellationToken)
-                            .AsTask()
-                            .GetAwaiter()
-                            .GetResult();
-                    }
-                },
-                cancellationToken)
+        //
+        // Resolving is not the owning thread's work and does not happen there. It reads metadata
+        // through the caller's resolver, touches no Avalonia object and compiles nothing, so it
+        // needs neither the thread nor the scope — and asking for the thread would be worse than
+        // unnecessary: a host whose resolver marshals to the owning thread would be waiting for a
+        // thread this call is sitting on.
+        Type? rootType = await XamlRootClass
+            .ResolveAsync(document, environment, diagnostics, cancellationToken)
             .ConfigureAwait(false);
+
+        // Creating is. It runs the class's constructor, which makes Avalonia objects, and it
+        // happens inside the compilation scope because an x:Class constructor is free to load
+        // markup of its own — a generated InitializeComponent does exactly that. The factory is
+        // the caller's and may be asynchronous, which is why this goes through RunAsync rather
+        // than waiting for a task on the one thread that task may need.
+        object? rootInstance = rootType is null
+            ? null
+            : await environment.Dispatcher
+                .RunAsync(
+                    async () =>
+                    {
+                        using (environment.CompilationScope?.Enter())
+                        {
+                            return await XamlRootClass
+                                .CreateAsync(rootType, document, environment, options, diagnostics, cancellationToken)
+                                .ConfigureAwait(true);
+                        }
+                    },
+                    cancellationToken)
+                .ConfigureAwait(false);
 
         ImmutableArray<TextSpan> unloadable = await XamlAttributeChecks
             .RunAsync(document, rootInstance?.GetType(), environment, diagnostics, cancellationToken)
@@ -264,7 +277,16 @@ public sealed partial class XamlLoadSession : IAsyncDisposable
             return (null, new XamlLoadResult { RootObject = null, Diagnostics = [.. diagnostics] });
         }
 
-        var session = new XamlLoadSession(document, environment, options, projection, root, []);
+        // On the owning thread, because constructing a session builds the object map, and the map
+        // pairs an object to an element by reading the source information Avalonia recorded on it
+        // — an attached property, on an AvaloniaObject, with the thread affinity all of them have.
+        // Where this line runs used to be decided by whether anything above it had really
+        // suspended, which for a factory that answers immediately is never.
+        XamlLoadSession session = await environment.Dispatcher
+            .InvokeAsync(
+                () => new XamlLoadSession(document, environment, options, projection, root, []),
+                cancellationToken)
+            .ConfigureAwait(false);
 
         // Design-time values are applied after the objects exist, because that is the earliest
         // there is anything to apply them to, and through the map, because an attribute belongs

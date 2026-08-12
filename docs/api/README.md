@@ -131,6 +131,13 @@ fails with `AXM3004` rather than corrupting state that would surface later and s
 the environment a dispatcher — `AvaloniaXamlDispatcher` by default — and the session will marshal
 for you.
 
+A dispatcher has two entry points, and a host implementing `IXamlDispatcher` supplies both.
+`InvokeAsync` runs a function on the owning thread. `RunAsync` runs an *asynchronous* operation
+there — it starts it on that thread and resumes it there, rather than waiting for the result while
+holding the thread the result may need. Work that is neither creating nor mutating an object does
+not go through either: resolving an `x:Class`, for one, is the caller's resolver reading metadata,
+and the session asks it on whatever thread it was called on.
+
 One session also mutates one thing at a time: the asynchronous updates queue behind each other,
 and the synchronous edits refuse rather than wait. See
 [Updates](updates.md#one-session-mutates-at-a-time) for why the two differ.

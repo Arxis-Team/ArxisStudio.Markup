@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
@@ -272,6 +273,75 @@ public sealed class RootClassTests
         Assert.Equal(typeof(CustomerView), factory.RequestedType);
     }
 
+    /// <summary>
+    /// Which half of an <c>x:Class</c> belongs on the owning thread, and which does not.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// Both halves used to happen inside one dispatched operation, with the asynchronous ones
+    /// waited for there. The resolver is the caller's and is allowed to be genuinely
+    /// asynchronous — reading a file, asking another process, marshalling to the owning thread
+    /// itself — and waiting for it from inside a dispatched operation is waiting for the owning
+    /// thread while holding it.
+    /// </para>
+    /// <para>
+    /// The factory is the opposite case and has to stay where it is: it constructs an Avalonia
+    /// object, and those belong to that thread.
+    /// </para>
+    /// </remarks>
+    [AvaloniaFact]
+    public async Task TheClassIsResolvedOffTheDispatcherAndCreatedOnIt()
+    {
+        var dispatcher = new ControllableDispatcher();
+        var factory = new WatchingFactory(dispatcher);
+
+        XamlLoadEnvironment defaults = XamlLoadEnvironment.CreateDefault(
+            [typeof(CustomerView).Assembly], new InMemoryMarkupSourceProvider());
+
+        var resolver = new WatchingTypeResolver(defaults.TypeResolver, dispatcher);
+
+        await using XamlLoadSession session = await XamlLoadSession.CreateAsync(
+            Parse(ViewXaml(content: "  <Button Content=\"Save\" />\n")),
+            new XamlLoadEnvironment
+            {
+                SourceProvider = defaults.SourceProvider,
+                AssemblyResolver = defaults.AssemblyResolver,
+                TypeResolver = resolver,
+                ResourceResolver = defaults.ResourceResolver,
+                RootInstanceFactory = factory,
+                Dispatcher = dispatcher,
+            },
+            cancellationToken: TestContext.Current.CancellationToken);
+
+        Assert.NotEmpty(resolver.AskedWhileDispatching);
+        Assert.DoesNotContain(true, resolver.AskedWhileDispatching);
+        Assert.True(factory.CalledWhileDispatching);
+    }
+
+    /// <summary>
+    /// A factory that does not finish synchronously is finished, not waited for.
+    /// </summary>
+    /// <remarks>
+    /// The factory suspends on the owning thread and resumes there, which is the shape of any
+    /// factory that waits for anything at all — a pooled instance, a lock, a rebuild. It is also
+    /// the shape the session could not survive: the operation it ran in blocked that thread for
+    /// the result, and the continuation needed the thread to produce it. Reintroduce the block
+    /// and this test hangs rather than fails, because that is what a deadlock does.
+    /// </remarks>
+    [AvaloniaFact]
+    public async Task AFactoryThatDoesNotFinishSynchronouslyStillProducesTheRoot()
+    {
+        await using XamlLoadSession session = await XamlLoadSession.CreateAsync(
+            Parse(ViewXaml(content: "  <Button Content=\"Save\" />\n")),
+            Environment(new SuspendingFactory()),
+            cancellationToken: TestContext.Current.CancellationToken);
+
+        var view = session.GetRoot<CustomerView>();
+
+        Assert.IsType<Button>(view.Content);
+        Assert.DoesNotContain(session.Diagnostics, static d => d.IsError);
+    }
+
     [AvaloniaFact]
     public async Task AFactoryReturningTheWrongTypeIsReported()
     {
@@ -377,5 +447,46 @@ public sealed class RootClassTests
         public ValueTask<object> CreateAsync(
             Type rootType, XamlRootInstanceContext context, CancellationToken cancellationToken) =>
             new(new Button());
+    }
+
+    private sealed class SuspendingFactory : IXamlRootInstanceFactory
+    {
+        public async ValueTask<object> CreateAsync(
+            Type rootType, XamlRootInstanceContext context, CancellationToken cancellationToken)
+        {
+            // Gives the thread back before constructing anything, and takes it again to construct.
+            await Task.Yield();
+
+            return Activator.CreateInstance(rootType)!;
+        }
+    }
+
+    private sealed class WatchingFactory(ControllableDispatcher dispatcher) : IXamlRootInstanceFactory
+    {
+        public bool CalledWhileDispatching { get; private set; }
+
+        public ValueTask<object> CreateAsync(
+            Type rootType, XamlRootInstanceContext context, CancellationToken cancellationToken)
+        {
+            CalledWhileDispatching = dispatcher.Dispatching;
+
+            return new ValueTask<object>(Activator.CreateInstance(rootType)!);
+        }
+    }
+
+    private sealed class WatchingTypeResolver(IXamlTypeResolver inner, ControllableDispatcher dispatcher)
+        : IXamlTypeResolver
+    {
+        public List<bool> AskedWhileDispatching { get; } = [];
+
+        public ValueTask<XamlTypeResolution> ResolveAsync(
+            XamlTypeName typeName,
+            XamlNamespaceContext namespaceContext,
+            CancellationToken cancellationToken)
+        {
+            AskedWhileDispatching.Add(dispatcher.Dispatching);
+
+            return inner.ResolveAsync(typeName, namespaceContext, cancellationToken);
+        }
     }
 }

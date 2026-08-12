@@ -45,6 +45,15 @@ internal sealed class ControllableDispatcher : IXamlDispatcher
     /// <summary>Gets how many operations have been dispatched.</summary>
     public int Invocations { get; private set; }
 
+    /// <summary>Gets whether a dispatched operation is running right now.</summary>
+    /// <remarks>
+    /// For asserting that something happens <em>outside</em> a dispatched operation. Resolving a
+    /// document's <c>x:Class</c> is the case that matters: it is the caller's resolver, it may be
+    /// genuinely asynchronous, and waiting for it from inside an operation is waiting for the
+    /// owning thread from the owning thread.
+    /// </remarks>
+    public bool Dispatching { get; private set; }
+
     /// <summary>Gets a task that completes once a held invocation has arrived and is waiting.</summary>
     public Task Arrived => _arrived.Task;
 
@@ -80,11 +89,58 @@ internal sealed class ControllableDispatcher : IXamlDispatcher
         return await AvaloniaXamlDispatcher.Instance.InvokeAsync(
             () =>
             {
-                T value = operation();
+                Dispatching = true;
 
-                After?.Invoke(ordinal);
+                try
+                {
+                    T value = operation();
 
-                return value;
+                    After?.Invoke(ordinal);
+
+                    return value;
+                }
+                finally
+                {
+                    Dispatching = false;
+                }
+            },
+            cancellationToken);
+    }
+
+    /// <inheritdoc />
+    public async ValueTask<T> RunAsync<T>(
+        Func<Task<T>> operation, CancellationToken cancellationToken = default)
+    {
+        int ordinal = ++Invocations;
+
+        Before?.Invoke(ordinal);
+
+        if (_holding)
+        {
+            _arrived.TrySetResult();
+
+            await _released.Task.WaitAsync(cancellationToken);
+        }
+
+        return await AvaloniaXamlDispatcher.Instance.RunAsync(
+            async () =>
+            {
+                Dispatching = true;
+
+                try
+                {
+                    // Keeping the context is the point of this overload: the operation resumes on
+                    // the thread it started on rather than wherever the pool put it.
+                    T value = await operation().ConfigureAwait(true);
+
+                    After?.Invoke(ordinal);
+
+                    return value;
+                }
+                finally
+                {
+                    Dispatching = false;
+                }
             },
             cancellationToken);
     }

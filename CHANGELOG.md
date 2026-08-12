@@ -33,6 +33,33 @@ It hosts and does not select: no adorner, no handle, no input, no inspector. See
 
 No existing public API changed.
 
+### A dispatcher can run asynchronous work, and loading stopped blocking on it
+
+Creating a document's `x:Class` instance was one dispatched operation that did two unrelated
+things, and waited for both on the owning thread. Resolving the class is the caller's
+`IXamlTypeResolver` — genuinely asynchronous, permitted to read a file or ask another process or
+marshal to the owning thread — and waiting for it *from* the owning thread is waiting for a thread
+this call is sitting on. Creating the instance is the caller's `IXamlRootInstanceFactory`, which
+may also be asynchronous, and which the session finished with `.GetAwaiter().GetResult()`.
+
+Resolution now happens off the dispatcher, where it always belonged: it touches no Avalonia object
+and compiles nothing, so it needs neither the thread nor the compilation scope. Creation stays on
+the dispatcher — it runs a constructor that makes Avalonia objects — and goes through a new
+`IXamlDispatcher.RunAsync`, which starts an asynchronous operation on the owning thread and resumes
+it there rather than blocking the thread for its result.
+
+**`IXamlDispatcher` has a second member.** A host that implements the interface itself must add
+`RunAsync`; `AvaloniaXamlDispatcher` already has it. It is a second name rather than an overload of
+`InvokeAsync` because a lambda returning a task satisfies both signatures, and which one it binds
+to is decided by rules nobody reads at a call site — while the difference between them is whether
+the task is awaited at all.
+
+One thing this uncovered: a session was constructed wherever the load's continuation happened to
+land, and constructing one builds the object map, which reads the source information Avalonia
+records on each object — an attached property, with the thread affinity every one of them has. It
+had always been the owning thread in practice, because nothing above it ever really suspended. Now
+it is dispatched and says so.
+
 ## 0.2.0-preview.2
 
 What a review of the previous release found. Four things, all of them cases where the code was
