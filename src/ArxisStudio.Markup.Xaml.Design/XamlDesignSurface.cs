@@ -99,6 +99,11 @@ public sealed class XamlDesignSurface : Border, IDisposable
         AvaloniaProperty.Register<XamlDesignSurface, WindowDecorations>(
             nameof(Decorations), defaultValue: WindowDecorations.Full);
 
+    /// <summary>Defines the <see cref="ApplicationThemeVariant"/> property.</summary>
+    public static readonly StyledProperty<ThemeVariant> ApplicationThemeVariantProperty =
+        AvaloniaProperty.Register<XamlDesignSurface, ThemeVariant>(
+            nameof(ApplicationThemeVariant), defaultValue: ThemeVariant.Default);
+
     /// <summary>
     /// Carries the root's requested theme variant down to the content.
     /// </summary>
@@ -109,6 +114,20 @@ public sealed class XamlDesignSurface : Border, IDisposable
     /// asks for a light variant inside a dark tool is shown dark.
     /// </remarks>
     private readonly ThemeVariantScope _scope = new();
+
+    /// <summary>
+    /// Stands where the document's application would stand.
+    /// </summary>
+    /// <remarks>
+    /// The second half of the variant story, wrapped around <see cref="_scope"/>. A root that
+    /// declares no variant does not mean "no variant": it means "whatever my application says",
+    /// and at run time the application is the next scope up. In a designer the next scope up is
+    /// the designer, so without this layer an undecided form took the tool's variant and wore it
+    /// as its own. <see cref="ApplicationThemeVariant"/> is bound here, and the root's own
+    /// request — bound to <see cref="_scope"/>, inside — still wins when the document makes one,
+    /// exactly as it would at run time.
+    /// </remarks>
+    private readonly ThemeVariantScope _application = new();
 
     private readonly List<IDisposable> _mirrors = [];
 
@@ -122,6 +141,7 @@ public sealed class XamlDesignSurface : Border, IDisposable
     private object? _borrowed;
     private IResourceDictionary? _borrowedResources;
     private readonly List<IStyle> _borrowedStyles = [];
+    private bool _variantMirrored;
     private bool _disposed;
 
     /// <summary>
@@ -137,7 +157,40 @@ public sealed class XamlDesignSurface : Border, IDisposable
     private static readonly ConditionalWeakTable<TopLevel, XamlDesignSurface> StandingIn = [];
 
     /// <summary>Creates a surface with nothing attached to it.</summary>
-    public XamlDesignSurface() => Child = _scope;
+    public XamlDesignSurface()
+    {
+        _application.Child = _scope;
+        Child = _application;
+
+        // For the surface's own lifetime, deliberately: both ends are this surface's own objects,
+        // so there is nothing to leak and no moment it would be right to stop.
+        _application.Bind(
+            ThemeVariantScope.RequestedThemeVariantProperty,
+            this.GetObservable(ApplicationThemeVariantProperty));
+    }
+
+    /// <summary>
+    /// The theme variant the document's application would supply, when the host knows it.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// A document's effective variant has two layers at run time: what its root declares, and what
+    /// its application requested for everything that declares nothing. The surface reproduces the
+    /// first from the document itself; this property is the second, because only the host can know
+    /// it — it is a fact about the project being edited, not about the document or about the tool.
+    /// </para>
+    /// <para>
+    /// The default, <see cref="ThemeVariant.Default"/>, inherits the tool's own variant — the
+    /// honest answer for a host that knows nothing. A host that does know supplies the variant the
+    /// application would resolve to, which for an application that itself says "Default" is the
+    /// platform's, not the tool's.
+    /// </para>
+    /// </remarks>
+    public ThemeVariant ApplicationThemeVariant
+    {
+        get => GetValue(ApplicationThemeVariantProperty);
+        set => SetValue(ApplicationThemeVariantProperty, value);
+    }
 
     /// <summary>The object the attached session produced, or <see langword="null"/> when detached.</summary>
     /// <remarks>
@@ -352,17 +405,78 @@ public sealed class XamlDesignSurface : Border, IDisposable
         {
             Styles.Add(style);
         }
+
+        MirrorApplicationVariant(top);
     }
 
     /// <summary>
-    /// Shows the root's background when the document gave it one, and nothing otherwise.
+    /// Lends the root the variant its application would have given it.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// The root is detached while it is stood in for, so the variant it would inherit at run time
+    /// — its application's — reaches it from nowhere, and every themed value it still carries is
+    /// resolved under the tool's instead. Writing <see cref="ApplicationThemeVariant"/> onto it
+    /// for the duration of the borrow is what makes those values the application's: the themed
+    /// background the surface shows below is the one this write selects.
+    /// </para>
+    /// <para>
+    /// A variant the document declared is never overwritten — the document outranks the
+    /// application at run time too — and the write is taken back before the root is returned,
+    /// like everything else borrowed here.
+    /// </para>
+    /// </remarks>
+    private void MirrorApplicationVariant(TopLevel top)
+    {
+        bool documentDecided = !_variantMirrored
+            && top.GetDiagnostic(TopLevel.RequestedThemeVariantProperty).Priority
+                <= BindingPriority.LocalValue;
+
+        if (documentDecided)
+        {
+            return;
+        }
+
+        if (ApplicationThemeVariant != ThemeVariant.Default)
+        {
+            top.SetValue(TopLevel.RequestedThemeVariantProperty, ApplicationThemeVariant);
+
+            _variantMirrored = true;
+        }
+        else if (_variantMirrored)
+        {
+            top.ClearValue(TopLevel.RequestedThemeVariantProperty);
+
+            _variantMirrored = false;
+        }
+    }
+
+    /// <summary>Follows the property while a root is held, because a host may learn late.</summary>
+    protected override void OnPropertyChanged(AvaloniaPropertyChangedEventArgs change)
+    {
+        base.OnPropertyChanged(change);
+
+        if (change.Property == ApplicationThemeVariantProperty && _donor is { } top)
+        {
+            MirrorApplicationVariant(top);
+            ShowBackground(top);
+        }
+    }
+
+    /// <summary>
+    /// Shows the background the form would really have: the document's when it gave one, the
+    /// application's themed default when the host has said which application that is, and nothing
+    /// when nobody knows.
     /// </summary>
     /// <remarks>
     /// Where the value came from is the whole question, and <c>IsSet</c> does not answer it — it is
     /// true for a themed value as much as for a declared one. The priority does answer it, and
-    /// reading a priority is what <c>GetDiagnostic</c> is for. Anything weaker than a local value
-    /// was supplied by the application the designer itself is running under, and showing it would
-    /// paint every undecided form in the tool's own colour while claiming it was the form's.
+    /// reading a priority is what <c>GetDiagnostic</c> is for. A themed value is shown only once
+    /// <see cref="ApplicationThemeVariant"/> has been set: from then on the root carries its own
+    /// application's variant — see <see cref="MirrorApplicationVariant"/> — so its themed
+    /// background is the one the running application would paint. Without that knowledge a themed
+    /// value is the tool's, and showing it would paint every undecided form in the tool's own
+    /// colour while claiming it was the form's.
     /// </remarks>
     /// <remarks>
     /// One transition cannot be seen from here, and it is worth naming rather than pretending
@@ -376,7 +490,11 @@ public sealed class XamlDesignSurface : Border, IDisposable
     {
         AvaloniaPropertyValue declared = top.GetDiagnostic(TemplatedControl.BackgroundProperty);
 
-        Background = declared.Priority <= BindingPriority.LocalValue ? declared.Value as IBrush : null;
+        Background =
+            declared.Priority <= BindingPriority.LocalValue
+                || ApplicationThemeVariant != ThemeVariant.Default
+            ? declared.Value as IBrush
+            : null;
     }
 
     /// <summary>Gives all of it back, in the reverse order it was taken.</summary>
@@ -385,6 +503,13 @@ public sealed class XamlDesignSurface : Border, IDisposable
         if (_donor is null)
         {
             return;
+        }
+
+        if (_variantMirrored)
+        {
+            _donor.ClearValue(TopLevel.RequestedThemeVariantProperty);
+
+            _variantMirrored = false;
         }
 
         // Exactly the borrowed ones, and released here before being added there: the collection an

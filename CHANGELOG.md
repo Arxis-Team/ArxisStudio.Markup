@@ -33,6 +33,29 @@ It hosts and does not select: no adorner, no handle, no input, no inspector. See
 
 No existing public API changed.
 
+### A hosted form no longer wears the tool's theme variant
+
+A control's effective variant is decided twice at run time: by what its root declares, and by what
+its application requested for everything that declares nothing. The surface carried the first and
+had nothing for the second, so the "whatever my application says" of an undecided form resolved to
+the *designer's* application — a dark tool showed every unstyled form dark, whatever the project's
+own `App.axaml` asked for, and a `UserControl`-rooted document had no variant of its own to carry
+at all.
+
+**`XamlDesignSurface.ApplicationThemeVariant`** is the second layer, supplied by the host, which is
+the only party that knows it. The content now sits inside two scopes: the outer one stands where
+the document's application would stand, the inner one still follows the root's own request — which
+still wins, exactly as it would at run time. The default is `ThemeVariant.Default`, which inherits
+the tool's variant as before, so a host that has not set it sees no change.
+
+Setting it also lends the borrowed root the variant for the duration of the borrow — a detached
+window inherits from nothing, and its themed values otherwise resolve under the tool's variant —
+taken back on detach and never overwriting a variant the document declared. And it extends the
+background policy: an undecided window is not transparent at run time, its application's theme
+paints it, so a surface that knows the application shows that themed background where it used to
+show nothing. Translucent theme brushes composite against the right ground, which is most of what
+"the preview looks wrong" turns out to be.
+
 ### A dispatcher can run asynchronous work, and loading stopped blocking on it
 
 Creating a document's `x:Class` instance was one dispatched operation that did two unrelated

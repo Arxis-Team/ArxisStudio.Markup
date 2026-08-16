@@ -73,6 +73,34 @@ every undecided form in the tool's own colour while claiming it was the form's. 
 local priority is the form's. [One transition cannot be observed](../limitations.md); the rest is
 exact.
 
+## The variant has two layers, and the host owns one of them
+
+At run time a control's effective theme variant is decided twice: by what its root declares, and by
+what its **application** requested for everything that declares nothing. The surface reproduces the
+first from the document itself — the root's `RequestedThemeVariant` is bound through, and it wins,
+exactly as it would at run time. The second it cannot know: which application a document belongs to
+is a fact about the project being edited, not about the document or the tool.
+
+`ApplicationThemeVariant` is where a host that knows says so:
+
+```csharp
+surface.ApplicationThemeVariant = ThemeVariant.Light; // what the project's App.axaml would supply
+```
+
+The default, `ThemeVariant.Default`, inherits the tool's own variant — the honest answer for a host
+that knows nothing, and the behaviour every host had before the property existed. A host that does
+know supplies the variant the application would *resolve to*: for an application that itself says
+`Default`, that is the platform's variant, not the tool's — a dark designer editing a light
+application shows a light form.
+
+Setting it changes two more things, both in the same direction. The borrowed root is *lent* the
+variant for the duration of the borrow — a detached window inherits from nothing, so without the
+loan every themed value it still carries would resolve under the tool's variant — and the loan is
+taken back on detach, never overwriting a variant the document declared. And the background policy
+above gains a second honest source: an undecided window is not transparent at run time, its
+application's theme paints it, so once the host has said which application that is, the themed
+background is shown rather than nothing.
+
 ## Chrome is data
 
 `Title`, `Icon`, `CanResize` and `Decorations` are properties of a window *as a window*, and there

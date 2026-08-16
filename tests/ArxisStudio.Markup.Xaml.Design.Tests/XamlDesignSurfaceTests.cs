@@ -61,6 +61,21 @@ public sealed class XamlDesignSurfaceTests
         host.UpdateLayout();
     }
 
+    /// <summary>A host that has opinions of its own, which is what every real designer is.</summary>
+    private static void HostDark(XamlDesignSurface surface)
+    {
+        var host = new Window
+        {
+            Content = surface,
+            Width = 900,
+            Height = 600,
+            RequestedThemeVariant = ThemeVariant.Dark,
+        };
+
+        host.Show();
+        host.UpdateLayout();
+    }
+
     private static T Find<T>(XamlLoadSession session, string name)
         where T : Control =>
         Assert.IsType<T>(session.GetRoot<Window>().FindControl<Control>(name));
@@ -411,6 +426,158 @@ public sealed class XamlDesignSurfaceTests
         Host(surface);
 
         Assert.Equal(ThemeVariant.Light, Find<TextBlock>(session, "Text").ActualThemeVariant);
+    }
+
+    /// <summary>
+    /// A document that decides nothing shows the variant its application would give it — not the
+    /// variant of the tool it happens to be previewed in.
+    /// </summary>
+    /// <remarks>
+    /// The scenario is a dark designer editing a light application: every control here declares
+    /// nothing, which at run time means "whatever the application says", and the application says
+    /// light. Before <see cref="XamlDesignSurface.ApplicationThemeVariant"/> the preview inherited
+    /// the designer instead, and a form nobody had styled yet was shown in colours it would never
+    /// have at run time.
+    /// </remarks>
+    [AvaloniaFact]
+    public async Task TheApplicationVariant_ReachesAFormThatDeclaresNone()
+    {
+        await using XamlLoadSession session = await LoadAsync(Form());
+
+        using var surface = new XamlDesignSurface { ApplicationThemeVariant = ThemeVariant.Light };
+
+        surface.Attach(session);
+
+        HostDark(surface);
+
+        Assert.Equal(ThemeVariant.Light, Find<TextBlock>(session, "Text").ActualThemeVariant);
+    }
+
+    /// <summary>The same layer reaches a root that is not a top level at all.</summary>
+    /// <remarks>
+    /// A <c>UserControl</c> has no variant property of its own, so before this there was nothing
+    /// the surface could even bind: the control took the tool's variant every time.
+    /// </remarks>
+    [AvaloniaFact]
+    public async Task TheApplicationVariant_ReachesAControlRootedDocument()
+    {
+        await using XamlLoadSession session = await LoadAsync(
+            $"<UserControl xmlns=\"{Avalonia}\" xmlns:x=\"{Xaml}\">\n" +
+            "<TextBlock x:Name=\"Text\" Text=\"hello\" />\n" +
+            "</UserControl>");
+
+        using var surface = new XamlDesignSurface { ApplicationThemeVariant = ThemeVariant.Light };
+
+        surface.Attach(session);
+
+        HostDark(surface);
+
+        TextBlock text = Assert.IsType<TextBlock>(
+            session.GetRoot<UserControl>().FindControl<Control>("Text"));
+
+        Assert.Equal(ThemeVariant.Light, text.ActualThemeVariant);
+    }
+
+    /// <summary>The document's own request still wins over the application's, as it does at run time.</summary>
+    [AvaloniaFact]
+    public async Task TheDocumentsOwnRequest_StillWinsOverTheApplications()
+    {
+        await using XamlLoadSession session = await LoadAsync(Form("RequestedThemeVariant=\"Dark\""));
+
+        using var surface = new XamlDesignSurface { ApplicationThemeVariant = ThemeVariant.Light };
+
+        surface.Attach(session);
+
+        Host(surface);
+
+        Assert.Equal(ThemeVariant.Dark, Find<TextBlock>(session, "Text").ActualThemeVariant);
+    }
+
+    /// <summary>
+    /// Knowing the application also answers what is behind the form.
+    /// </summary>
+    /// <remarks>
+    /// An undecided window is not transparent at run time: its application's theme paints it. A
+    /// surface that knows the application therefore shows that themed background — resolved under
+    /// the application's variant, because the borrow lends the root that variant — where a surface
+    /// that knows nothing keeps showing nothing, which the next test pins.
+    /// </remarks>
+    [AvaloniaFact]
+    public async Task TheApplicationVariant_PaintsTheThemedWindowBackground()
+    {
+        await using XamlLoadSession session = await LoadAsync(Form());
+
+        using var surface = new XamlDesignSurface { ApplicationThemeVariant = ThemeVariant.Light };
+
+        surface.Attach(session);
+
+        HostDark(surface);
+
+        Assert.NotNull(surface.Background);
+    }
+
+    /// <summary>The lent variant is taken back with everything else.</summary>
+    [AvaloniaFact]
+    public async Task TheMirroredVariant_LeavesNoTraceAfterDetach()
+    {
+        await using XamlLoadSession session = await LoadAsync(Form());
+
+        var window = session.GetRoot<Window>();
+
+        using (var surface = new XamlDesignSurface { ApplicationThemeVariant = ThemeVariant.Light })
+        {
+            surface.Attach(session);
+
+            // While borrowed, the root lives under its application's variant — that is what makes
+            // its themed values the application's rather than the tool's.
+            Assert.Equal(ThemeVariant.Light, window.RequestedThemeVariant);
+
+            surface.Detach();
+        }
+
+        Assert.Equal(ThemeVariant.Default, window.RequestedThemeVariant);
+    }
+
+    /// <summary>A variant the document declared is the document's, before, during and after.</summary>
+    [AvaloniaFact]
+    public async Task ADeclaredVariant_IsNeverOverwrittenByTheMirror()
+    {
+        await using XamlLoadSession session = await LoadAsync(Form("RequestedThemeVariant=\"Dark\""));
+
+        var window = session.GetRoot<Window>();
+
+        using (var surface = new XamlDesignSurface { ApplicationThemeVariant = ThemeVariant.Light })
+        {
+            surface.Attach(session);
+
+            Assert.Equal(ThemeVariant.Dark, window.RequestedThemeVariant);
+
+            surface.Detach();
+        }
+
+        Assert.Equal(ThemeVariant.Dark, window.RequestedThemeVariant);
+    }
+
+    /// <summary>
+    /// A host that says nothing gets what it always got: the content follows the host.
+    /// </summary>
+    /// <remarks>
+    /// The default is <see cref="ThemeVariant.Default"/>, which inherits — the honest answer for a
+    /// host that does not know what the document's application would ask, and the reason this
+    /// property arriving is not a change of behaviour for anyone who has not set it.
+    /// </remarks>
+    [AvaloniaFact]
+    public async Task AnUnsetApplicationVariant_KeepsTheHostsOwn()
+    {
+        await using XamlLoadSession session = await LoadAsync(Form());
+
+        using var surface = new XamlDesignSurface();
+
+        surface.Attach(session);
+
+        HostDark(surface);
+
+        Assert.Equal(ThemeVariant.Dark, Find<TextBlock>(session, "Text").ActualThemeVariant);
     }
 
     // -- The context the content would otherwise lose, or inherit wrongly -------------------------
