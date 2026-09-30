@@ -28,7 +28,6 @@ The package family consists of:
 ArxisStudio.Markup
 ArxisStudio.Markup.Xaml
 ArxisStudio.Markup.Xaml.Loader
-ArxisStudio.Markup.Xaml.Design
 ```
 
 The dependency direction must remain:
@@ -39,19 +38,18 @@ ArxisStudio.Markup
 ArxisStudio.Markup.Xaml
         ↑
 ArxisStudio.Markup.Xaml.Loader
-        ↑
-ArxisStudio.Markup.Xaml.Design
 ```
 
 Circular dependencies are not allowed.
 
-The first three were the family as planned. The fourth answers something the plan did not
-anticipate and the loader must not absorb: the commonest document in any Avalonia application is a
-window, a `Window` is a `TopLevel`, and Avalonia parents it at construction — so the object the
-loader correctly produces for `MainWindow.axaml` is an object nothing can display. Making it
-displayable means producing an object the document does not describe, which is not a load result
-and does not belong behind a session. It sits beside the loader instead, and hosts without
-selecting: no adorner, no handle, no input, no inspector. See
+These three are the family as planned. One thing the plan did not anticipate is answered elsewhere:
+the commonest document in any Avalonia application is a window, a `Window` is a `TopLevel`, and
+Avalonia parents it at construction — so the object the loader correctly produces for
+`MainWindow.axaml` is an object nothing can display. Making it displayable means producing an
+object the document does not describe, which is not a load result and does not belong behind a
+session. A fourth package here did that for a while; it needed nothing from a session but the root
+object, so it is the form container of the library that shows forms now —
+`UiDesignerFormItem` in ArxisStudio.Surface. See the note that closes
 [ADR 0012](docs/adr/0012-hosting-a-top-level-root-is-a-package-beside-the-loader.md).
 
 ## Terminology
@@ -135,8 +133,6 @@ When one value is changed, unrelated source text must remain unchanged, includin
 
 `ArxisStudio.Markup.Xaml.Loader` understands Avalonia types, properties, resources, styles, templates, bindings, and runtime object creation.
 
-`ArxisStudio.Markup.Xaml.Design` understands one thing on top of that: how to stand in for a loaded root that Avalonia will not let anything host.
-
 ### 4. Unknown content must survive
 
 The parser must be forward-compatible. An unknown element, attribute, namespace, directive, or markup extension is not a reason to discard or rewrite source text.
@@ -195,15 +191,12 @@ ArxisStudio.Markup/
 │   │   └── ArxisStudio.Markup.csproj
 │   ├── ArxisStudio.Markup.Xaml/
 │   │   └── ArxisStudio.Markup.Xaml.csproj
-│   ├── ArxisStudio.Markup.Xaml.Loader/
-│   │   └── ArxisStudio.Markup.Xaml.Loader.csproj
-│   └── ArxisStudio.Markup.Xaml.Design/
-│       └── ArxisStudio.Markup.Xaml.Design.csproj
+│   └── ArxisStudio.Markup.Xaml.Loader/
+│       └── ArxisStudio.Markup.Xaml.Loader.csproj
 ├── tests/
 │   ├── ArxisStudio.Markup.Tests/
 │   ├── ArxisStudio.Markup.Xaml.Tests/
-│   ├── ArxisStudio.Markup.Xaml.Loader.Tests/
-│   └── ArxisStudio.Markup.Xaml.Design.Tests/
+│   └── ArxisStudio.Markup.Xaml.Loader.Tests/
 ├── benchmarks/
 │   └── ArxisStudio.Markup.Benchmarks/
 └── samples/

@@ -17,11 +17,10 @@ internal static class RepositoryLayout
     public const string BasePackage = "ArxisStudio.Markup";
     public const string SyntaxPackage = "ArxisStudio.Markup.Xaml";
     public const string LoaderPackage = "ArxisStudio.Markup.Xaml.Loader";
-    public const string DesignPackage = "ArxisStudio.Markup.Xaml.Design";
 
     /// <summary>The shipping packages, ordered from the bottom of the stack upwards.</summary>
     public static IReadOnlyList<string> Packages { get; } =
-        new[] { BasePackage, SyntaxPackage, LoaderPackage, DesignPackage };
+        new[] { BasePackage, SyntaxPackage, LoaderPackage };
 
     public static string RepositoryRoot { get; } = ResolveRepositoryRoot();
 

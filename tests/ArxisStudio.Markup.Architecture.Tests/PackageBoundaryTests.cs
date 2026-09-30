@@ -20,11 +20,11 @@ public sealed class PackageBoundaryTests
 
     /// <summary>
     /// The only permitted direction:
-    /// Markup ← Markup.Xaml ← Markup.Xaml.Loader ← Markup.Xaml.Design.
+    /// Markup ← Markup.Xaml ← Markup.Xaml.Loader.
     /// </summary>
     /// <remarks>
-    /// The design package sits above the loader rather than inside it, and depends on it rather
-    /// than the other way round. That direction is the decision, not an accident of layout — see
+    /// Nothing sits above the loader. A fourth package did for a while — the stand-in for a root
+    /// nothing can host — and it moved to the library that shows forms; see the note that closes
     /// <c>docs/adr/0012-hosting-a-top-level-root-is-a-package-beside-the-loader.md</c>.
     /// </remarks>
     private static readonly Dictionary<string, string[]> ExpectedProjectReferences = new(StringComparer.Ordinal)
@@ -32,7 +32,6 @@ public sealed class PackageBoundaryTests
         [RepositoryLayout.BasePackage] = [],
         [RepositoryLayout.SyntaxPackage] = [RepositoryLayout.BasePackage],
         [RepositoryLayout.LoaderPackage] = [RepositoryLayout.SyntaxPackage],
-        [RepositoryLayout.DesignPackage] = [RepositoryLayout.LoaderPackage],
     };
 
     [Fact]
@@ -96,8 +95,8 @@ public sealed class PackageBoundaryTests
         Assert.True(
             avalonia.Length == 0,
             $"'{package}' declares Avalonia package references ({string.Join(", ", avalonia)}). " +
-            "Avalonia may only be referenced by the two packages above the syntax layer, " +
-            "ArxisStudio.Markup.Xaml.Loader and ArxisStudio.Markup.Xaml.Design.");
+            "Avalonia may only be referenced by the package above the syntax layer, " +
+            "ArxisStudio.Markup.Xaml.Loader.");
     }
 
     /// <summary>

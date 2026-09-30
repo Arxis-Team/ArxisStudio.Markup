@@ -19,7 +19,6 @@ Written against **0.2.0-preview.2**. Every example here uses only public API.
 | [Loading](loading.md) | Environments, resolvers, sessions, objects ↔ elements, enumerating members, values |
 | [Updates](updates.md) | Bringing running objects in line with a changed document, design mode, includes |
 | [Live population](live-population.md) | Making placed `x:Class` controls follow their documents instead of their last build |
-| [Showing a root](design.md) | Standing in for a `Window`, which Avalonia will not let anything host |
 
 [Known limitations](../limitations.md) is the honest list of what these packages do not do. Read it
 before promising anything to your users.
@@ -32,14 +31,13 @@ ArxisStudio.Markup              text, documents, versions, transactions, undo �
 ArxisStudio.Markup.Xaml         lossless XAML syntax, editing, resource graph, workspace — no Avalonia
         ↑
 ArxisStudio.Markup.Xaml.Loader  live Avalonia objects, resolution, sessions, updates
-        ↑
-ArxisStudio.Markup.Xaml.Design   a stand-in for a root that cannot be hosted
 ```
 
-The first three stack; the fourth sits beside the loader rather than above it, because a stand-in is
-an object the document does not describe and is therefore not a load result — see
-[ADR 0012](../adr/0012-hosting-a-top-level-root-is-a-package-beside-the-loader.md). Only a tool that
-shows forms needs it.
+Showing a loaded root is not in this family. A `Window` cannot be the content of anything, so a tool
+that shows forms needs a stand-in for it, and that stand-in is an object the document does not
+describe — not a load result. It is `UiDesignerFormItem` in ArxisStudio.Surface, which takes
+`session.RootObject` and nothing else from here; the note that closes
+[ADR 0012](../adr/0012-hosting-a-top-level-root-is-a-package-beside-the-loader.md) says why it moved.
 
 Reference the highest one you need; it brings the others with it. A tool that only reads and edits
 markup — a formatter, a linter, a codemod — needs `ArxisStudio.Markup.Xaml` and never loads

@@ -11,50 +11,24 @@ the source of truth, an unchanged document round-trips byte for byte, and unknow
 
 ## Unreleased
 
-### A fourth package: `ArxisStudio.Markup.Xaml.Design`
+### The stand-in for a window lives with the editor that shows it
 
-The commonest document in any Avalonia application is a window, and a `Window` is a `TopLevel`:
-Avalonia parents it at construction, so the object the loader correctly produces for
-`MainWindow.axaml` is an object nothing can display. Every host that shows forms has had to invent
-the same detach-and-transplant, and discover in the same order that the content then loses the
-window's styles, resources, background, theme variant and inherited text properties — and last,
-that it loses the window's `DataContext`, which looks like a form that failed to load rather than
-like the cause.
+Between releases this family had a fourth package, `ArxisStudio.Markup.Xaml.Design`, holding one
+control: `XamlDesignSurface`, a stand-in for a root Avalonia will not let anything host. A `Window`
+is a `TopLevel` and is parented at construction, so the object the loader correctly produces for
+`MainWindow.axaml` cannot be shown; the control borrowed the window's content, resources and styles,
+mirrored its background, size and theme variant, and carried its `DataContext` across.
 
-`XamlDesignSurface` is that answer written once. It borrows what Avalonia will not let two elements
-have at once — the content, the resource dictionary and the styles — and gives all of it back on
-detach; it binds background, size and theme variant, so an edit through the session shows without a
-rebuild; and it publishes the window's chrome as data for a host to draw from. The root is
-untouched, so the object map, `x:Class`, member resolution and every edit path are exactly as they
-were.
-
-It hosts and does not select: no adorner, no handle, no input, no inspector. See
+It is gone from here, and no release ever contained it. All it took from the loader was the root
+object and a thread check, and nested inside an editor's container it left the host three things to
+keep in step. The same mechanics are the form container of ArxisStudio.Surface now —
+`UiDesignerFormItem`, which takes `session.RootObject` as an object — so a host references that
+library for it and nothing of this one. The architecture guards enumerate three packages again, and
+the limitation about background priority left `docs/limitations.md` with the code it described. See
+the note that closes
 [ADR 0012](docs/adr/0012-hosting-a-top-level-root-is-a-package-beside-the-loader.md).
 
-No existing public API changed.
-
-### A hosted form no longer wears the tool's theme variant
-
-A control's effective variant is decided twice at run time: by what its root declares, and by what
-its application requested for everything that declares nothing. The surface carried the first and
-had nothing for the second, so the "whatever my application says" of an undecided form resolved to
-the *designer's* application — a dark tool showed every unstyled form dark, whatever the project's
-own `App.axaml` asked for, and a `UserControl`-rooted document had no variant of its own to carry
-at all.
-
-**`XamlDesignSurface.ApplicationThemeVariant`** is the second layer, supplied by the host, which is
-the only party that knows it. The content now sits inside two scopes: the outer one stands where
-the document's application would stand, the inner one still follows the root's own request — which
-still wins, exactly as it would at run time. The default is `ThemeVariant.Default`, which inherits
-the tool's variant as before, so a host that has not set it sees no change.
-
-Setting it also lends the borrowed root the variant for the duration of the borrow — a detached
-window inherits from nothing, and its themed values otherwise resolve under the tool's variant —
-taken back on detach and never overwriting a variant the document declared. And it extends the
-background policy: an undecided window is not transparent at run time, its application's theme
-paints it, so a surface that knows the application shows that themed background where it used to
-show nothing. Translucent theme brushes composite against the right ground, which is most of what
-"the preview looks wrong" turns out to be.
+No public API of the three remaining packages changed.
 
 ### A dispatcher can run asynchronous work, and loading stopped blocking on it
 

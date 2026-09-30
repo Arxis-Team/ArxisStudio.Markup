@@ -208,13 +208,6 @@ the document — see `docs/adr/0005-resource-includes.md` for why. That leaves f
   still not `Template`: nothing available says which template produced it. A caller asking "may the
   user edit this?" gets a better answer from `GetElement`, which is `null` for anything the document
   does not name.
-- **A stand-in cannot see a background change that only changes priority.**
-  `XamlDesignSurface` shows a root's `Background` only when the document declared it, which it
-  decides from the value's priority. A transition that changes the priority and leaves the effective
-  value untouched — a document declaring locally the very brush instance a theme was already
-  supplying, or clearing one — raises no property-changed notification, and Avalonia offers no
-  observable of a value's priority, only the one-shot `GetDiagnostic`. So there is nothing to
-  subscribe to and the surface keeps showing what it last decided until it is attached again.
 - **No sandbox.** Loading a document runs constructors, setters, type converters, markup
   extensions and any custom control code the document reaches. A caller loading XAML it did not
   write is running code it did not write, and this library makes no attempt to prevent that.

@@ -14,7 +14,6 @@
     <ProjectReference Include="../../src/ArxisStudio.Markup/ArxisStudio.Markup.csproj" />
     <ProjectReference Include="../../src/ArxisStudio.Markup.Xaml/ArxisStudio.Markup.Xaml.csproj" />
     <ProjectReference Include="../../src/ArxisStudio.Markup.Xaml.Loader/ArxisStudio.Markup.Xaml.Loader.csproj" />
-    <ProjectReference Include="../../src/ArxisStudio.Markup.Xaml.Design/ArxisStudio.Markup.Xaml.Design.csproj" />
   </ItemGroup>
 
   <!-- The declarative project graph is checked from source, so the tests need the repo root. -->

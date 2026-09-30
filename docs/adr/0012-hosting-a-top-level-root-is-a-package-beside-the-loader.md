@@ -1,7 +1,7 @@
 # 12. Hosting a `TopLevel` root is a package beside the loader, not a part of it
 
 Date: 2026-08-07
-Status: Accepted
+Status: Superseded by ADR 0020 of ArxisStudio.Surface — see the closing note
 
 ## Context
 
@@ -163,3 +163,35 @@ drawn in the wrong place and the new code belongs to a host or an editor, not he
 - The architecture tests gained a fourth package: the dependency direction, the Avalonia rule and
   the documentation and description requirements all now cover it. A package the guards do not
   enumerate is a package with no guards.
+
+## What became of it
+
+The package is gone. Its half of the decision stands and its other half was wrong.
+
+What stands: the loader does not host. A stand-in is an object the document does not describe, it is
+not a load result, and nothing behind a session learns Avalonia's visual-tree rules. No option that
+put the surrogate into the load path has become more attractive.
+
+What was wrong is where the stand-in went instead. It was put in this family because it was written
+next to the loader, and the dependency it took on the loader turned out to be two lines: it read
+`session.RootObject`, and it borrowed the session's thread check. Everything else it did —
+borrowing content, resources and styles, mirroring background, size and theme, carrying the data
+context — is Avalonia's and needs no document at all.
+
+Meanwhile the host paid for the placement. The control sat *inside* the editor's container, so a
+designer had three things to keep in step: the container against the stand-in, the container's size
+against the root's, and a title bar drawn as a separate layer from "chrome published as data". The
+section *In this family, because that is where its dependencies are* turned the editor's library
+down because a control library must not depend on a document model — and that objection was aimed
+at the wrong thing: the stand-in never needed a document, only an object.
+
+So it is the editor's own container now: `UiDesignerFormItem` in ArxisStudio.Surface, recorded there
+as ADR 0020, *the form item holds the document's root*. It takes the root as an `object`, so the
+surface library still references nothing of this family; its size is the form's; and it draws the
+window's title bar itself. `ArxisStudio.ProjectSystem`'s FormsDesigner moved to it, which removed the
+last reference to this package, and the package, its tests and its guide page were deleted in the
+same change. The limitation it contributed to `docs/limitations.md` — a background change that only
+changes priority is not seen — went with the code it describes.
+
+The boundary sentence at the top of this family's `CLAUDE.md` is one exception shorter as a result:
+nothing in `src/` hosts anything.
