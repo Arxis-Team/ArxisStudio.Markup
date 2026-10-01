@@ -24,7 +24,9 @@ XamlLivePopulationResult result = await population.SetDocumentAsync(
 
 From that point, **every new instance** of `MyControl` — constructed by a session loading another
 document, by an update rebuilding a fragment, or by plain code — is populated from `document`
-instead of the assembly. Unsaved edits included, because the document is whatever the caller
+instead of the assembly. The one exception is the root of a session loading `MyControl.axaml`
+itself: that instance is populated from the session's own document, once, and the registration
+answers for everything else again as soon as it is constructed (ADR 0015). Unsaved edits included, because the document is whatever the caller
 registered. ADR 0014 records why reaching a generated member is acceptable here and nowhere else.
 
 ## What registration does and does not do

@@ -9,10 +9,11 @@ namespace ArxisStudio.Markup.Xaml.Loader;
 /// </summary>
 /// <remarks>
 /// <para>
-/// A class whose constructor calls <c>InitializeComponent()</c> will load the document a second
-/// time if it is constructed normally and then populated. A factory exists so the caller can
-/// decide how to avoid that — a parameterless constructor guarded by a flag, a purpose-built
-/// constructor, or something else it knows about its own types.
+/// A class whose constructor calls a generated <c>InitializeComponent()</c> is populated by the
+/// session inside that call, once and from the document (ADR 0015), however the factory
+/// constructs it. A factory exists for what that cannot see: a constructor that loads markup some
+/// other way, a pooled instance, or a type the caller wants built differently — and an instance
+/// the factory hands over without constructing it here is populated afterwards.
 /// </para>
 /// <para>
 /// The default deliberately does not reach for uninitialised-object creation. Skipping

@@ -202,10 +202,10 @@ public sealed partial class XamlLoadSession : IAsyncDisposable
             diagnostics.Add(diagnostic);
         }
 
-        // x:Class has to be resolved and instantiated before loading, because Avalonia
-        // populates an instance the caller supplies rather than creating one for it. This also
-        // gives Avalonia the object whose methods the document's event handlers name — and it
-        // is what the attributes are checked against, so it comes first.
+        // x:Class has to be resolved before loading, because Avalonia populates an instance the
+        // caller supplies rather than creating one for it. The class is also the object whose
+        // methods the document's event handlers name, so it is what the attributes are checked
+        // against — and it comes first.
         //
         // Resolving is not the owning thread's work and does not happen there. It reads metadata
         // through the caller's resolver, touches no Avalonia object and compiles nothing, so it
@@ -216,29 +216,11 @@ public sealed partial class XamlLoadSession : IAsyncDisposable
             .ResolveAsync(document, environment, diagnostics, cancellationToken)
             .ConfigureAwait(false);
 
-        // Creating is. It runs the class's constructor, which makes Avalonia objects, and it
-        // happens inside the compilation scope because an x:Class constructor is free to load
-        // markup of its own — a generated InitializeComponent does exactly that. The factory is
-        // the caller's and may be asynchronous, which is why this goes through RunAsync rather
-        // than waiting for a task on the one thread that task may need.
-        object? rootInstance = rootType is null
-            ? null
-            : await environment.Dispatcher
-                .RunAsync(
-                    async () =>
-                    {
-                        using (environment.CompilationScope?.Enter())
-                        {
-                            return await XamlRootClass
-                                .CreateAsync(rootType, document, environment, options, diagnostics, cancellationToken)
-                                .ConfigureAwait(true);
-                        }
-                    },
-                    cancellationToken)
-                .ConfigureAwait(false);
-
+        // Against the class the document names rather than against an instance of it, because
+        // there is no instance yet: the text the instance is populated from has to exist before
+        // its constructor runs. It is the type Avalonia compiles the handlers against either way.
         ImmutableArray<TextSpan> unloadable = await XamlAttributeChecks
-            .RunAsync(document, rootInstance?.GetType(), environment, diagnostics, cancellationToken)
+            .RunAsync(document, rootType, environment, diagnostics, cancellationToken)
             .ConfigureAwait(false);
 
         // Includes are resolved before anything is created, because Avalonia resolves them
@@ -249,13 +231,21 @@ public sealed partial class XamlLoadSession : IAsyncDisposable
             .ProjectAsync(document, null, environment, diagnostics, unloadable, cancellationToken)
             .ConfigureAwait(false);
 
+        // Creating and populating are the owning thread's work, and one piece of it. Creating runs
+        // the class's constructor, which makes Avalonia objects, inside the compilation scope
+        // because an x:Class constructor is free to load markup of its own — a generated
+        // InitializeComponent does exactly that, and that load is where the document goes. The
+        // factory is the caller's and may be asynchronous, which is why this goes through RunAsync
+        // rather than waiting for a task on the one thread that task may need.
         object? root = await environment.Dispatcher
-            .InvokeAsync(
-                () =>
+            .RunAsync(
+                async () =>
                 {
                     using (environment.CompilationScope?.Enter())
                     {
-                        return Load(document, projection, options, rootInstance, diagnostics);
+                        return await BuildAsync(
+                                rootType, document, projection, environment, options, diagnostics, cancellationToken)
+                            .ConfigureAwait(true);
                     }
                 },
                 cancellationToken)
@@ -381,6 +371,73 @@ public sealed partial class XamlLoadSession : IAsyncDisposable
     /// Closes the session to further changes, because its objects no longer describe a document.
     /// </summary>
     private void RequireRecreation() => State = XamlSessionState.RequiresNewSession;
+
+    /// <summary>
+    /// Creates the root the document names, and populates it from the document exactly once.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// A document with no <c>x:Class</c> has no instance to create, and Avalonia builds the root
+    /// as it builds everything else.
+    /// </para>
+    /// <para>
+    /// One that names a class is populated <em>inside</em> the class's own constructor wherever
+    /// the constructor loads markup, which a generated partial's does — see
+    /// <see cref="XamlRootPopulation"/> for what populating it afterwards cost. Where the
+    /// constructor loaded nothing, the instance is populated afterwards, as it always was.
+    /// </para>
+    /// <para>
+    /// Keeps its context throughout, for the reason <see cref="XamlRootClass.CreateAsync"/> does:
+    /// all of this is on the owning thread, inside a scope that thread entered and will leave.
+    /// </para>
+    /// </remarks>
+    private static async Task<object?> BuildAsync(
+        Type? rootType,
+        XamlDocument document,
+        TextProjection projection,
+        XamlLoadEnvironment environment,
+        XamlLoadOptions options,
+        List<MarkupDiagnostic> diagnostics,
+        CancellationToken cancellationToken)
+    {
+        if (rootType is null)
+        {
+            return Load(document, projection, options, null, diagnostics);
+        }
+
+        object? rootInstance;
+
+        XamlRootPopulation population = XamlRootPopulation.Lend(
+            rootType, instance => Load(document, projection, options, instance, diagnostics));
+
+        using (population)
+        {
+            rootInstance = await XamlRootClass
+                .CreateAsync(rootType, document, environment, options, diagnostics, cancellationToken)
+                .ConfigureAwait(true);
+        }
+
+        if (population.Instance is { } populated)
+        {
+            // The constructor ran the document. When the instance it ran it over is the one that
+            // came back, that was the load — including when it failed, which the diagnostics
+            // already say and a second attempt would only say again.
+            if (ReferenceEquals(populated, rootInstance))
+            {
+                return population.Root;
+            }
+
+            // And when nothing came back, the constructor threw after loading, or the factory
+            // threw the instance away. Either way there is no root, and asking Avalonia to
+            // construct the class a second time is asking for the same failure.
+            if (rootInstance is null)
+            {
+                return null;
+            }
+        }
+
+        return Load(document, projection, options, rootInstance, diagnostics);
+    }
 
     /// <summary>Hands the projected text to Avalonia's runtime loader.</summary>
     private static object? Load(

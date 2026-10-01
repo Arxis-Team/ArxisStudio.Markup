@@ -9,17 +9,18 @@ namespace ArxisStudio.Markup.Xaml.Loader;
 /// </summary>
 /// <remarks>
 /// <para>
-/// There is a real hazard here, and it is the reason <see cref="IXamlRootInstanceFactory"/>
-/// exists rather than this being hard-coded. A generated <c>x:Class</c> partial usually calls
-/// <c>InitializeComponent()</c> from its constructor, which loads the document. Constructing
-/// such a type and then populating it loads the document twice: the children appear twice, the
-/// handlers are attached twice, and nothing about the result says why.
+/// A generated <c>x:Class</c> partial calls <c>InitializeComponent()</c> from its constructor,
+/// which loads markup. That load is where the session's document goes: while this factory runs,
+/// the session has lent the type's populate hook its own population, so a type built by
+/// Avalonia's XAML compiler is populated once, from the document, inside its constructor
+/// (ADR 0015). This factory needs to know nothing about it, and does not detect it.
 /// </para>
 /// <para>
-/// This factory does not attempt to detect that. It cannot: whether a constructor calls
-/// <c>InitializeComponent</c> is a fact about code it has never seen. A caller whose types
-/// initialise themselves should supply a factory that constructs them in whatever way skips
-/// that — a purpose-built constructor, a flag the constructor honours, or a pooled instance.
+/// What it cannot cover is a type that loads markup some other way than through the compiled
+/// hook — a hand-written <c>AvaloniaXamlLoader.Load(uri)</c>, say. Constructing such a type and
+/// then populating it still loads twice. A caller whose types do that supplies a factory that
+/// constructs them in whatever way skips it — a purpose-built constructor, a flag the constructor
+/// honours, or a pooled instance.
 /// </para>
 /// <para>
 /// What this factory deliberately does not do is create the object without running its

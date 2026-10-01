@@ -86,6 +86,21 @@ if (session is null)
 
 A session is disposable, holds the objects it built, and refuses to work after disposal.
 
+### An `x:Class` root
+
+A document naming a class is loaded by creating the class and populating the instance. Every class
+a project writes calls `InitializeComponent()` from its constructor, which loads markup too — so the
+session lends that load its document: the class's constructor runs, its generated
+`InitializeComponent` populates the instance from the session's projection, in the session's mode,
+and its own code after the call sees the controls that are shown. One population, never two
+(ADR 0015). A root with `<Window.Resources>` used to fail here with "An item with the same key has
+already been added", and its styles and handlers came out doubled.
+
+The hook the session borrows is the one `XamlLivePopulation` stands on, and it is borrowed rather
+than taken: a document registered for the same type keeps populating every *placed* copy of it.
+`RootInstanceFactory` decides how the instance is constructed; an instance it hands over without
+constructing it here is populated after the fact, as it always was.
+
 ## Objects and elements
 
 The map is the point of the whole exercise: given an object, which markup declared it, and given

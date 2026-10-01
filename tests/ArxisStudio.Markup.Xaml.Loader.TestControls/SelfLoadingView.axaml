@@ -1,0 +1,15 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             x:Class="ArxisStudio.Markup.Xaml.Loader.TestControls.SelfLoadingView">
+    <UserControl.Resources>
+        <SolidColorBrush x:Key="Accent" Color="Red" />
+    </UserControl.Resources>
+    <UserControl.Styles>
+        <Style Selector="TextBlock">
+            <Setter Property="FontSize" Value="20" />
+        </Style>
+    </UserControl.Styles>
+    <StackPanel>
+        <TextBlock x:Name="Title" Text="Compiled" />
+    </StackPanel>
+</UserControl>

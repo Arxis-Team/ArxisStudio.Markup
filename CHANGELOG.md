@@ -11,6 +11,18 @@ the source of truth, an unchanged document round-trips byte for byte, and unknow
 
 ## Unreleased
 
+### An x:Class root is populated once, inside its constructor
+
+A session created its root by constructing the class, and the class's constructor loaded markup of
+its own — the compiled markup, or the document registered for live population — before the session
+populated the same instance again. Everything the root accumulates came out doubled, and a keyed
+resource on the root failed the whole load: "An item with the same key has already been added". The
+session now lends the type's populate hook its document for the one construction, so the
+constructor's own `InitializeComponent` is the population, and the fields it assigns point at the
+controls that are shown. What was installed before — a live registration — is put back and keeps
+answering for placed copies. The attribute checks and the projection now run before construction,
+against the class the document names. See [ADR 0015](docs/adr/0015-a-session-populates-an-x-class-root-inside-its-constructor.md).
+
 ### An update carries what an element writes as property elements
 
 Adding `<X.Resources>`, a style to `<X.Styles>` or a row to `<Grid.RowDefinitions>` reads as a change

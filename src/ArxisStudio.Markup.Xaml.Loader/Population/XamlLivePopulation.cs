@@ -1,8 +1,6 @@
 using System;
 using System.Collections.Generic;
 using System.Collections.Immutable;
-using System.Reflection;
-using System.Runtime.ExceptionServices;
 using System.Threading;
 using System.Threading.Tasks;
 using Avalonia.Markup.Xaml;
@@ -56,12 +54,6 @@ namespace ArxisStudio.Markup.Xaml.Loader;
 /// </remarks>
 public sealed class XamlLivePopulation : IDisposable
 {
-    /// <summary>The field Avalonia's XAML compiler emits for exactly this purpose.</summary>
-    private const string OverrideFieldName = "!XamlIlPopulateOverride";
-
-    /// <summary>The generated method that consults it and runs the compiled markup otherwise.</summary>
-    private const string TrampolineMethodName = "!XamlIlPopulateTrampoline";
-
     /// <summary>
     /// The types the current thread is populating, for breaking cycles.
     /// </summary>
@@ -157,7 +149,7 @@ public sealed class XamlLivePopulation : IDisposable
         // caller registering a document mid-edit wants to know what state it is in.
         diagnostics.AddRange(document.Diagnostics);
 
-        if (Hooks(type) is not { } hooks)
+        if (XamlPopulateHook.Find(type) is not { } hook)
         {
             diagnostics.Add(MarkupDiagnostic.Load(
                 XamlLoaderDiagnosticCodes.NotPopulatable,
@@ -205,10 +197,10 @@ public sealed class XamlLivePopulation : IDisposable
             }
             else
             {
-                var registration = new Registration(this, type, hooks.Field, hooks.Trampoline, prepared);
+                var registration = new Registration(this, type, hook, prepared);
 
                 _registrations.Add(type, registration);
-                hooks.Field.SetValue(null, registration.Override);
+                hook.Installed = registration.Override;
             }
         }
 
@@ -266,35 +258,6 @@ public sealed class XamlLivePopulation : IDisposable
     }
 
     private bool IsDisposed => Volatile.Read(ref _disposed) != 0;
-
-    /// <summary>
-    /// The two generated members population stands on, or nothing when the type has no compiled
-    /// markup.
-    /// </summary>
-    /// <remarks>
-    /// Both are checked for shape as well as name. A field of another type, whatever it is called,
-    /// is not the seam this rides on — installing into it would fail at invocation time, far from
-    /// the mistake.
-    /// </remarks>
-    private static (FieldInfo Field, MethodInfo Trampoline)? Hooks(Type type)
-    {
-        FieldInfo? field = type.GetField(
-            OverrideFieldName, BindingFlags.Static | BindingFlags.NonPublic);
-
-        MethodInfo? trampoline = type.GetMethod(
-            TrampolineMethodName, BindingFlags.Static | BindingFlags.NonPublic);
-
-        if (field is null
-            || trampoline is null
-            || field.FieldType != typeof(Action<object>)
-            || trampoline.GetParameters() is not [{ ParameterType: { } parameter }]
-            || !parameter.IsAssignableFrom(type))
-        {
-            return null;
-        }
-
-        return (field, trampoline);
-    }
 
     /// <summary>
     /// Populates one instance from the prepared document, on the constructing thread.
@@ -426,8 +389,7 @@ public sealed class XamlLivePopulation : IDisposable
     /// <summary>One overridden type: its hooks, its delegate, and the document it populates from.</summary>
     private sealed class Registration
     {
-        private readonly FieldInfo _field;
-        private readonly MethodInfo _trampoline;
+        private readonly XamlPopulateHook _hook;
 
         /// <summary>
         /// The prepared document, replaced whole on every registration and never cleared.
@@ -443,15 +405,13 @@ public sealed class XamlLivePopulation : IDisposable
         public Registration(
             XamlLivePopulation owner,
             Type type,
-            FieldInfo field,
-            MethodInfo trampoline,
+            XamlPopulateHook hook,
             PreparedDocument prepared)
         {
             Type = type;
             Prepared = prepared;
 
-            _field = field;
-            _trampoline = trampoline;
+            _hook = hook;
 
             Override = instance => owner.Populate(this, instance);
         }
@@ -472,9 +432,9 @@ public sealed class XamlLivePopulation : IDisposable
         {
             Removed = true;
 
-            if (ReferenceEquals(_field.GetValue(null), Override))
+            if (ReferenceEquals(_hook.Installed, Override))
             {
-                _field.SetValue(null, null);
+                _hook.Installed = null;
             }
         }
 
@@ -490,23 +450,15 @@ public sealed class XamlLivePopulation : IDisposable
         /// </remarks>
         public void PopulateFromCompiledMarkup(object instance)
         {
-            _field.SetValue(null, null);
-
             try
             {
-                _trampoline.Invoke(null, [instance]);
-            }
-            catch (TargetInvocationException wrapped) when (wrapped.InnerException is not null)
-            {
-                // The compiled populate's own failure is the caller's to see, exactly as it
-                // would have been with nothing registered.
-                ExceptionDispatchInfo.Capture(wrapped.InnerException).Throw();
+                _hook.PopulateFromCompiledMarkup(instance);
             }
             finally
             {
                 if (!Removed)
                 {
-                    _field.SetValue(null, Override);
+                    _hook.Installed = Override;
                 }
             }
         }
