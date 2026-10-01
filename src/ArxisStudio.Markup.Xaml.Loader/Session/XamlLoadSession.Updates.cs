@@ -5,6 +5,7 @@ using System.Linq;
 using System.Reflection;
 using System.Threading;
 using System.Threading.Tasks;
+using Avalonia.Controls;
 using Avalonia.LogicalTree;
 using Avalonia.Markup.Xaml;
 using Avalonia.Markup.Xaml.Diagnostics;
@@ -324,9 +325,37 @@ public sealed partial class XamlLoadSession
                     .ConfigureAwait(false)));
         }
 
+        var rootMustBeRebuilt = false;
+
         XamlMutationOutcome written = await _dispatcher
-            .InvokeAsync(() => Write(changes, fragments, diagnostics), cancellationToken)
+            .InvokeAsync(
+                () =>
+                {
+                    XamlMutationOutcome outcome = Write(changes, fragments, diagnostics, out bool root);
+
+                    rootMustBeRebuilt = root;
+
+                    return outcome;
+                },
+                cancellationToken)
             .ConfigureAwait(false);
+
+        if (written == XamlMutationOutcome.Refused && rootMustBeRebuilt)
+        {
+            // The same answer a changed root element gets, for the same reason: nothing was
+            // written, this session is as usable as it was, and the new document is out of its
+            // reach because reaching it means a new root object.
+            return Refuse(
+                updated,
+                XamlUpdateStrategy.RecreateSession,
+                changes,
+                diagnostics,
+                XamlLoaderDiagnosticCodes.UpdateRequiresNewSession,
+                "A value the root element writes as a property element changed, and a single value "
+                    + "cannot be moved onto the root from a rebuilt copy of it. Nothing was written to the "
+                    + "objects, and this session goes on describing the document it loaded; create a new "
+                    + "session to load the new one.");
+        }
 
         if (written == XamlMutationOutcome.Refused)
         {
@@ -465,11 +494,15 @@ public sealed partial class XamlLoadSession
     private XamlMutationOutcome Write(
         ImmutableArray<XamlDocumentChange> changes,
         List<(XamlDocumentChange Change, TextProjection Projection)> fragments,
-        List<MarkupDiagnostic> diagnostics)
+        List<MarkupDiagnostic> diagnostics,
+        out bool rootMustBeRebuilt)
     {
         var writes = new List<(object Target, XamlMemberDescriptor Member, object? Value)>();
-        var rebuilds = new List<(XamlDocumentChange Change, object Previous, object Fresh, Uri? RuntimeUri)>();
+        var rebuilds = new List<(
+            XamlDocumentChange Change, object Previous, object Fresh, Uri? RuntimeUri, bool ReplacesObject)>();
         var reorders = new List<(XamlElement Parent, IReadOnlyList<XamlElement> Order)>();
+
+        rootMustBeRebuilt = false;
 
         // Cleared here rather than after a successful apply: an attempt that gets part-way and
         // then refuses leaves pairs behind, keyed by elements of a document this session never
@@ -499,7 +532,31 @@ public sealed partial class XamlLoadSession
                 return XamlMutationOutcome.Refused;
             }
 
-            rebuilds.Add((change, previous, fresh, runtimeUri));
+            bool replacesObject = change.ReplacesObject;
+
+            // Rebuilding what an element holds leaves the object alone, which is only possible
+            // while everything that changed can be moved onto it from the rebuilt copy: its
+            // content, and the dictionaries and lists it writes as property elements. A single
+            // value written that way cannot — so the object is put in instead, which is the
+            // larger of the two and always enough. The comparison cannot decide this, because it
+            // reads syntax and the difference is what the member is.
+            if (!replacesObject
+                && !XamlObjectReplacement.CanReplaceContent(
+                    previous, fresh, element, change.NewElement, Environment.MemberResolver))
+            {
+                // Except at the root, which has no slot to be put into. Found out here, with
+                // nothing touched, so it is still a refusal.
+                if (ReferenceEquals(element, Document.Root))
+                {
+                    rootMustBeRebuilt = true;
+
+                    return XamlMutationOutcome.Refused;
+                }
+
+                replacesObject = true;
+            }
+
+            rebuilds.Add((change, previous, fresh, runtimeUri, replacesObject));
         }
 
         foreach (XamlDocumentChange change in changes)
@@ -618,13 +675,14 @@ public sealed partial class XamlLoadSession
             mutated = true;
         }
 
-        foreach ((XamlDocumentChange change, object previous, object fresh, Uri? runtimeUri) in rebuilds)
+        foreach ((XamlDocumentChange change, object previous, object fresh, Uri? runtimeUri, bool replacesObject)
+            in rebuilds)
         {
-            XamlMutationOutcome replaced = change.ReplacesObject
+            XamlMutationOutcome replaced = replacesObject
                 ? XamlObjectReplacement.Replace(
                     Objects, change.OldElement!, previous, fresh, Environment.MemberResolver, diagnostics)
                 : XamlObjectReplacement.ReplaceContent(
-                    previous, fresh, change.OldElement!, Environment.MemberResolver, diagnostics);
+                    previous, fresh, change.OldElement!, change.NewElement, Environment.MemberResolver, diagnostics);
 
             if (replaced != XamlMutationOutcome.Applied)
             {
@@ -642,7 +700,7 @@ public sealed partial class XamlLoadSession
             // old one carrying the fresh one's content when only the content was rebuilt.
             if (change.NewElement is { } rebuilt)
             {
-                Pair(rebuilt, change.ReplacesObject ? fresh : previous, _rebuilt);
+                Pair(rebuilt, replacesObject ? fresh : previous, _rebuilt);
             }
         }
 
@@ -794,15 +852,24 @@ public sealed partial class XamlLoadSession
     /// position.
     /// </summary>
     /// <remarks>
+    /// <para>
     /// The same conservative rule the rest of the update path uses: where the two sides stop
     /// having the same shape, the walk stops descending rather than guessing which child is
     /// which. A property element contributes what is inside it — a resource dictionary, a
     /// template — and those are not logical children, so a mismatch there simply ends the
     /// descent, and what is below keeps whatever the map can work out for itself.
+    /// </para>
+    /// <para>
+    /// A resource is the exception, because it has something better than a position: its key.
+    /// The entries of a dictionary the element holds are paired with the elements that declare
+    /// them, by the key each is written under — see <see cref="PairResources"/>.
+    /// </para>
     /// </remarks>
-    private static void Pair(XamlElement element, object target, Dictionary<XamlElement, object> into)
+    private void Pair(XamlElement element, object target, Dictionary<XamlElement, object> into)
     {
         into[element] = target;
+
+        PairResources(element, target, into);
 
         XamlElement[] children = [.. element.ContentElements];
         object[] objects = target is ILogical logical ? [.. logical.LogicalChildren] : [];
@@ -815,6 +882,72 @@ public sealed partial class XamlLoadSession
         for (int index = 0; index < children.Length; index++)
         {
             Pair(children[index], objects[index], into);
+        }
+    }
+
+    /// <summary>
+    /// Pairs the resources an element declares with what its dictionaries now hold under their
+    /// keys.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// Rebuilding what an element holds refills its dictionaries from the rebuilt copy, so every
+    /// entry afterwards is a new object. An element still paired with the entry that used to be
+    /// under its key sends the next edit of it — a changed colour, say — to an object the tree no
+    /// longer holds; the update then reports success and nothing on screen moves.
+    /// </para>
+    /// <para>
+    /// The key is what says which entry an element is, and it says so exactly, which a position
+    /// among siblings never could. A key written as an expression — <c>{x:Type Button}</c> — is
+    /// not text this can look up, and is left to whatever the map works out for itself.
+    /// </para>
+    /// </remarks>
+    private void PairResources(XamlElement element, object target, Dictionary<XamlElement, object> into)
+    {
+        if (target is IResourceDictionary own)
+        {
+            PairEntries(element, own, into);
+
+            return;
+        }
+
+        foreach (XamlElement member in element.MemberElements)
+        {
+            if (XamlObjectReplacement.Owns(element, member)
+                && member.MemberName is { } name
+                && XamlObjectReplacement.Held(target, name, Environment.MemberResolver) is IResourceDictionary held)
+            {
+                PairEntries(member, held, into);
+            }
+        }
+    }
+
+    /// <summary>Pairs the keyed elements written inside a dictionary with its entries.</summary>
+    private void PairEntries(XamlElement holder, IResourceDictionary dictionary, Dictionary<XamlElement, object> into)
+    {
+        foreach (XamlElement entry in holder.ContentElements)
+        {
+            if (entry.GetDirective("Key") is not { Length: > 0 } key)
+            {
+                // A dictionary written out in full inside the property element is the dictionary
+                // the member holds, and its entries are one level further down.
+                if (holder.IsPropertyElementSyntax
+                    && string.Equals(entry.Name.LocalName, nameof(ResourceDictionary), StringComparison.Ordinal))
+                {
+                    into[entry] = dictionary;
+
+                    PairEntries(entry, dictionary, into);
+                }
+
+                continue;
+            }
+
+            if (key.StartsWith('{') || !dictionary.ContainsKey(key) || dictionary[key] is not { } value)
+            {
+                continue;
+            }
+
+            Pair(entry, value, into);
         }
     }
 

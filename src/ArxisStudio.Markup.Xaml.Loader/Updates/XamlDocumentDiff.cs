@@ -141,6 +141,25 @@ internal static class XamlDocumentDiff
             && extension.PositionalArguments.Any(argument =>
                 string.Equals(argument.Value.ToXamlText(), key, StringComparison.Ordinal)));
 
+    /// <summary>
+    /// Reports whether two elements standing in the same place describe different objects.
+    /// </summary>
+    /// <remarks>
+    /// The same comparison as the one between documents, asked of one pair of elements: by tree
+    /// rather than by text, so an element that was only reindented is the same element.
+    /// </remarks>
+    /// <param name="before">The element as the objects were built from it.</param>
+    /// <param name="after">The element standing in its place now.</param>
+    /// <returns><see langword="true"/> when anything that affects an object differs.</returns>
+    internal static bool Differ(XamlElement before, XamlElement after)
+    {
+        var changes = ImmutableArray.CreateBuilder<XamlDocumentChange>();
+
+        CompareElements(before, after, changes);
+
+        return changes.Count > 0;
+    }
+
     /// <summary>Gets the largest strategy a set of changes calls for.</summary>
     internal static XamlUpdateStrategy Largest(ImmutableArray<XamlDocumentChange> changes) =>
         changes.IsEmpty

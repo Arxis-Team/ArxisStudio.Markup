@@ -1075,6 +1075,332 @@ public sealed class UpdateTests
         Assert.Equal("after", session.GetRoot<StackPanel>().Children.OfType<TextBlock>().Single().Text);
     }
 
+    private const string XamlLanguageNamespace = "http://schemas.microsoft.com/winfx/2006/xaml";
+
+    private static Avalonia.Media.Color? Colour(Avalonia.Media.IBrush? brush) =>
+        (brush as Avalonia.Media.ISolidColorBrush)?.Color;
+
+    /// <summary>
+    /// A member written as a property element is part of what an element holds.
+    /// </summary>
+    /// <remarks>
+    /// Adding one changes how many children the element has, which reads as a change to its
+    /// content — and rebuilding the content moved the type's <c>[Content]</c> member across and
+    /// nothing else. The rebuilt copy carried the new resources and was thrown away with them,
+    /// and the update said it had been applied: a file saved by another editor with a
+    /// <c>Resources</c> block added showed no change until the form was opened again.
+    /// </remarks>
+    [AvaloniaFact]
+    public async Task ResourcesAddedToAnElementReachADynamicReferenceInsideIt()
+    {
+        string Xaml(string resources) =>
+            $"<Border xmlns=\"{AvaloniaNamespace}\" xmlns:x=\"{XamlLanguageNamespace}\">\n" +
+            "  <StackPanel>\n" +
+            resources +
+            "    <Border Background=\"{DynamicResource Accent}\" />\n" +
+            "  </StackPanel>\n" +
+            "</Border>";
+
+        await using XamlLoadSession session = await Load(Xaml(string.Empty));
+
+        var panel = (StackPanel)session.GetRoot<Border>().Child!;
+
+        Assert.Null(((Border)panel.Children[0]).Background);
+
+        XamlUpdateResult result = await Update(session, Xaml(
+            "    <StackPanel.Resources>\n" +
+            "      <SolidColorBrush x:Key=\"Accent\" Color=\"Blue\" />\n" +
+            "    </StackPanel.Resources>\n"));
+
+        Assert.True(result.Applied, string.Join(" | ", result.Diagnostics));
+
+        // The panel is the same panel, and it is the one that has the resources now.
+        Assert.Same(panel, session.GetRoot<Border>().Child);
+        Assert.True(panel.Resources.ContainsKey("Accent"));
+        Assert.Equal(Avalonia.Media.Colors.Blue, Colour(((Border)panel.Children[0]).Background));
+    }
+
+    [AvaloniaFact]
+    public async Task ResourcesAddedToAnElementWithNothingElseInsideItAreItsResources()
+    {
+        string Xaml(string button) =>
+            $"<StackPanel xmlns=\"{AvaloniaNamespace}\" xmlns:x=\"{XamlLanguageNamespace}\">\n" +
+            button +
+            "\n</StackPanel>";
+
+        await using XamlLoadSession session = await Load(Xaml(
+            "  <Button x:Name=\"Go\" Content=\"Go\" Background=\"{DynamicResource Accent}\" />"));
+
+        var button = (Button)session.GetRoot<StackPanel>().Children[0];
+
+        // The case a designer meets: a control whose look is changed by resources of its own,
+        // written by hand in the other editor while the form is open here.
+        XamlUpdateResult result = await Update(session, Xaml(
+            "  <Button x:Name=\"Go\" Content=\"Go\" Background=\"{DynamicResource Accent}\">\n" +
+            "    <Button.Resources>\n" +
+            "      <SolidColorBrush x:Key=\"Accent\" Color=\"Blue\" />\n" +
+            "    </Button.Resources>\n" +
+            "  </Button>"));
+
+        Assert.True(result.Applied, string.Join(" | ", result.Diagnostics));
+        Assert.Same(button, session.GetRoot<StackPanel>().Children[0]);
+        Assert.Equal("Go", button.Content);
+        Assert.Equal(Avalonia.Media.Colors.Blue, Colour(button.Background));
+    }
+
+    [AvaloniaFact]
+    public async Task AResourceAddedToABlockThatWasAlreadyThereIsAdded()
+    {
+        string Xaml(string more) =>
+            $"<Border xmlns=\"{AvaloniaNamespace}\" xmlns:x=\"{XamlLanguageNamespace}\">\n" +
+            "  <Border.Resources>\n" +
+            "    <SolidColorBrush x:Key=\"Accent\" Color=\"Red\" />\n" +
+            more +
+            "  </Border.Resources>\n" +
+            "  <Border Background=\"{DynamicResource Second}\" />\n" +
+            "</Border>";
+
+        await using XamlLoadSession session = await Load(Xaml(string.Empty));
+
+        var root = session.GetRoot<Border>();
+
+        // The change is inside the property element this time, and the element that owns it is
+        // the root — so there is no rebuilding the object, only what it holds.
+        XamlUpdateResult result = await Update(
+            session, Xaml("    <SolidColorBrush x:Key=\"Second\" Color=\"Blue\" />\n"));
+
+        Assert.True(result.Applied, string.Join(" | ", result.Diagnostics));
+        Assert.Same(root, session.RootObject);
+        Assert.Equal(2, root.Resources.Count);
+        Assert.Equal(Avalonia.Media.Colors.Blue, Colour(((Border)root.Child!).Background));
+    }
+
+    [AvaloniaFact]
+    public async Task ResourcesTakenOutOfAnElementAreGone()
+    {
+        string Xaml(string resources) =>
+            $"<Border xmlns=\"{AvaloniaNamespace}\" xmlns:x=\"{XamlLanguageNamespace}\">\n" +
+            resources +
+            "  <Border Background=\"{DynamicResource Accent}\" />\n" +
+            "</Border>";
+
+        await using XamlLoadSession session = await Load(Xaml(
+            "  <Border.Resources>\n" +
+            "    <SolidColorBrush x:Key=\"Accent\" Color=\"Red\" />\n" +
+            "  </Border.Resources>\n"));
+
+        var root = session.GetRoot<Border>();
+
+        XamlUpdateResult result = await Update(session, Xaml(string.Empty));
+
+        // Removing the block is the same change read the other way, and leaving the old entries
+        // behind would be the same disagreement between the objects and the document.
+        Assert.True(result.Applied, string.Join(" | ", result.Diagnostics));
+        Assert.Empty(root.Resources);
+        Assert.Null(((Border)root.Child!).Background);
+    }
+
+    [AvaloniaFact]
+    public async Task StylesAddedToTheRootStyleWhatIsInsideIt()
+    {
+        string Xaml(string styles) =>
+            $"<Border xmlns=\"{AvaloniaNamespace}\">\n" +
+            styles +
+            "  <Border />\n" +
+            "</Border>";
+
+        await using XamlLoadSession session = await Load(Xaml(string.Empty));
+
+        var root = session.GetRoot<Border>();
+
+        XamlUpdateResult result = await Update(session, Xaml(
+            "  <Border.Styles>\n" +
+            "    <Style Selector=\"Border\"><Setter Property=\"Width\" Value=\"20\" /></Style>\n" +
+            "  </Border.Styles>\n"));
+
+        Assert.True(result.Applied, string.Join(" | ", result.Diagnostics));
+        Assert.Same(root, session.RootObject);
+        Assert.Single(root.Styles);
+
+        root.Measure(new Avalonia.Size(1000, 1000));
+
+        Assert.Equal(20d, ((Border)root.Child!).Width);
+    }
+
+    [AvaloniaFact]
+    public async Task ACollectionWrittenAsAPropertyElementFollowsTheDocument()
+    {
+        string Xaml(string rows) =>
+            $"<Grid xmlns=\"{AvaloniaNamespace}\">\n" +
+            "  <Grid.RowDefinitions>\n" +
+            rows +
+            "  </Grid.RowDefinitions>\n" +
+            "  <TextBlock Text=\"x\" />\n" +
+            "</Grid>";
+
+        await using XamlLoadSession session = await Load(Xaml("    <RowDefinition Height=\"10\" />\n"));
+
+        var grid = session.GetRoot<Grid>();
+
+        XamlUpdateResult result = await Update(session, Xaml(
+            "    <RowDefinition Height=\"10\" />\n" +
+            "    <RowDefinition Height=\"30\" />\n"));
+
+        // Not resources and not styles: any member that holds a list is what the element holds.
+        Assert.True(result.Applied, string.Join(" | ", result.Diagnostics));
+        Assert.Same(grid, session.RootObject);
+        Assert.Equal(2, grid.RowDefinitions.Count);
+        Assert.Equal(30d, grid.RowDefinitions[1].Height.Value);
+    }
+
+    [AvaloniaFact]
+    public async Task AValueWrittenAsAPropertyElementRebuildsTheObjectItIsOn()
+    {
+        string Xaml(string border) =>
+            $"<StackPanel xmlns=\"{AvaloniaNamespace}\" xmlns:x=\"{XamlLanguageNamespace}\">\n" +
+            border +
+            "\n</StackPanel>";
+
+        await using XamlLoadSession session = await Load(Xaml("  <Border x:Name=\"Swatch\" />"));
+
+        var panel = session.GetRoot<StackPanel>();
+
+        XamlUpdateResult result = await Update(session, Xaml(
+            "  <Border x:Name=\"Swatch\">\n" +
+            "    <Border.Background>\n" +
+            "      <SolidColorBrush Color=\"Blue\" />\n" +
+            "    </Border.Background>\n" +
+            "  </Border>"));
+
+        // A single value cannot be moved across the way a list can: what the rebuilt copy reads
+        // back is a value, and what the markup wrote may have been a binding. So the element's
+        // object is built again and put where the old one was, which is always right.
+        Assert.True(result.Applied, string.Join(" | ", result.Diagnostics));
+        Assert.Equal(Avalonia.Media.Colors.Blue, Colour(((Border)panel.Children[0]).Background));
+
+        XamlElement swatch = session.Document.DescendantElements()
+            .Single(static element => element.Name.LocalName == "Border");
+
+        Assert.Same(panel.Children[0], session.GetObject(swatch));
+    }
+
+    [AvaloniaFact]
+    public async Task AValueWrittenAsAPropertyElementOnTheRootNeedsANewSession()
+    {
+        await using XamlLoadSession session = await Load($"<Border xmlns=\"{AvaloniaNamespace}\" />");
+
+        var root = session.GetRoot<Border>();
+
+        XamlUpdateResult result = await Update(
+            session,
+            $"<Border xmlns=\"{AvaloniaNamespace}\">\n" +
+            "  <Border.Background>\n" +
+            "    <SolidColorBrush Color=\"Blue\" />\n" +
+            "  </Border.Background>\n" +
+            "</Border>");
+
+        // There is no slot to put a rebuilt root into, so this is the one place the honest answer
+        // is a refusal. It used to be reported as applied, with the brush nowhere.
+        Assert.Equal(XamlUpdateOutcome.RejectedCleanly, result.Outcome);
+        Assert.Equal(XamlUpdateStrategy.RecreateSession, result.Strategy);
+        Assert.Contains(
+            result.Diagnostics,
+            static diagnostic => diagnostic.Code == XamlLoaderDiagnosticCodes.UpdateRequiresNewSession);
+        Assert.Equal(XamlSessionState.Usable, session.State);
+        Assert.Null(root.Background);
+        Assert.NotNull(session.PendingDocument);
+    }
+
+    [AvaloniaFact]
+    public async Task AThemeDictionaryAddedToADictionaryIsCarriedAcross()
+    {
+        string Xaml(string themes) =>
+            $"<ResourceDictionary xmlns=\"{AvaloniaNamespace}\" xmlns:x=\"{XamlLanguageNamespace}\">\n" +
+            themes +
+            "  <SolidColorBrush x:Key=\"Plain\" Color=\"Red\" />\n" +
+            "</ResourceDictionary>";
+
+        await using XamlLoadSession session = await Load(Xaml(string.Empty));
+
+        var dictionary = session.GetRoot<ResourceDictionary>();
+
+        XamlUpdateResult result = await Update(session, Xaml(
+            "  <ResourceDictionary.ThemeDictionaries>\n" +
+            "    <ResourceDictionary x:Key=\"Dark\">\n" +
+            "      <SolidColorBrush x:Key=\"Accent\" Color=\"Blue\" />\n" +
+            "    </ResourceDictionary>\n" +
+            "  </ResourceDictionary.ThemeDictionaries>\n"));
+
+        // A resource that differs between light and dark is under a variant rather than under a
+        // key, so a dictionary refilled by its keys alone would have left this out.
+        Assert.True(result.Applied, string.Join(" | ", result.Diagnostics));
+        Assert.Same(dictionary, session.RootObject);
+        Assert.True(dictionary.TryGetResource("Accent", Avalonia.Styling.ThemeVariant.Dark, out object? accent));
+        Assert.Equal(Avalonia.Media.Colors.Blue, Colour(accent as Avalonia.Media.IBrush));
+        Assert.True(dictionary.ContainsKey("Plain"));
+    }
+
+    [AvaloniaFact]
+    public async Task AResourceIsStillTheOneTheDictionaryHoldsAfterItsBlockWasRebuilt()
+    {
+        string Xaml(string colour, string more) =>
+            $"<StackPanel xmlns=\"{AvaloniaNamespace}\" xmlns:x=\"{XamlLanguageNamespace}\">\n" +
+            "  <StackPanel.Resources>\n" +
+            $"    <SolidColorBrush x:Key=\"Accent\" Color=\"{colour}\" />\n" +
+            more +
+            "  </StackPanel.Resources>\n" +
+            "  <Border Background=\"{DynamicResource Accent}\" />\n" +
+            "</StackPanel>";
+
+        await using XamlLoadSession session = await Load(Xaml("Red", string.Empty));
+
+        var panel = session.GetRoot<StackPanel>();
+
+        Assert.True((await Update(
+            session, Xaml("Red", "    <SolidColorBrush x:Key=\"Second\" Color=\"Green\" />\n"))).Applied);
+
+        XamlElement accent = session.Document.DescendantElements()
+            .First(static element => element.GetDirective("Key") == "Accent");
+
+        // The dictionary was filled again from the rebuilt copy, so every entry in it is a new
+        // object. The map has to follow: an element paired with the brush that used to be there
+        // sends the next edit of it to something the tree no longer holds.
+        Assert.Same(panel.Resources["Accent"], session.GetObject(accent));
+
+        XamlUpdateResult recoloured = await Update(
+            session, Xaml("Blue", "    <SolidColorBrush x:Key=\"Second\" Color=\"Green\" />\n"));
+
+        Assert.True(recoloured.Applied, string.Join(" | ", recoloured.Diagnostics));
+        Assert.Equal(XamlUpdateStrategy.ReplaceResource, recoloured.Strategy);
+        Assert.Equal(Avalonia.Media.Colors.Blue, Colour(((Border)panel.Children[0]).Background));
+    }
+
+    [AvaloniaFact]
+    public async Task AResourceAStaticReferenceReadIsStillTheOneTheDictionaryHolds()
+    {
+        string Xaml(string colour) =>
+            $"<StackPanel xmlns=\"{AvaloniaNamespace}\" xmlns:x=\"{XamlLanguageNamespace}\">\n" +
+            "  <StackPanel.Resources>\n" +
+            $"    <SolidColorBrush x:Key=\"Accent\" Color=\"{colour}\" />\n" +
+            "  </StackPanel.Resources>\n" +
+            "  <Border Background=\"{StaticResource Accent}\" />\n" +
+            "</StackPanel>";
+
+        await using XamlLoadSession session = await Load(Xaml("Red"));
+
+        var panel = session.GetRoot<StackPanel>();
+
+        Assert.True((await Update(session, Xaml("Blue"))).Applied);
+
+        XamlElement accent = session.Document.DescendantElements()
+            .First(static element => element.GetDirective("Key") == "Accent");
+
+        // Two changes meet here: the entry is replaced, and then the element that declares the
+        // dictionary is rebuilt for the reader. Whichever object ends up under the key is the one
+        // the element stands for.
+        Assert.Same(panel.Resources["Accent"], session.GetObject(accent));
+    }
+
     [AvaloniaFact]
     public async Task AnUpdateOnADisposedSessionThrows()
     {

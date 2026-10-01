@@ -167,6 +167,17 @@ Where an element's objects live is read from the member the type marks `[Content
 therefore replaced and reordered exactly as `Panel.Children` is, with nothing to register and no
 base class to derive from.
 
+What an element holds is its content **and the members it writes as property elements**. Adding
+`<Grid.Resources>`, a style to `<Window.Styles>` or a row to `<Grid.RowDefinitions>` changes the
+element's children, and the rebuilt copy's member is moved onto the object that stays: a dictionary
+is refilled — entries, merged dictionaries and theme dictionaries — and a list emptied and filled
+again, so a `DynamicResource` inside picks the new entry up. A member written that way that holds a
+single value — `<Border.Background>` — cannot be moved across, because what the copy reads back is a
+value where the markup may have written a binding; the element's object is rebuilt and put back
+instead. At the root there is nowhere to put it, so that one change is refused cleanly with
+`Strategy` `RecreateSession`. A property element that reads the same in both documents is left
+exactly as it is.
+
 ## What a changed file costs
 
 A document that includes other files is built from all of them, so a change to one of them is a

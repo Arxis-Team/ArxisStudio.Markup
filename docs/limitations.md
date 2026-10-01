@@ -66,8 +66,16 @@ the document — see `docs/adr/0005-resource-includes.md` for why. That leaves f
   reads them. A reader built on its own has no dictionary to read, because a static reference is
   resolved against the resources in scope where the markup sits.
 - **A structural change at the root rebuilds the root's content in place.** The root object
-  itself survives, because a session is built around it and the caller holds it. A change to the
-  root element's own type or `x:Class` needs a new session.
+  itself survives, because a session is built around it and the caller holds it — and so do the
+  dictionaries and lists it writes as property elements, which are refilled from the rebuilt copy.
+  A change to the root element's own type or `x:Class` needs a new session, and so does a changed
+  property element on the root that holds a single value (`<Window.Background>`): a value cannot
+  be moved across without losing the binding it may have been, and the root has no slot to be
+  rebuilt into.
+- **A file an include at the root reaches is followed as content only.** `ApplySourceUpdateAsync`
+  rebuilds the root's content when an include sits straight inside it; a `StyleInclude` in
+  `<Window.Styles>` is not re-read that way, because the root's own document did not change and
+  there is nothing to compare its property elements against.
 - **An object rebuilt below a structural change is paired with its element by shape, and
   everything that survived the change carries its element across by position.** Avalonia records
   where it built the root of a separately loaded text and nothing below it, so the objects inside

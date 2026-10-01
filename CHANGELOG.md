@@ -11,6 +11,18 @@ the source of truth, an unchanged document round-trips byte for byte, and unknow
 
 ## Unreleased
 
+### An update carries what an element writes as property elements
+
+Adding `<X.Resources>`, a style to `<X.Styles>` or a row to `<Grid.RowDefinitions>` reads as a change
+to the element's content, and rebuilding the content moved the `[Content]` member across and threw
+the rebuilt copy away with the rest — while reporting the update as applied. Changed dictionaries
+and lists written as property elements are now moved onto the object that stays, a refilled
+dictionary carries its theme dictionaries too, and the elements of its entries are paired by key.
+A changed single-valued property element rebuilds the element's object instead, and at the root is
+refused with `RecreateSession`. A string `Content` is no longer mistaken for a collection.
+
+No public API changed.
+
 ### The stand-in for a window lives with the editor that shows it
 
 Between releases this family had a fourth package, `ArxisStudio.Markup.Xaml.Design`, holding one

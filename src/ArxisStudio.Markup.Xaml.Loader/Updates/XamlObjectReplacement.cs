@@ -5,6 +5,7 @@ using System.Linq;
 using System.Reflection;
 using Avalonia.Controls;
 using Avalonia.LogicalTree;
+using Avalonia.Styling;
 
 namespace ArxisStudio.Markup.Xaml.Loader;
 
@@ -278,13 +279,25 @@ internal static class XamlObjectReplacement
 
     /// <summary>Rebuilds what an element holds without disturbing the object it is.</summary>
     /// <remarks>
-    /// For a change to an element's content rather than to the element itself. The object stays,
+    /// <para>
+    /// For a change to what an element holds rather than to the element itself. The object stays,
     /// so a caller holding it — or a session built around it, which is the case at the root —
     /// keeps working, and only what is inside is built again.
+    /// </para>
+    /// <para>
+    /// What an element holds is its content <em>and the members it writes as property
+    /// elements</em>: <c>&lt;Grid.Resources&gt;</c>, <c>&lt;Window.Styles&gt;</c>,
+    /// <c>&lt;Grid.RowDefinitions&gt;</c>. Those are children of the element in the document, so
+    /// adding one is exactly the kind of change that arrives here — and moving only the content
+    /// member across threw the rebuilt copy away with the new resources still in it, and called
+    /// the update applied. <see cref="CanReplaceContent"/> says beforehand whether every member
+    /// that changed is one this can move.
+    /// </para>
     /// </remarks>
     /// <param name="target">The object whose content is being rebuilt.</param>
     /// <param name="fresh">A freshly built copy of the same element.</param>
-    /// <param name="element">The element, for diagnostics.</param>
+    /// <param name="element">The element as the objects were built from it.</param>
+    /// <param name="updated">The element as it now reads, or <see langword="null"/> when it reads the same.</param>
     /// <param name="members">What decides which member the type calls its content.</param>
     /// <param name="diagnostics">Collects a report when the content cannot be moved across.</param>
     /// <returns>Whether the content was rebuilt, refused, or left part-way.</returns>
@@ -292,6 +305,7 @@ internal static class XamlObjectReplacement
         object target,
         object fresh,
         XamlElement element,
+        XamlElement? updated,
         XamlMemberResolver members,
         List<MarkupDiagnostic> diagnostics)
     {
@@ -300,25 +314,268 @@ internal static class XamlObjectReplacement
             return Fail(element, diagnostics, "the rebuilt object is not the same kind of object");
         }
 
-        // Whatever the type says its content is, moved across from the rebuilt copy. A dictionary
-        // has no [Content] and is handled below, because what it holds is keys and merged files
-        // rather than a member.
-        if (target is not IResourceDictionary
-            && members.FindContent(target.GetType()) is { CanRead: true } content)
+        // A dictionary has no [Content], and what it holds is keys, merged files and theme
+        // dictionaries rather than members — all of which refilling it carries.
+        if (target is IResourceDictionary dictionary)
         {
-            return MoveContent(target, fresh, content, members, element, diagnostics);
+            return fresh is IResourceDictionary rebuilt
+                ? Refill(dictionary, rebuilt, element, diagnostics)
+                : Fail(element, diagnostics, $"{target.GetType().Name} does not say what it holds");
         }
 
-        return target is IResourceDictionary dictionary && fresh is IResourceDictionary rebuilt
-            ? Refill(dictionary, rebuilt, element, diagnostics)
-            : Fail(element, diagnostics, $"{target.GetType().Name} does not say what it holds");
+        XamlMemberDescriptor? content = members.FindContent(target.GetType()) is { CanRead: true } found
+            ? found
+            : null;
+
+        // Worked out before anything is touched, so a member that cannot be moved is a refusal
+        // rather than something discovered with the content already gone across.
+        if (Moves(target, fresh, element, updated, content, members) is not { } moves)
+        {
+            return Fail(
+                element,
+                diagnostics,
+                "a member it writes as a property element changed and holds a single value, which "
+                    + "cannot be moved across from a rebuilt copy");
+        }
+
+        if (content is null && moves.Count == 0)
+        {
+            return Fail(element, diagnostics, $"{target.GetType().Name} does not say what it holds");
+        }
+
+        var moved = false;
+
+        // Whatever the type says its content is, moved across from the rebuilt copy.
+        if (content is not null)
+        {
+            XamlMutationOutcome outcome = MoveContent(target, fresh, content, members, element, diagnostics);
+
+            if (outcome != XamlMutationOutcome.Applied)
+            {
+                return outcome;
+            }
+
+            moved = true;
+        }
+
+        foreach ((string name, object held, object rebuiltMember) in moves)
+        {
+            XamlMutationOutcome outcome = held is IResourceDictionary resources
+                ? Refill(resources, (IResourceDictionary)rebuiltMember, element, diagnostics)
+                : MoveItems(held, rebuiltMember) switch
+                {
+                    XamlMutationOutcome.Applied => XamlMutationOutcome.Applied,
+                    XamlMutationOutcome.Refused => Fail(
+                        element, diagnostics, $"{name} would not take what the document now gives it"),
+                    _ => Broke(
+                        element, diagnostics, $"{name} was emptied and would not take its items back"),
+                };
+
+            if (outcome == XamlMutationOutcome.Inconsistent)
+            {
+                return outcome;
+            }
+
+            // A member that refuses cleanly has touched nothing itself — but by now something
+            // before it has, and an element part of which has moved describes neither document.
+            if (outcome != XamlMutationOutcome.Applied)
+            {
+                return moved
+                    ? Broke(element, diagnostics, $"{name} refused after part of what it holds had been moved")
+                    : outcome;
+            }
+
+            moved = true;
+        }
+
+        return XamlMutationOutcome.Applied;
+    }
+
+    /// <summary>
+    /// Reports whether what an element holds can be rebuilt inside the object it already is.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// Asked before the first live object is touched, so the answer can still change what is
+    /// done. A dictionary and a list are moved across item by item and the object holding them
+    /// never notices. A single value is not: what the rebuilt copy reads back is a value, and
+    /// what the markup wrote may have been a binding or a resource reference — writing the value
+    /// would silently replace the expression with its result, and a member taken out of the
+    /// document would have to be un-set, which is not the same as setting its default. So a
+    /// changed member of that kind means the element's own object has to be built again.
+    /// </para>
+    /// <para>
+    /// Only members that changed are asked about. One that reads the same in both documents stays
+    /// exactly as it is, whatever it holds.
+    /// </para>
+    /// </remarks>
+    /// <param name="target">The object whose content would be rebuilt.</param>
+    /// <param name="fresh">A freshly built copy of the same element.</param>
+    /// <param name="element">The element as the objects were built from it.</param>
+    /// <param name="updated">The element as it now reads, or <see langword="null"/> when it reads the same.</param>
+    /// <param name="members">What decides what each member is.</param>
+    /// <returns><see langword="false"/> when the object itself has to be rebuilt.</returns>
+    internal static bool CanReplaceContent(
+        object target,
+        object fresh,
+        XamlElement element,
+        XamlElement? updated,
+        XamlMemberResolver members)
+    {
+        // Neither is this question's to answer: a copy of another type and a dictionary are both
+        // reported by the replacement itself, in its own words.
+        if (target.GetType() != fresh.GetType() || target is IResourceDictionary)
+        {
+            return true;
+        }
+
+        XamlMemberDescriptor? content = members.FindContent(target.GetType()) is { CanRead: true } found
+            ? found
+            : null;
+
+        return Moves(target, fresh, element, updated, content, members) is not null;
+    }
+
+    /// <summary>Reads what an object holds in a member a property element names.</summary>
+    /// <param name="owner">The object that has the member.</param>
+    /// <param name="memberName">The member, as the property element names it.</param>
+    /// <param name="members">What decides what the member is.</param>
+    /// <returns>What the member holds, or <see langword="null"/> when it cannot be read.</returns>
+    internal static object? Held(object owner, string memberName, XamlMemberResolver members) =>
+        Read(owner, memberName, members);
+
+    /// <summary>
+    /// Reports whether a property element names a member of the element it is written inside.
+    /// </summary>
+    /// <remarks>
+    /// <c>&lt;Grid.Resources&gt;</c> inside a <c>Grid</c> does; <c>&lt;ToolTip.Tip&gt;</c> inside a
+    /// <c>Button</c> names an attached property of another type, which is a value set on the
+    /// button rather than something the button holds.
+    /// </remarks>
+    /// <param name="element">The element the property element is written inside.</param>
+    /// <param name="member">The property element.</param>
+    /// <returns><see langword="true"/> when the owner the property element names is the element.</returns>
+    internal static bool Owns(XamlElement element, XamlElement member) =>
+        string.Equals(member.OwnerName, element.Name.LocalName, StringComparison.Ordinal)
+        && string.Equals(member.Name.Prefix, element.Name.Prefix, StringComparison.Ordinal);
+
+    /// <summary>
+    /// Works out which members have to be moved across with the content, or that one of them
+    /// cannot be.
+    /// </summary>
+    /// <returns>
+    /// The members to move, which may be none, or <see langword="null"/> when a member that
+    /// changed is not something that can be moved.
+    /// </returns>
+    private static List<(string Name, object Held, object Rebuilt)>? Moves(
+        object target,
+        object fresh,
+        XamlElement element,
+        XamlElement? updated,
+        XamlMemberDescriptor? content,
+        XamlMemberResolver members)
+    {
+        var moves = new List<(string Name, object Held, object Rebuilt)>();
+
+        // The same element is the same markup: an update made because a file it includes changed
+        // has nothing to compare, and goes on rebuilding the content alone.
+        if (updated is null || ReferenceEquals(updated, element))
+        {
+            return moves;
+        }
+
+        var seen = new HashSet<XamlQualifiedName>();
+
+        foreach (XamlElement member in element.MemberElements.Concat(updated.MemberElements))
+        {
+            if (!seen.Add(member.Name))
+            {
+                continue;
+            }
+
+            XamlElement? before = element.MemberElements.FirstOrDefault(other => other.Name == member.Name);
+            XamlElement? after = updated.MemberElements.FirstOrDefault(other => other.Name == member.Name);
+
+            // Written the same in both documents, so whatever it holds is still what it holds.
+            if (before is not null && after is not null && !XamlDocumentDiff.Differ(before, after))
+            {
+                continue;
+            }
+
+            if (!Owns(element, member) || member.MemberName is not { } name)
+            {
+                return null;
+            }
+
+            // The content member written out by name is still the content member, and it is
+            // already on its way across.
+            if (content is not null && string.Equals(content.Name, name, StringComparison.Ordinal))
+            {
+                continue;
+            }
+
+            object? held = Read(target, name, members);
+            object? rebuilt = Read(fresh, name, members);
+
+            if (held is IResourceDictionary && rebuilt is IResourceDictionary)
+            {
+                moves.Add((name, held, rebuilt));
+
+                continue;
+            }
+
+            if (held is null || rebuilt is null || !IsList(held) || !IsList(rebuilt))
+            {
+                return null;
+            }
+
+            moves.Add((name, held, rebuilt));
+        }
+
+        return moves;
+    }
+
+    /// <summary>
+    /// Reports whether a member's value is a list whose items can be taken out and put back.
+    /// </summary>
+    /// <remarks>
+    /// Asked of the value rather than the member, because it is the collection that has to take
+    /// the items. A dictionary that is not a resource dictionary is left out: its entries are
+    /// pairs, and nothing here knows how one is added.
+    /// </remarks>
+    private static bool IsList(object value)
+    {
+        if (value is string or IDictionary or IResourceDictionary)
+        {
+            return false;
+        }
+
+        if (value is IList list)
+        {
+            return !list.IsReadOnly && !list.IsFixedSize;
+        }
+
+        // Avalonia's own collections — Styles among them — implement IList<T> and not IList.
+        foreach (Type implemented in value.GetType().GetInterfaces())
+        {
+            if (implemented.IsGenericType && implemented.GetGenericTypeDefinition() == typeof(IList<>))
+            {
+                Type collection = typeof(ICollection<>).MakeGenericType(implemented.GetGenericArguments());
+
+                return collection.GetProperty(nameof(ICollection<object>.IsReadOnly))?.GetValue(value) is false;
+            }
+        }
+
+        return false;
     }
 
     /// <summary>Replaces everything a resource dictionary holds with what a rebuilt one holds.</summary>
     /// <remarks>
-    /// Merged dictionaries are not entries. A file that only merges other files has all of its
-    /// content there and none of it under a key, so copying the keys alone would leave the old
-    /// content in place and call it an update.
+    /// Merged dictionaries are not entries, and neither are theme dictionaries. A file that only
+    /// merges other files has all of its content there and none of it under a key, and a resource
+    /// that differs between light and dark is under a variant rather than in the dictionary
+    /// itself — so copying the keys alone would leave the old content in place and call it an
+    /// update.
     /// </remarks>
     private static XamlMutationOutcome Refill(
         IResourceDictionary dictionary,
@@ -361,6 +618,18 @@ internal static class XamlObjectReplacement
                 dictionary.MergedDictionaries.Add(provider);
             }
 
+            KeyValuePair<ThemeVariant, IThemeVariantProvider>[] themes = [.. rebuilt.ThemeDictionaries];
+
+            dictionary.ThemeDictionaries.Clear();
+
+            // Out of the copy first, like the merged ones and for the same reason.
+            rebuilt.ThemeDictionaries.Clear();
+
+            foreach ((ThemeVariant variant, IThemeVariantProvider provider) in themes)
+            {
+                dictionary.ThemeDictionaries[variant] = provider;
+            }
+
             return XamlMutationOutcome.Applied;
         }
         catch (Exception error) when (Ordinary(error))
@@ -386,7 +655,9 @@ internal static class XamlObjectReplacement
         object? held = Read(target, content.Name, members);
         object? rebuilt = Read(fresh, content.Name, members);
 
-        if (held is IEnumerable && rebuilt is IEnumerable)
+        // A string is a sequence of characters and a value all the same: a button whose content
+        // is its caption holds one thing, and is written like any other single value.
+        if (held is IEnumerable and not string && rebuilt is IEnumerable and not string)
         {
             return MoveItems(held!, rebuilt!) switch
             {
