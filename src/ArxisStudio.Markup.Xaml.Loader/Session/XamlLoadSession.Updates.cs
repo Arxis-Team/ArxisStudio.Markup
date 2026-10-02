@@ -872,6 +872,15 @@ public sealed partial class XamlLoadSession
     /// objects have moved and the document cannot follow them — so from that point every failure
     /// is <see cref="XamlMutationOutcome.Inconsistent"/> and the session must be replaced.
     /// </para>
+    /// <para>
+    /// Every part is built before anything is written, so an update that refuses — a root that needs
+    /// a new session, a later part that will not build, a member that cannot be written — has built
+    /// objects that go nowhere, and so has one that stops part-way. A copy of a top level is a top
+    /// level, with a platform window of its own that nothing else will close and through which the
+    /// copy, and every type it was built from, stays. So whatever way the run ends, every object it
+    /// built and did not leave standing in the tree is retired on the way out: the copies whose
+    /// content was moved across, and the parts of an update that never got there.
+    /// </para>
     /// </remarks>
     private XamlMutationOutcome Write(
         ImmutableArray<XamlDocumentChange> changes,
@@ -879,6 +888,34 @@ public sealed partial class XamlLoadSession
         List<(XamlDocumentChange Change, TextProjection Projection, Type? Placed)> fragments,
         List<MarkupDiagnostic> diagnostics,
         List<XamlElement> kept,
+        out bool rootMustBeRebuilt)
+    {
+        var unplaced = new HashSet<object>(ReferenceEqualityComparer.Instance);
+
+        try
+        {
+            return WriteParts(changes, inPlace, fragments, diagnostics, kept, unplaced, out rootMustBeRebuilt);
+        }
+        finally
+        {
+            foreach (object built in unplaced)
+            {
+                Retire(built, diagnostics);
+            }
+        }
+    }
+
+    /// <summary>
+    /// Does what <see cref="Write"/> describes, putting every object it builds into
+    /// <paramref name="unplaced"/> and taking out each one it leaves standing in the tree.
+    /// </summary>
+    private XamlMutationOutcome WriteParts(
+        ImmutableArray<XamlDocumentChange> changes,
+        Dictionary<XamlDocumentChange, XamlInPlaceWrite> inPlace,
+        List<(XamlDocumentChange Change, TextProjection Projection, Type? Placed)> fragments,
+        List<MarkupDiagnostic> diagnostics,
+        List<XamlElement> kept,
+        HashSet<object> unplaced,
         out bool rootMustBeRebuilt)
     {
         var writes = new List<(object Target, XamlMemberDescriptor Member, XamlInPlaceWrite Write)>();
@@ -915,6 +952,8 @@ public sealed partial class XamlLoadSession
             {
                 return XamlMutationOutcome.Refused;
             }
+
+            unplaced.Add(fresh);
 
             bool replacesObject = change.ReplacesObject;
 
@@ -1097,17 +1136,16 @@ public sealed partial class XamlLoadSession
 
             mutated = true;
 
-            if (!replacesObject)
+            if (replacesObject)
             {
-                // The copy only carried the content across, and is finished with. A copy of a top
-                // level is a top level, with a platform window of its own that nothing else will
-                // close — and through which the copy, and every type it was built from, stays.
-                Retire(fresh, diagnostics);
-
-                if (change.NewElement is { } holder)
-                {
-                    kept.Add(holder);
-                }
+                // Standing in the tree now, where the object it replaced stood.
+                unplaced.Remove(fresh);
+            }
+            else if (change.NewElement is { } holder)
+            {
+                // The copy only carried the content across, and is finished with: it stays among
+                // what is retired on the way out.
+                kept.Add(holder);
             }
 
             if (runtimeUri is not null)

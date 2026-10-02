@@ -133,6 +133,41 @@ public sealed class ClassKeepingUpdateTests
         }
     }
 
+    [AvaloniaTheory]
+    [InlineData("  <tc:TrackedWindow.Background>\n    <SolidColorBrush Color=\"Red\" />\n  </tc:TrackedWindow.Background>\n")]
+    [InlineData("  <Design.DataContext>\n    <tc:GreetingModel />\n  </Design.DataContext>\n")]
+    public async Task ARootTheUpdateCannotRebuildLeavesNoWindowOpen(string added)
+    {
+        const string Content = "  <StackPanel />\n";
+
+        XamlLoadSession session = await LoadAsync(Window(Content));
+        var root = session.GetRoot<CountedWindow>();
+
+        try
+        {
+            HashSet<TrackedWindow> before = [.. TrackedWindow.Open()];
+
+            // A single value written as a property element of the root cannot be moved onto it from a
+            // copy, which the update finds out only once it has built the copy; it then asks for a new
+            // session — and the copy, a window like the root, is still the update's to close.
+            XamlUpdateResult result = await UpdateAsync(session, Window(added + Content));
+
+            Assert.Equal(XamlUpdateStrategy.RecreateSession, result.Strategy);
+
+            TrackedWindow[] leftOpen = [.. TrackedWindow.Open().Where(window => !before.Contains(window))];
+
+            Assert.True(
+                leftOpen.Length == 0,
+                $"The refused update left {leftOpen.Length} window(s) open: "
+                    + string.Join(", ", leftOpen.Select(static window => window.GetType().Name)));
+        }
+        finally
+        {
+            await session.DisposeAsync();
+            root.Close();
+        }
+    }
+
     [AvaloniaFact]
     public async Task AStructuralChangeInsideAPanelHoldingAHandlerAppliesInPlace()
     {

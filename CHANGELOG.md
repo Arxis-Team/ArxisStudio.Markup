@@ -70,7 +70,10 @@ update path less well than one whose class was missing.
   platform window was left open, holding everything it was built from. The root's part is now
   projected without `x:Class`, `x:ClassModifier` and `x:Subclass`, its content moves onto the root from
   a copy of the element the root is written as, and a top-level copy is closed once its content has
-  moved; one that will not close is reported with `TopLevelCopyNotClosed` (`AXM3046`).
+  moved — and when the update refuses after building it: a single value the root writes as a property
+  element, `Design.DataContext` among them, asks for a new session only once the copy exists, and that
+  copy was left open, holding the design instance and every type it was built from. One that will not
+  close is reported with `TopLevelCopyNotClosed` (`AXM3046`).
 - A part holding a handler the class declares could not be rebuilt: a part is built without the
   instance whose methods its handlers name, and Avalonia refused the whole part. Handlers are now left
   out of every rebuilt part and hooked up to the session's root once the part's objects exist, through

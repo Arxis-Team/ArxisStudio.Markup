@@ -220,8 +220,9 @@ projection of just that element. What that would lose, the session puts back:
 - **The class is not constructed again.** The root's content is rebuilt from a copy of the root, and
   the copy is made without `x:Class` and the directives that go with it — the author's constructor
   runs once per session, and a window's copy is not a second window. The copy is closed once its
-  content has moved across; one that refuses to close is reported with `AXM3046`, because its platform
-  window stays until the process ends.
+  content has moved across, and so is every part an update built and did not leave in the tree — an
+  update that refuses, the root that asks for a new session among them; one that refuses to close is
+  reported with `AXM3046`, because its platform window stays until the process ends.
 - **Handlers are hooked up to the root.** A part is loaded with no instance whose methods its
   handlers could name, so they are left out of the part and hooked up to the session's root once the
   part's objects exist — never twice, and not on an element whose object stayed. A method of that name
