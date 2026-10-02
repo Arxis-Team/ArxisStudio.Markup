@@ -103,7 +103,7 @@ is the same conversion with no side effects, so half a value never reaches the u
 ## One session mutates at a time
 
 Every operation that changes a session — `ApplyDocumentUpdateAsync`, `ApplySourceUpdateAsync`,
-`SetValue`, `SetXamlValue` — passes through one gate per session, because they all read and write
+`ApplyRebuildAsync`, `SetValue`, `SetXamlValue` — passes through one gate per session, because they all read and write
 the same document, projection, object map and object tree. Two updates arriving together, which is
 what a host watching a folder gets when a form and its dictionary are saved at once, cannot
 interleave.
@@ -134,6 +134,8 @@ larger.
 | --- | --- |
 | `None` | Nothing that affects an object changed |
 | `SetProperty` | A literal on a writable member; the property is set where it stands |
+| `ClearProperty` | An attribute taken out, on an Avalonia property; its local value is cleared where it stands |
+| `SetExpression` | A binding, a dynamic resource, a static member or a null; set where the property stands |
 | `UpdateDesignValue` | A design-time value; applied in design mode only |
 | `ReorderChildren` | Named siblings changed places; the objects move, nothing is rebuilt |
 | `ReplaceResource` | A dictionary entry is replaced |
@@ -177,6 +179,130 @@ value where the markup may have written a binding; the element's object is rebui
 instead. At the root there is nowhere to put it, so that one change is refused cleanly with
 `Strategy` `RecreateSession`. A property element that reads the same in both documents is left
 exactly as it is.
+
+### Values set where they stand
+
+A literal is converted and set. An attribute taken out of an Avalonia property clears the property's
+local value — a style, a theme or an inherited value shows through again, which is what the document
+now says — and that includes an attached property and the root's own attributes, so removing
+`Background` from a window no longer costs a new session. A CLR property has no local value to clear:
+only building the object again says what it holds when nobody wrote it, so that one rebuilds.
+
+An expression is set in place when a load would turn it into a value or a binding with nothing to go
+on but the element it is written on:
+
+| Written | Set as |
+| --- | --- |
+| `{x:Null}` | null, where the member can hold one |
+| `{x:Static prefix:Type.Member}` | the public static field's or property's value, where it fits the member |
+| `{DynamicResource Key}` | a binding to the resource, which follows it when it changes |
+| `{Binding …}` | a binding — `Path`, `Mode`, `StringFormat`, `ElementName`, `RelativeSource` (`Mode`, `AncestorType`, `AncestorLevel`), `FallbackValue`, `TargetNullValue` |
+
+Everything else rebuilds the element: `{StaticResource}`, which is read once from the dictionaries in
+scope while the element is built; a converter, which is one; `{CompiledBinding}`; a `{Binding}` where
+bindings compile — under `x:CompileBindings="True"`, or with `UseCompiledBindingsByDefault` and nothing
+in scope saying otherwise — because a compiled binding is checked against its data type when it is
+built; and any argument not in the table. Whatever is written in place ends the binding the property
+had first: a binding runs at local-value priority, and the next change of its source would otherwise
+write over what the document now says.
+
+`mc:Ignorable` that only gains namespaces nothing in the loaded document used is not a change at all:
+a reader ignores markup in an ignorable namespace, and there was none. The first design value a tool
+writes declares the design namespace and lists it — that used to cost a new session for a design
+width. A namespace taken off the list, or one the loaded document has markup in, is structural as
+before.
+
+## What a rebuild keeps
+
+A part rebuilt from the document is built on its own, through Avalonia's runtime loader, from a
+projection of just that element. What that would lose, the session puts back:
+
+- **The class is not constructed again.** The root's content is rebuilt from a copy of the root, and
+  the copy is made without `x:Class` and the directives that go with it — the author's constructor
+  runs once per session, and a window's copy is not a second window. The copy is closed once its
+  content has moved across; one that refuses to close is reported with `AXM3046`, because its platform
+  window stays until the process ends.
+- **Handlers are hooked up to the root.** A part is loaded with no instance whose methods its
+  handlers could name, so they are left out of the part and hooked up to the session's root once the
+  part's objects exist — never twice, and not on an element whose object stayed. A method of that name
+  that cannot take the event's arguments is reported with `AXM3045`, a warning, and the rest of the
+  update stands: a handler the author is still writing is the ordinary state of a file in an editor.
+  A handler written, renamed or taken out is not a value to set — its element is built again and
+  hooked up this way; on the root, whose handlers its load hooked up, it is a new session.
+- **The part carries its scope.** `x:DataType` and `x:CompileBindings` of the nearest element above it
+  are written onto the part's root, so a compiled binding inside it compiles as it did in the load.
+- **A static reference reads the dictionaries around it.** A part whose markup reads a key with
+  `{StaticResource}` that it does not declare itself is moved out to the element that declares it, and
+  what that element holds is rebuilt instead; a key no element declares, where an element above
+  includes another file, moves it out past the outermost such element. A key neither declared nor
+  possibly included is the application's or a theme's, which a part built on its own still finds.
+- **A rebuild inside another is the outer one's.** The outer rebuild builds the inner part as the
+  document says, so the inner one is not built at all.
+- **A control placed with markup of its own stays itself.** When the part's root is an `x:Class`
+  control placed on the form, the session constructs it — its constructor populates it from its
+  compiled markup, or from a [live document](live-population.md) registered for it — and loads the part
+  onto it. Avalonia, left to construct it, took the part for the control's definition and populated the
+  control from markup that only places it, and wrote `null` into the hook a live registration stands on.
+
+All of it happens in one turn of the dispatcher: the writes, the map rebuilt over them, the design
+values applied again and the handlers hooked up. Cancellation is observed before that turn and never
+inside it, so an update cannot stop between writing the objects and adopting the document.
+
+## A host that borrows the root
+
+A tool that shows a `Window` cannot make it the content of anything, so it shows a stand-in that
+borrows the window's content, resources and styles — and the session's next write would land on a
+root whose content is somewhere else. A host that borrows says so through the options:
+
+```csharp
+sealed class BorrowedRoot(FormStandIn standIn) : IXamlRootAccess
+{
+    public IDisposable Lend(object root)
+    {
+        standIn.Return();               // the root holds its content, resources and styles again
+        return new Reborrow(standIn);   // and the stand-in takes them back when the write is over
+    }
+
+    private sealed class Reborrow(FormStandIn standIn) : IDisposable
+    {
+        public void Dispose() => standIn.Borrow();
+    }
+}
+
+var options = new XamlLoadOptions { Mode = XamlLoadMode.Design, RootAccess = new BorrowedRoot(standIn) };
+```
+
+`Lend` is called on the objects' thread around every write the session makes to the tree — an
+update's whole turn, `SetValue`, the document side of `SetXamlValue` — and the lease is disposed when
+the write is over, whether it landed or not. Nothing is lent for reading: the map and `GetValueInfo`
+do not walk the root's children. A host that borrows nothing leaves `RootAccess` null.
+
+## Rebuilding what the document did not change
+
+A control written with `x:Class` is populated from its own markup when it is constructed, and an
+instance already on a form goes on showing what that markup said then. When the control's own
+document changes, the form's has not — and a host that has registered the new text for the class
+asks for the elements that place it to be built again:
+
+```csharp
+await population.SetDocumentAsync(typeof(CustomerCard), editedCardDocument, token);
+
+ImmutableArray<XamlElement> placed =
+[
+    .. session.Document.DescendantElements()
+        .Where(element => session.GetObject(element) is CustomerCard),
+];
+
+XamlUpdateResult result = await session.ApplyRebuildAsync(placed, token);
+```
+
+Each element is rebuilt the way a change to it would be — with the smallest container it sits in, and
+with whatever around it a static reference inside it reads — and comes back populated from the
+registered document. The elements are of `session.Document` as it stands when the rebuild's turn
+comes: one an earlier update has replaced since is refused with `AXM3041` and nothing written, so find
+it again and ask again. The root is not rebuilt this way, because the session is built around it:
+asking for it is refused with `RecreateSession`, and a new session from the same document is what
+builds it again.
 
 ## What a changed file costs
 

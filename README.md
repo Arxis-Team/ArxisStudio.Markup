@@ -16,7 +16,7 @@ The current development scope is limited to the markup libraries described in th
 
 ## Status
 
-Milestones 0 to 16 are implemented, and every item under *Definition of done for the first preview release* holds. The state at the end of Milestone 11 is tagged `v0.1.0-preview`; milestones 12 to 16 came after it, and the current version is `0.2.0-preview.2`. This document stays the contract: the milestones below are the plan, not a record of what happened.
+Milestones 0 to 17 are implemented, and every item under *Definition of done for the first preview release* holds. The state at the end of Milestone 11 is tagged `v0.1.0-preview`; milestones 12 to 17 came after it, and the current version is `0.2.0-preview.2`. This document stays the contract: the milestones below are the plan, not a record of what happened.
 
 The three libraries are consumed by **project reference**. They are not published to NuGet, the repository builds no packages, and it runs no CI workflow of its own; the version above names a state of the source rather than something installable. Two items of the plan below are deliberately not carried out, both for the same reason: milestone 11's preview packages, and milestone 12's `PublicAPI.Shipped.txt`. A declared surface is a promise made to whoever installs a package, and nothing here is installed.
 
@@ -1917,6 +1917,74 @@ Exit criteria:
   Avalonia meaning what it meant;
 - a fragment that is not one element, or whose unprefixed names are in another default namespace, is
   refused with a diagnostic and nothing recorded.
+
+### Milestone 17: updates that keep the class
+
+A designer works beside an IDE: the form it shows names a class the project has built, and the
+author edits the markup somewhere else. The update path met that case less well than the one where
+the class is missing. Rebuilding the root's content projected the whole document, `x:Class`
+included, so Avalonia constructed the class a second time — the author's constructor ran, and for a
+window a second window was left open. A part holding a handler the class declares could not be
+rebuilt at all, because a fragment is built without the instance the handler names; a part under
+`x:DataType` lost the data type its compiled bindings need. A host showing a window lends its
+content and resources to whatever displays them, and the session wrote into that root and rebuilt
+its map in a second dispatcher turn, over a tree that was not all there. `SetValue` wrote an
+attached property under its bare name and rebuilt the map without what earlier updates had rebuilt;
+an update that replaced a binding with a literal left the binding running; a control with markup of
+its own, placed on the form, mapped to nothing; and removing a value or writing an expression was
+structural — at the root, a new session.
+
+- Rebuild the root's content without the class: leave `x:Class`, the other directives only a root
+  may carry and the root's own handlers out of its projection, and close the top-level copy the
+  rebuild built once its content has moved.
+- Leave every handler out of a rebuilt part, and hook the ones the class declares onto the session's
+  root after the rebuild, through public reflection; report one whose signature does not fit, and
+  apply the update anyway.
+- Name the assembly of the class a session populates as the document's local assembly when the
+  caller names none, so a runtime load reaches the class's private handlers.
+- Carry the nearest `x:DataType` and `x:CompileBindings` above a rebuilt part onto its root.
+- Write an update in one dispatcher turn — the writes, the map rebuilt over them and the design
+  values reapplied — and let a host that borrows parts of the root give them back for exactly that
+  turn, through an access the options carry; the same around every synchronous edit.
+- Write and read an attached property as `Owner.Member`, declaring the owner's namespace when the
+  document lacks it, and keep a synchronous edit's map whole.
+- End the binding an update replaces with a literal.
+- Pair a control placed on the form with its element by where it stands, with its type as the
+  witness, and leave its internals unpaired.
+- Apply on the objects what can be applied there: a removed value is cleared, and an expression the
+  session can evaluate on its own — a binding where bindings do not compile, a resource reference, a
+  static member, a null — is set; a namespace made ignorable that nothing in the document used is no
+  change.
+- Rebuild a part that reads a static resource from outside itself together with the element whose
+  dictionaries answer it; build a part that sits inside another rebuild only once, as part of the
+  outer one; and construct a control placed with markup of its own, when it is the root of a part,
+  the way the document's load constructed it.
+- Rebuild named elements on request, for a control whose own markup has changed.
+
+Exit criteria:
+
+- a structural change to the root's content of a document whose class resolved applies in place,
+  constructs the class no second time, and leaves no second window open;
+- a structural change inside a panel holding a handler the class declares applies in place, and the
+  rebuilt control's handler runs on the session's root;
+- a form whose class declares a private handler loads, and the handler runs before and after a
+  rebuild;
+- a structural change under `x:DataType` with compiled bindings applies in place;
+- every write of an update and of an edit happens while the root is lent, and the map rebuilt in that
+  turn pairs every element whose object exists;
+- `SetValue` on an attached property writes `Owner.Member`, and a source update after it reads as
+  nothing;
+- an update that replaces a binding with a literal leaves the object following nothing;
+- a placed control is mapped to its element, its internals are not, and deleting it applies in place;
+- a binding written on a child or on the root, and an attribute removed from the root, apply without
+  a new session;
+- a part that reads a key an element above it declares, or that a file an element above it includes
+  may hold, shows the resource once it is rebuilt;
+- a rebuild inside another leaves the map naming the objects in the tree, and a handler inside both
+  runs once;
+- a placed control rebuilt as the root of its part shows its own markup, and a live registration for
+  its class outlives the rebuild;
+- rebuilding named elements replaces their objects and the map follows.
 
 ## Definition of done for the first preview release
 

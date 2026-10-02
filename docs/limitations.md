@@ -69,7 +69,12 @@ the document — see `docs/adr/0005-resource-includes.md` for why. That leaves f
   the rest of afterwards, and the update is refused rather than guessed at.
 - **A static resource rebuilds the element that declares the resources**, not the element that
   reads them. A reader built on its own has no dictionary to read, because a static reference is
-  resolved against the resources in scope where the markup sits.
+  resolved against the resources in scope where the markup sits. The same holds the other way: a
+  rebuilt part that reads a key it does not declare is moved out to the element that does, and where
+  no element declares it but one above includes another file, out past the outermost such element —
+  which file holds the key is not something the syntax says. Only a key written as text is followed;
+  a key written as an expression (`{StaticResource {x:Static …}}`) is not, and the part is rebuilt
+  where it stands.
 - **A structural change at the root rebuilds the root's content in place.** The root object
   itself survives, because a session is built around it and the caller holds it — and so do the
   dictionaries and lists it writes as property elements, which are refilled from the rebuilt copy.
@@ -81,14 +86,23 @@ the document — see `docs/adr/0005-resource-includes.md` for why. That leaves f
   rebuilds the root's content when an include sits straight inside it; a `StyleInclude` in
   `<Window.Styles>` is not re-read that way, because the root's own document did not change and
   there is nothing to compare its property elements against.
-- **A rebuilt part that names a handler its class has cannot be rebuilt in place.** A fragment is
-  built on its own, without the root instance whose methods its handlers name, and Avalonia's loader
-  refuses a handler it cannot hook up to anything — so a structural change inside a panel holding a
-  `Click="SaveClicked"` that the class declares is refused cleanly, and a new session follows the
-  document. A handler the class does not have, and every handler when the session was loaded without
-  its class, is left out of the fragment exactly as it was left out of the load, and those rebuild.
-  Hooking the handlers of a rebuilt part up to the root by hand is the way to lift this, and has not
-  been done.
+- **A rebuilt part's handlers are hooked up by reflection, and only to the event the object has.** A
+  part is built on its own, with no instance whose methods its handlers name, so they are left out of
+  it and hooked up to the session's root afterwards through the event's own accessor. An event written
+  as attached on another element — `Button.Click="Saved"` on a panel — is a routed event the panel has
+  no accessor for; it is reported with `AXM3045` and not hooked up, and the rest of the update stands.
+  A handler the class does not have, and every handler when the session was loaded without its class,
+  is left out of the part exactly as it was left out of the load.
+- **What Avalonia records about where it built something does not say which text it built it from.**
+  Its runtime loader names every text it is handed alike — the document, each part an update builds,
+  the markup live population builds a placed control from — so a recorded position is read as one in
+  the document only where it falls inside the element the walk is in. A control's own markup,
+  populated into an instance the form placed, is therefore not paired with anything: the control is
+  the form's element, and what its markup built inside it belongs to no element of the form.
+- **Expressions are set in place only where a load would need nothing else.** A binding, a dynamic
+  resource, a static member and a null are; a static resource, a converter, a compiled binding and an
+  argument the session does not know rebuild the element. A rebuild is always right, and an in-place
+  write that guessed would not be.
 - **An object rebuilt below a structural change is paired with its element by shape, and
   everything that survived the change carries its element across by position.** Avalonia records
   where it built the root of a separately loaded text and nothing below it, so the objects inside

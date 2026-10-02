@@ -145,8 +145,9 @@ if (session is null)
 | Option | Meaning |
 | --- | --- |
 | `Mode` | `Runtime` or `Design` — see [design mode](updates.md#design-mode) |
-| `LocalAssembly` | The assembly unqualified `clr-namespace:` references resolve against |
+| `LocalAssembly` | The assembly unqualified `clr-namespace:` references resolve against, and whose non-public members — a private handler — the document may name; by default the resolved `x:Class`'s |
 | `UseCompiledBindingsByDefault` | What `{Binding}` means when the document does not say |
+| `RootAccess` | A host that borrows parts of the root, lending them back for every write — see [updates](updates.md#a-host-that-borrows-the-root) |
 
 A session is disposable, holds the objects it built, and refuses to work after disposal.
 
@@ -360,6 +361,12 @@ disagreeing.
 Replacing a binding is allowed, because a caller may mean exactly that, but it is reported —
 and the binding ends with it. The object stops following its source, so it goes on agreeing with
 the document, which now holds the literal.
+
+The attribute is written under the name the document would use for it. A property of the object's
+own type is written as it is named, `Width`; an attached property is written `Owner.Member` —
+`Grid.Row`, or `controls:Dock.Side` with the owner's namespace declared on the root when nothing in
+scope binds it — and an attribute already there under any prefix is the one that is changed, and read
+back. The map keeps every object it knew, including the ones an earlier update rebuilt.
 
 **This writes the session's own document and creates no undo entry.** A tool with a history writes
 through the document instead — record the edit on a `XamlDocumentEditor`, apply it through

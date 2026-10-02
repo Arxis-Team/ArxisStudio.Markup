@@ -11,6 +11,103 @@ the source of truth, an unchanged document round-trips byte for byte, and unknow
 
 ## Unreleased
 
+### Updates keep the class
+
+A form whose `x:Class` resolved — the form a designer shows beside the IDE that edits it — met the
+update path less well than one whose class was missing.
+
+- Rebuilding the root's content projected the whole document, `x:Class` included, so Avalonia
+  constructed the class a second time: the author's constructor ran again, and for a window a second
+  platform window was left open, holding everything it was built from. The root's part is now
+  projected without `x:Class`, `x:ClassModifier` and `x:Subclass`, its content moves onto the root from
+  a copy of the element the root is written as, and a top-level copy is closed once its content has
+  moved; one that will not close is reported with `TopLevelCopyNotClosed` (`AXM3046`).
+- A part holding a handler the class declares could not be rebuilt: a part is built without the
+  instance whose methods its handlers name, and Avalonia refused the whole part. Handlers are now left
+  out of every rebuilt part and hooked up to the session's root once the part's objects exist, through
+  the event's accessor; one whose method cannot take the event's arguments is reported with
+  `HandlerSignatureMismatch` (`AXM3045`, a warning) and the update applies without it. A handler
+  written or renamed was treated as a value and refused as a member nobody can write; it now rebuilds
+  its element, and on the root asks for a new session.
+- A form whose class declares a private handler — code-behind's usual kind — did not load: a runtime
+  load reaches a private member only of the assembly it names as the document's, and a session that
+  was given no `LocalAssembly` named none. It now names the assembly of the class it populates, for
+  the load and for every part it rebuilds.
+- A part under `x:DataType` with compiled bindings did not compile: the nearest `x:DataType` and
+  `x:CompileBindings` above a part are now written onto its root.
+- A part that read a key with `{StaticResource}` from a dictionary above it was built with no value at
+  all. It is now rebuilt together with the element that declares the key, or, where none does and an
+  element above includes another file, past the outermost such element.
+- Two rebuilds of one update, one inside the other, were both applied, and the map named the inner
+  one's copy — a part the outer one had already replaced. The inner one is now left to the outer.
+- A control with markup of its own, placed on the form and rebuilt as the root of its part, was handed
+  to Avalonia to construct, which took the part for the control's definition: the control came back
+  empty, and a live registration for its class ended. The session now constructs it, the way the
+  document's load did, and loads the part onto it.
+- Every write of an update, the map rebuilt over it, the design values applied again and the handlers
+  hooked up now happen in one dispatcher turn. A cancellation can no longer arrive between the writes
+  and the document they belong to.
+
+`docs/adr/0019`, `0020`, `0024`.
+
+### Values and removals in place
+
+An attribute taken out of an Avalonia property clears its local value where it stands
+(`XamlUpdateStrategy.ClearProperty`), and an expression a load would evaluate with nothing but the
+element to go on is set where it stands (`SetExpression`): `{x:Null}`, `{x:Static}`,
+`{DynamicResource}`, and a `{Binding}` with `Path`, `Mode`, `StringFormat`, `ElementName`,
+`RelativeSource`, `FallbackValue` and `TargetNullValue`, where bindings do not compile. Both were
+structural, which at the root meant a new session — a new instance of the author's class for an
+inspector's edit. Anything else, a CLR property's removal among it, rebuilds as before. A value an
+update writes over a binding now ends the binding, as `SetValue` already did. An `mc:Ignorable` that
+only gains namespaces nothing in the loaded document used is no change; the first design value a tool
+writes declared and listed the design namespace, and that cost a new session.
+
+**Breaking:** `ClearProperty` and `SetExpression` are inserted after `SetProperty`, because the enum is
+ordered by cost and compared by that order. Every member from `UpdateDesignValue` on is two higher than
+it was: `UpdateDesignValue` 4, `ReorderChildren` 5, `ReplaceResource` 6, `ReloadStyle` 7, `ReloadTheme`
+8, `ReloadTemplate` 9, `ReloadSubtree` 10, `RecreateSession` 11. Code that stored the numbers has to
+move with them.
+
+`docs/adr/0021`.
+
+### A host that borrows the root
+
+`IXamlRootAccess`, carried by `XamlLoadOptions.RootAccess`, is lent the root around every write the
+session makes to the tree — an update's whole turn, `SetValue`, the document side of `SetXamlValue` —
+so a host that shows a window through a stand-in borrowing its content gives the content back for
+exactly as long as a write takes. The map was rebuilt in a second turn and could walk a root whose
+content was somewhere else.
+
+Public API added: `IXamlRootAccess`, `XamlLoadOptions.RootAccess`. `docs/adr/0023`.
+
+### Writing through a session, and what the map pairs
+
+`SetValue` and `SetXamlValue` write an attached property as `Owner.Member`, declaring the owner's
+namespace when the document lacks it, and find and read back an attribute written under any prefix;
+an attached property was written under its bare name, which is another property. A synchronous edit
+now keeps every pair the map had, including objects an earlier update rebuilt, and a source update
+after one compares only what the includes contributed, so it no longer reads the edit as a change to
+an include.
+
+Avalonia names every text its runtime loader is handed alike, so where it recorded building something
+does not say which text it read. A recorded position now pairs an object with an element only inside
+the element the walk is in: a control placed on the form is the form's element, and what its own
+markup — compiled or live — built inside it is nobody's. It mapped to nothing, so a designer could not
+select or delete it.
+
+`docs/adr/0022`.
+
+### Rebuilding what the document did not change
+
+`XamlLoadSession.ApplyRebuildAsync` builds named elements again as they stand, for a control whose own
+markup changed while the form that places it did not: registered with `XamlLivePopulation`, the new
+markup is what the rebuilt instances show. Each element is rebuilt the way a change to it would be; an
+element of a document an update has since replaced is refused with `UpdateNotApplied`, and the root,
+which the session is built around, with `RecreateSession`.
+
+Public API added: `XamlLoadSession.ApplyRebuildAsync`. `docs/adr/0024`.
+
 ### A form nobody has built yet is still shown
 
 A document whose `x:Class` names a class the environment does not have — the ordinary state of a form
