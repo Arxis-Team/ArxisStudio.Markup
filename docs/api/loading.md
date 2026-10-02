@@ -49,6 +49,70 @@ The resolvers are interfaces. Implement one and the packages will use it — tha
 anything external gets in, and it is what lets a host serve unsaved buffers, a plugin folder, or an
 in-memory theme without the library knowing.
 
+## What a document is
+
+A window, a user control, a templated control's look, a set of styles — asked of a document
+without loading it:
+
+```csharp
+XamlDocumentClassification what =
+    await XamlDocumentClassifier.ClassifyAsync(document, environment, token);
+
+switch (what.Kind)
+{
+    case XamlDocumentKind.TemplatedControl:
+        foreach (XamlTemplatedType control in what.TemplatedTypes)
+        {
+            // control.Type, or null before the project is built; control.Declaration sets it
+        }
+
+        break;
+
+    case XamlDocumentKind.Styles or XamlDocumentKind.ResourceDictionary:
+        XamlElement? preview = what.Preview;   // inside <Design.PreviewWith>: the one visual it has
+        break;
+}
+```
+
+| Kind | Root |
+| --- | --- |
+| `Application` | `Application`, or a type derived from it — `App.axaml` |
+| `Window` | `Window`, or a type derived from it |
+| `UserControl` | `UserControl`, or a type derived from it |
+| `Control` | any other control: a panel, a border, a control of your own |
+| `TemplatedControl` | a set of styles or a dictionary that sets the `Template` of a control written outside `https://github.com/avaloniaui` |
+| `Styles` | `Styles`, `Style` or `ControlTheme` |
+| `ResourceDictionary` | `ResourceDictionary` |
+| `Other` | anything else — a brush, a data template, an object of your own |
+| `Unknown` | a root the environment cannot resolve, or no root at all |
+
+The root element's type decides, and its base types with it: `<local:ToolWindowBase>` is a `Window`
+when `ToolWindowBase` derives from one. `RootType` is that element's type, not the `x:Class`.
+`IsCustomRoot` says the root is written outside Avalonia's namespace — `<local:ToolWindowBase>`,
+`<local:Badge>` — which is how a control of your own is told from Avalonia's `Border`, whatever its
+kind.
+
+A templated control's look has a set of styles or a dictionary at its root, and only what it sets
+says what it is for. Setting `Template` on Avalonia's `Button` is a theme, and the file stays
+`Styles`; setting it on a control written in a namespace of your own — `controls|Badge`,
+`TargetType="controls:Badge"` — makes it a `TemplatedControl`. So does a control theme for such a
+control that is `BasedOn` a theme in the same file that sets the template, which is how a theme
+library writes one template for several controls; a base theme from another file supplies a
+template this file does not, and is not followed. A template written inside `Design.PreviewWith`
+does not count.
+
+Whose control it is, the namespace the name is written in decides, so the answer holds before the
+project is built: when the environment does not have the control, the kind is the same,
+`IsResolved` is `false`, the control's `Type` is `null`, and a warning sits on its name. When the
+environment has it, it must derive from `TemplatedControl`.
+
+A root the environment cannot resolve is `Unknown`, with an error on the root's name. It is not
+guessed at: `ToolWindowBase` says nothing reliable about what it derives from, and a document whose
+root does not resolve cannot be loaded either.
+
+Classifying creates nothing and needs no Avalonia thread. It goes through the same cached resolver
+a session does, so classifying a folder costs a lookup per distinct type.
+
 ## A session
 
 ```csharp
@@ -100,6 +164,33 @@ The hook the session borrows is the one `XamlLivePopulation` stands on, and it i
 than taken: a document registered for the same type keeps populating every *placed* copy of it.
 `RootInstanceFactory` decides how the instance is constructed; an instance it hands over without
 constructing it here is populated after the fact, as it always was.
+
+### A class there is not
+
+A form the project has not built yet names a class no assembly in the environment has, and a
+class can also not be what the root says it is. Neither stops the load: the class is reported,
+and the document is loaded without it — the root is built as the element it is written as.
+
+```csharp
+// <UserControl x:Class="Contoso.Views.NotBuiltYet"> … with a Button Click="SaveClicked" inside
+(XamlLoadSession? session, XamlLoadResult result) =
+    await XamlLoadSession.TryCreateAsync(document, environment, options);
+
+session!.RootObject;   // a UserControl, not a NotBuiltYet
+// AXM3020 (warning): x:Class names 'Contoso.Views.NotBuiltYet', which was not found …
+// AXM3005 (warning): 'Click' names the handler 'SaveClicked', but the document has no x:Class …
+```
+
+`UnresolvedRootType` (AXM3020) is a warning, because a class nobody has built yet is the
+environment lagging behind the document; `IncompatibleRootType` (AXM3021) stays an error, because
+that one is the document contradicting itself. Names still resolve — `x:Name` needs a name scope,
+not a class — and handlers are reported and left out, because a handler names a method of the
+class and there is no class to find it on. The document keeps every one of them.
+
+What the load left out of the text Avalonia was given, every later projection of the session leaves
+out too, so the session stays updatable: a child added to the root rebuilds its content, and a panel
+holding a button with a handler is rebuilt without the handler. A class that resolves later — after a
+build — is a new environment and a new session; a changed `x:Class` is one anyway.
 
 ## Objects and elements
 
@@ -266,7 +357,9 @@ The member is validated, the value converted, the object updated and the documen
 order, and if writing the document fails the object is put back. The two never end up silently
 disagreeing.
 
-Replacing a binding is allowed, because a caller may mean exactly that, but it is reported.
+Replacing a binding is allowed, because a caller may mean exactly that, but it is reported —
+and the binding ends with it. The object stops following its source, so it goes on agreeing with
+the document, which now holds the literal.
 
 **This writes the session's own document and creates no undo entry.** A tool with a history writes
 through the document instead — record the edit on a `XamlDocumentEditor`, apply it through

@@ -16,7 +16,7 @@ The current development scope is limited to the markup libraries described in th
 
 ## Status
 
-Milestones 0 to 14 are implemented, and every item under *Definition of done for the first preview release* holds. The state at the end of Milestone 11 is tagged `v0.1.0-preview`; milestones 12 to 14 came after it, and the current version is `0.2.0-preview.2`. This document stays the contract: the milestones below are the plan, not a record of what happened.
+Milestones 0 to 16 are implemented, and every item under *Definition of done for the first preview release* holds. The state at the end of Milestone 11 is tagged `v0.1.0-preview`; milestones 12 to 16 came after it, and the current version is `0.2.0-preview.2`. This document stays the contract: the milestones below are the plan, not a record of what happened.
 
 The three libraries are consumed by **project reference**. They are not published to NuGet, the repository builds no packages, and it runs no CI workflow of its own; the version above names a state of the source rather than something installable. Two items of the plan below are deliberately not carried out, both for the same reason: milestone 11's preview packages, and milestone 12's `PublicAPI.Shipped.txt`. A declared surface is a promise made to whoever installs a package, and nothing here is installed.
 
@@ -650,6 +650,24 @@ Requirements:
 
 Actual loading and application of resource objects belongs to Loader.
 
+Discover style declarations the same way:
+
+```xml
+<Style Selector="controls|Badge /template/ Border#PART_Root" />
+<ControlTheme x:Key="{x:Type controls:Badge}" TargetType="controls:Badge" />
+```
+
+Requirements:
+
+- every `Style` and `ControlTheme`, wherever it appears;
+- the types each one's setters apply to, as written: a control theme's `TargetType`, and the last
+  step of each alternative of a style's selector, with `^` standing for the parent's targets;
+- the setters each one carries itself, with their properties as written;
+- the span of every type name, whatever entity references the attribute uses;
+- no type resolution, and no selector diagnostics — a wrong selector is Avalonia's to report.
+
+Which CLR types those names mean belongs to Loader.
+
 #### Editing API
 
 Provide structured edits:
@@ -673,11 +691,21 @@ document.ReplaceElement(element, xaml);
 document.WrapElement(element, wrapperXaml);
 document.UnwrapElement(element);
 document.DuplicateElement(element, XamlDuplicateNames.Remove);
+
+// Names in namespaces the document may not have declared yet, and markup from another document.
+// These record declarations alongside the edit, so they live on the editor.
+XamlDocumentEditor editor = document.Edit();
+XamlQualifiedName badge = editor.Qualify(parent, "using:App.Controls", "Badge");
+XamlQualifiedName width = editor.QualifyAttribute(root, XamlNamespaces.Design, "DesignWidth");
+editor.EnsureIgnorable(XamlNamespaces.Design);
+editor.InsertFragment(parent, index, XamlFragment.From(elementOfAnotherDocument));
 ```
 
 `index` counts content children only. A property element is not a position, so index 0 in a parent that declares one means before its first content child and after the member — which is what a caller asking for "first" means, and what counting `Elements` got wrong.
 
 Duplicating takes the names out of the copy by default: a name scope refuses a second `x:Name`, so a copy that kept them would not load. `x:Key` is carried as written and collides in the same way, which is the caller's to resolve.
+
+A name in a namespace is written under the prefix the document gives that namespace where it is used, and a namespace the document lacks is declared on its root — Avalonia accepts `xmlns` nowhere else — never as the default namespace. Markup from another document travels as a fragment carrying its declarations, and is reconciled on the way in: nothing where the prefix already means the same, a declaration where it is free, and a rename only where it means something else here. Only the receiving document's own names are taken out of it by default.
 
 Every edit must:
 
@@ -829,6 +857,28 @@ Support:
 - standard Avalonia types;
 - custom controls from explicitly available assemblies;
 - generic and nested type diagnostics where applicable.
+
+#### Document classification
+
+Say what a document is without loading it:
+
+```csharp
+public static class XamlDocumentClassifier
+{
+    public static ValueTask<XamlDocumentClassification> ClassifyAsync(
+        XamlDocument document,
+        XamlLoadEnvironment environment,
+        CancellationToken cancellationToken = default);
+}
+```
+
+The kinds are an application, a window, a user control, any other control, a templated control's
+look, a set of styles, a resource dictionary, something else, and unknown. The root element's type
+decides, base types included. For a set of styles or a resource dictionary the style declarations
+decide as well: one that sets the `Template` of a control written outside Avalonia's namespace —
+itself, or through a control theme in the same document it is based on — is a templated control's
+look. Where a type cannot be resolved, say so with a located diagnostic, and
+judge by names only where names are reliable — a namespace is, a root's type name is not.
 
 #### XAML load session
 
@@ -1067,6 +1117,8 @@ Required behavior:
 7. allow Avalonia to resolve declared event handlers;
 8. produce clear diagnostics on failure.
 
+A class that cannot be used — not found, because the project has not been built, or not what the root element says — is reported and left out of the load, and the root is built as the element it is written as. A form nobody has built yet is the first document a designer opens; showing nothing is the wrong answer to it (Milestone 16, `docs/adr/0017`).
+
 Root creation must be extensible:
 
 ```csharp
@@ -1094,6 +1146,8 @@ Event declarations must remain in the source:
 Loader should support normal Avalonia event hookup when a compatible `x:Class` root instance is provided.
 
 The library does not suppress, remove, or intercept events. Input interception is the responsibility of a future consumer, not this repository.
+
+What it does not do is hook a handler up to nothing. A handler names a method of the root's class, and one that names a method the class does not declare — or any, when there is no class to use — is reported and left out of the text Avalonia is given, while the document keeps it.
 
 #### Load modes and design-time attributes
 
@@ -1478,6 +1532,7 @@ Required categories:
 - resource includes;
 - style includes;
 - cyclic includes;
+- style declarations and their targets;
 - `d:` and `mc:`;
 - events as unresolved members;
 - minimal one-attribute edits;
@@ -1517,7 +1572,8 @@ Required categories:
 - source-to-object mapping;
 - template-generated object origin;
 - conservative runtime change detection;
-- failed update preserving last successful runtime state.
+- failed update preserving last successful runtime state;
+- document classification, with the controls' assembly supplied and without it.
 
 Tests must include controls from a separate test assembly to verify custom assembly resolution.
 
@@ -1784,6 +1840,83 @@ Exit criteria:
   were, and nothing is thrown;
 - the showcase's tree, selection and property list are expressed in the published model, and the
   code it needed for them is gone.
+
+### Milestone 15: what a document is
+
+A designer opening a project's `.axaml` files has to know, for each, whether it is a window, a user
+control, a templated control's look or a set of styles before it can show it — and the packages had
+every part of that answer but the answer. The root's type was one resolver call away; the type a
+style applies to was buried in selector text nothing read. A templated control's look is the case
+that needs both: its root is `Styles` or `ResourceDictionary`, and only the template it sets says
+what it is for.
+
+- Read style declarations from the syntax: their targets — `TargetType`, and the last step of each
+  selector alternative, with `^` standing for the parent's — their setters, and their nesting.
+- Classify a document by its root's type through the environment: application, window, user
+  control, control, styles, resource dictionary, other.
+- Recognise a templated control's look: styles or a dictionary that set the `Template` of a control
+  written outside Avalonia's namespace, directly or through a control theme in the same document it
+  is `BasedOn` — decided by that namespace, so it holds before the project is built, and checked
+  against `TemplatedControl` when the control resolves.
+- Say what the answer rests on: whether it was resolved, which names were not, and where.
+- Show it in the showcase, on the published API alone: a gallery of every kind, each previewed the
+  way its kind calls for, with and without the project's own assembly.
+
+Exit criteria:
+
+- the file Avalonia's templated-control template produces is a templated control's look, whether
+  or not the control's assembly is supplied, and its `Design.PreviewWith` element is at hand;
+- re-templating one of Avalonia's own controls leaves a file a set of styles or a dictionary, and a
+  theme of the author's own that takes its template from a base theme in the file is a templated
+  control's look;
+- a root derived from `Window` or `UserControl` is a window or a user control;
+- a root that does not resolve is unknown, with an error on its name, and is not guessed at;
+- a selector the reader cannot follow names nothing and throws nothing;
+- `ArxisStudio.Markup.Xaml` resolves no type to do any of it;
+- the showcase classifies its gallery without a line added to `src/` for it.
+
+### Milestone 16: markup that crosses documents
+
+An audit of the packages as the base of a form designer working on a real project found three gaps
+a designer meets before anything else. The form it opens first is usually one the project has not
+built, and the class it names does not exist yet — which the loader meant to carry on without and
+did not, because the directive still went to Avalonia, and Avalonia failed the whole document on it.
+Putting a control from a library or a user control of the project onto a form means naming it in a
+namespace the form may not declare, and the editor wrote whatever prefix it was handed. And moving
+markup between forms — a paste, a drag, an extraction — moved its text without the declarations its
+names depend on, which sit on its document's root. Every host wrote the same three workarounds.
+
+- Withhold an `x:Class` the load cannot use from the projected text, as a handler with nothing to
+  hook up to already was, and build the root as the element it is written as — in every projection
+  of the session, not only the first.
+- Report a class nobody has built as a warning and a class that is not what the root says as an
+  error.
+- Let the editor name something in a namespace at a place: under the prefix the document gives it
+  there, unprefixed for an element in the default namespace, and otherwise declared on the root,
+  after the declarations already there and laid out like them. Never declare a default namespace.
+- Make a declared design namespace ignorable in the same edit, and let a caller make any namespace
+  ignorable.
+- Lift an element out of its document with the declarations it uses and the namespaces its source
+  marked ignorable, as text that stands on its own.
+- Insert such markup reconciling its prefixes in the least intrusive way that is right — nothing, a
+  declaration, or a rename only where the prefix means something else — and take out only the names
+  the receiving document already declares.
+
+Exit criteria:
+
+- a document whose `x:Class` names a class no assembly has loads, as the element its root is written
+  as, with its names resolving and its handlers reported; and a structural change to its root's
+  content and to a part holding a handler both apply in place;
+- a source update that changed nothing reads as nothing for a document whose load withheld something;
+- naming an element in a namespace in scope adds nothing to the document, and in one that is not adds
+  exactly one declaration on the root, laid out as the root's declarations are;
+- an attribute is never named in the default namespace, and declaring the design namespace lists it
+  in `mc:Ignorable`;
+- a fragment inserted into a document that binds its prefix to another namespace is renamed at every
+  place the syntax says names a namespace, leaves the text a control displays alone, and loads in
+  Avalonia meaning what it meant;
+- a fragment that is not one element, or whose unprefixed names are in another default namespace, is
+  refused with a diagnostic and nothing recorded.
 
 ## Definition of done for the first preview release
 

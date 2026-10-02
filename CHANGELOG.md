@@ -11,6 +11,105 @@ the source of truth, an unchanged document round-trips byte for byte, and unknow
 
 ## Unreleased
 
+### A form nobody has built yet is still shown
+
+A document whose `x:Class` names a class the environment does not have — the ordinary state of a form
+created from a template, before the project's first build — produced no session at all:
+`AXM3020`, then Avalonia's own "Unable to resolve type", then `AXM3003`. The loader reported the class
+and meant to carry on without it, but the directive still went to Avalonia in the projected text, and
+Avalonia resolves it on its own. It is withheld now, as a handler with nothing to hook up to already
+was, and the root is built as the element it is written as — in both load modes. A class that is not
+what the root says went the same way and was built as the class; it is built as the element too.
+
+What the load withheld, every projection of the session now withholds: an update rebuilding the root's
+content, a fragment rebuilt around a handler, and the reprojection a source update compares against the
+load's. The last of those differed from the load's text for any document with a handler nobody had
+written, so an include that had not changed could rebuild what it reaches — that is fixed with it.
+
+Behaviour that changed: `UnresolvedRootType` (`AXM3020`) is a warning, because the load now goes on
+without loss; `IncompatibleRootType` (`AXM3021`) stays an error. Updates report what the attribute
+checks notice about the document offered — a handler still missing, for one. No public API changed.
+`docs/adr/0017`.
+
+### Names in namespaces the document has not declared
+
+`XamlDocumentEditor.Qualify` names an element, or an attached property's owner, in a namespace at a
+place: under the prefix the document gives it there, unprefixed in the default namespace, and otherwise
+declared on the root — after the root's declarations and laid out like them, under the prefix asked for
+or one made up from the namespace, numbered when the document declares or writes it already. Nothing is
+ever declared as the default namespace. `QualifyAttribute` does the same for a namespaced attribute,
+which is never unprefixed. Declaring the design namespace declares markup compatibility and lists it in
+`mc:Ignorable` in the same edit, and `EnsureIgnorable` lists any other — added to an existing list, never
+rewriting it, and completing an `mc:Ignorable` whose prefix was never declared rather than writing a
+second one.
+
+An insertion recorded where a replacement begins is now placed in front of it whichever was recorded
+first. One order used to work and the other threw; it is what lets a declaration and the opening of a
+self-closing root be one edit.
+
+Public API added: `XamlDocumentEditor.Qualify`, `QualifyAttribute`, `EnsureIgnorable`.
+
+### Markup from another document
+
+`XamlFragment.From` lifts an element with the declarations its text uses written onto its own start
+tag, the namespaces its source marked ignorable, and the indentation it sat at taken off; `ToXamlText`
+and `XamlFragment.Parse` make it a clipboard format. `XamlDocumentEditor.InsertFragment` puts it into a
+document, reconciling each namespace it uses: nothing where the prefix already means the same, a
+declaration where the prefix is free, and a rename only where it means something else here — at every
+place the syntax says names a namespace, with any other mention left as written and reported. The
+inserted element leaves its declarations, its `mc:Ignorable` and its `x:Class` behind, is indented to
+where it lands and is written with the document's line breaks. A fragment that is not one element, or
+whose unprefixed names are in another default namespace, is refused with a diagnostic.
+
+Names follow `XamlDuplicateNames.RemoveConflicting`, new and the default for a fragment: only the names
+the receiving document already declares are taken out, so a control moved between forms keeps the name
+its code behind uses.
+
+Public API added: `XamlFragment`, `XamlDocumentEditor.InsertFragment`,
+`XamlDuplicateNames.RemoveConflicting`, `XamlDiagnosticCodes.MalformedFragment` (`AXM1042`),
+`FragmentDefaultNamespaceConflict` (`AXM1043`) and `FragmentPrefixLeftAsWritten` (`AXM1044`).
+`docs/adr/0018`.
+
+### A value written over a binding ends the binding
+
+`XamlLoadSession.SetValue` over a property the document binds wrote the literal into the
+document and onto the object, and reported the replacement — and left the binding running. A
+binding the document applies runs at local-value priority, and setting a local value does not end
+it, so the next change of its source wrote over the literal: the document said `Text="literal"`
+and the object showed whatever the source said, with nobody told. The binding is ended now before
+the value is set, and should the document then fail to take the edit, the session asks to be
+recreated rather than claim the object is back as it was — nothing here can start the document's
+binding again. `SetXamlValue` with a literal goes the same way. Found while the showcase was
+made to write values through its session.
+
+No public API changed.
+
+### What a document is
+
+`XamlDocumentClassifier.ClassifyAsync` says whether a document is an application, a window, a user
+control, another control, a templated control's look, a set of styles or a resource dictionary —
+by its root's type and that type's bases, through the environment's type resolver, without loading
+anything. A templated control's look has `Styles` or `ResourceDictionary` at its root, so its root
+cannot say what it is; a style or control theme in it that sets the `Template` of a control written
+outside Avalonia's namespace does — itself, or through a theme in the same file it is `BasedOn`.
+That is decided by the namespace, so the file classifies before the project is built, and the
+control is checked against `TemplatedControl` when it resolves. The result says whether the kind
+rests on types or on names, lists the templated controls, and hands over the `Design.PreviewWith`
+element. A root nobody can resolve is `Unknown` rather than guessed. The showcase has a section for
+it: a dozen documents, one of every kind, each previewed the way its kind calls for — and a switch
+that takes the showcase's own assembly away, to show what a designer sees before a project's first
+build.
+
+Underneath, `XamlStyleAnalyzer` reads every `Style` and `ControlTheme` from the syntax alone: the
+types each applies to — `TargetType`, or the last step of each selector alternative, with `^`
+standing for the parent's — its setters and its nesting, with spans that stay right through entity
+references.
+
+Added to `ArxisStudio.Markup.Xaml`: `XamlStyleAnalyzer`, `XamlStyleDeclaration`, `XamlStyleKind`,
+`XamlStyleSetter`, `XamlTypeReference`. Added to `ArxisStudio.Markup.Xaml.Loader`:
+`XamlDocumentClassifier`, `XamlDocumentClassification`, `XamlDocumentKind`, `XamlTemplatedType`.
+See [ADR 0016](docs/adr/0016-a-document-is-classified-by-its-root-and-by-the-templates-it-sets.md).
+
 ### An x:Class root is populated once, inside its constructor
 
 A session created its root by constructing the class, and the class's constructor loaded markup of

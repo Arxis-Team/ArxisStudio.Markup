@@ -206,3 +206,53 @@ foreach (XamlResourceReference reference in references)
 
 `XamlResourceGraph` follows those references across files and answers what depends on what — see
 [Updates](updates.md#what-a-changed-file-costs).
+
+## Style declarations
+
+Whose style each `<Style>` and `<ControlTheme>` is, read the same way as the includes — from the
+syntax, with no Avalonia and no type resolved:
+
+```csharp
+ImmutableArray<XamlStyleDeclaration> declarations = XamlStyleAnalyzer.Discover(document);
+
+foreach (XamlStyleDeclaration declaration in declarations)
+{
+    foreach (XamlTypeReference target in declaration.Targets)
+    {
+        // controls|Badge in a selector and controls:Badge in a TargetType are the same Name
+        Console.WriteLine($"{declaration.Kind} → {target.Name} in {target.NamespaceUri}");
+    }
+
+    foreach (XamlStyleSetter setter in declaration.Setters)
+    {
+        Console.WriteLine($"  sets {setter.Property}");   // as written: Template, (Grid.Row)
+    }
+}
+```
+
+A target is the type the setters land on:
+
+| Written | Targets |
+| --- | --- |
+| `TargetType="controls:Badge"` or `TargetType="{x:Type controls:Badge}"` | `controls:Badge` |
+| `Selector="controls\|Badge"` | `controls:Badge` |
+| `Selector="StackPanel > Button.primary:pointerover"` | `Button` — the last step |
+| `Selector="Button /template/ ContentPresenter"` | `ContentPresenter`, inside the template |
+| `Selector=":is(Button)"` | `Button` |
+| `Selector="Button, ToggleButton"` | `Button` and `ToggleButton` |
+| `Selector="^:pressed"`, nested | whatever the parent targets |
+| `Selector=".accent"` | nothing: a class names no type |
+
+`Parent` is the declaration a style is nested in — written directly inside it or in its
+`Children`. One inside a parent's `Resources`, or inside a template the parent sets, is not nested,
+and `^` there does not reach the parent. `Setters` are the declaration's own: those directly inside
+it and those in its `Setters`, not a nested style's.
+
+A target's `Span` is where its name is written, entity references and all, so a diagnostic or a
+rename can point at it; its `NamespaceUri` is what the prefix means there, or `null` when nothing
+declares it. Which CLR type that is, the loader answers — see
+[What a document is](loading.md#what-a-document-is).
+
+Reading never throws and never reports. A selector it cannot follow names no target, and so does
+one computed by a markup extension; a selector that is wrong is Avalonia's to diagnose when it
+loads one.

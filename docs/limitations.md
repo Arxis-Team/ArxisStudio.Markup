@@ -48,6 +48,11 @@ the document — see `docs/adr/0005-resource-includes.md` for why. That leaves f
   contract asks only about attributes, and Avalonia reports them clearly enough.
 - **`mc:Ignorable`** is honoured for attributes, by namespace rather than by prefix. Ignorable
   elements are not removed, for the same reason.
+- **A class the environment cannot give is left out, not stood in for.** A document whose `x:Class`
+  does not resolve — the form has not been built — or is not what its root says is loaded as the
+  element its root is written as, in either mode. The class's constructor does not run, its code is
+  absent, and `GetRoot<TheClass>()` fails: what is shown is the markup. A host that wants the class
+  waits for a build, which is a new environment and a new session.
 
 ## Updates
 
@@ -76,6 +81,14 @@ the document — see `docs/adr/0005-resource-includes.md` for why. That leaves f
   rebuilds the root's content when an include sits straight inside it; a `StyleInclude` in
   `<Window.Styles>` is not re-read that way, because the root's own document did not change and
   there is nothing to compare its property elements against.
+- **A rebuilt part that names a handler its class has cannot be rebuilt in place.** A fragment is
+  built on its own, without the root instance whose methods its handlers name, and Avalonia's loader
+  refuses a handler it cannot hook up to anything — so a structural change inside a panel holding a
+  `Click="SaveClicked"` that the class declares is refused cleanly, and a new session follows the
+  document. A handler the class does not have, and every handler when the session was loaded without
+  its class, is left out of the fragment exactly as it was left out of the load, and those rebuild.
+  Hooking the handlers of a rebuilt part up to the root by hand is the way to lift this, and has not
+  been done.
 - **An object rebuilt below a structural change is paired with its element by shape, and
   everything that survived the change carries its element across by position.** Avalonia records
   where it built the root of a separately loaded text and nothing below it, so the objects inside
@@ -154,6 +167,31 @@ the document — see `docs/adr/0005-resource-includes.md` for why. That leaves f
 - **Wrapping and replacing do not reformat what they are given.** A multi-line wrapper or
   replacement arrives written as the caller wrote it; only the wrapped element is re-indented, by
   the step the document already uses. This matches insertion, which has always behaved this way.
+  A fragment is the exception, because it is lifted left-aligned on purpose: it is indented to the
+  sibling it lands beside.
+- **A fragment's prefix is renamed only where the syntax says it names a namespace.** Element and
+  attribute names, markup extensions, values that are nothing but type names, attached properties in
+  parentheses and style selectors are reached; a value that only mentions the prefix among other
+  words — `Text="see local:Badge"` — is left as written and reported with `AXM1044`. The rule cuts
+  the other way once: a value that is *exactly* a prefixed name is taken to be one, so a `Text` that
+  reads `local:Badge` and nothing else is renamed with the rest. Which members hold type names is a
+  question about what they mean, and this package cannot ask it.
+- **A prefix the receiving document does not use is declared as the fragment wrote it**, even where
+  the document already has the namespace under another prefix. Two prefixes for one namespace is
+  legal and costs one attribute; renaming rewrites the fragment, and is kept for when the prefix
+  means something else here.
+- **The default namespace is not reconciled.** A fragment whose unprefixed names are in a different
+  default namespace from the one where it would land is refused with `AXM1043`: making it fit would
+  mean prefixing every unprefixed name in it, markup extensions and type-name values included.
+- **Relative URIs inside a fragment are not rebased.** An image's `Source="Assets/logo.png"`
+  resolves against the receiving document's folder once inserted. `XamlFragment.SourceUri` says what
+  it was relative to; which attributes hold a URI is, again, a question about members.
+- **Names inside a template count against the whole document.** `XamlDuplicateNames.RemoveConflicting`
+  takes out a fragment's name when the receiving document declares it anywhere, although a template
+  is a name scope of its own — which errs towards taking out a name that could have stayed.
+- **A declaration below a fragment's own element travels as written.** Avalonia refuses `xmlns` on
+  anything but the root, in the fragment's source as much as in its destination, so markup that has
+  one did not load where it came from either.
 
 ## Members
 
@@ -190,6 +228,38 @@ the document — see `docs/adr/0005-resource-includes.md` for why. That leaves f
 - **A property registered both as an ordinary and as an attached property is listed once**, under
   its simple name. `KeyboardNavigation.IsTabStop` and `IsTabStop` are both valid XAML for the same
   property; a tool that needs the qualified spelling writes it itself.
+
+## Classification
+
+- **The default resolver sees what the process has loaded.** `XamlLoadEnvironment.CreateDefault`
+  finds Avalonia's own types among the assemblies already loaded, and remembers a failure for as
+  long as the resolver lives. An Avalonia application has loaded them by the time it opens a
+  document; a tool that classifies in a process of its own — a command-line indexer, a background
+  worker — may not have, and gets `Unknown` for `<Window>` until it does. Load them before the
+  first lookup (naming `typeof(Avalonia.Controls.Control)` is enough), or supply them:
+  `CreateDefault(assemblies: [typeof(Control).Assembly])`.
+- **A root of somebody's own type needs its assembly.** What `<local:ToolWindowBase>` is depends on
+  what it derives from, and only its type says. Without the assembly the document is `Unknown`: a
+  name ending in "Window" is not evidence. A templated control's look is the exception, because its
+  root is Avalonia's own and the question is answered by the namespace a name is written in.
+- **"Of your own" means "outside Avalonia's namespace".** A control library that declares its types
+  into `https://github.com/avaloniaui` looks like Avalonia to the classifier, and its look files
+  classify as styles; a third-party library with a namespace of its own looks like the author's, and
+  re-templating one of its controls classifies as a templated control's look. The namespace is what
+  the document says and what holds before a build; an assembly name would be a guess about
+  packaging.
+- **Selectors are read, not parsed.** The reader takes the type of each alternative's last step and
+  passes over the rest, so a selector Avalonia would refuse can still yield a target, and one
+  computed by a markup extension yields none. Nothing here reports a malformed selector — Avalonia
+  does when it loads one.
+- **`Template` is recognised by name.** A setter whose property is `Template`, however qualified —
+  `TemplatedControl.Template`, `(TemplatedControl.Template)` — counts. When the control resolves it
+  must derive from `TemplatedControl`; when it does not, the name is taken at its word.
+- **`BasedOn` is followed inside the document only.** A control theme based on
+  `{StaticResource key}` takes the template of the theme filed under that key in the same file —
+  a text key, or an `{x:Type}` compared by the type it names. A key from another file, a merged
+  dictionary or the application is not looked up, so a theme that only says what it is based on
+  templates nothing here.
 
 ## Everything else
 

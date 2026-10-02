@@ -1,6 +1,6 @@
 # ArxisStudio.Markup — API guide
 
-Four libraries for reading, editing, running and showing Avalonia XAML without compiling it.
+Three libraries for reading, editing and running Avalonia XAML without compiling it.
 
 They exist to make one thing possible: a tool that shows a XAML document and the live objects it
 describes at the same time, lets a user change either, and never damages the file doing it. A form
@@ -13,10 +13,10 @@ Written against **0.2.0-preview.2**. Every example here uses only public API.
 
 | Guide | What it covers |
 | --- | --- |
-| [Documents](documents.md) | Text, spans, parsing, round-trip, navigating a syntax tree, element paths, diagnostics |
-| [Editing](editing.md) | Changing attributes and elements without disturbing anything else |
+| [Documents](documents.md) | Text, spans, parsing, round-trip, navigating a syntax tree, element paths, style declarations, diagnostics |
+| [Editing](editing.md) | Changing attributes and elements without disturbing anything else; names in namespaces the document lacks; markup from another document |
 | [Workspace and history](workspace.md) | Several open documents, transactions, undo and redo |
-| [Loading](loading.md) | Environments, resolvers, sessions, objects ↔ elements, enumerating members, values |
+| [Loading](loading.md) | Environments, resolvers, what a document is, sessions, objects ↔ elements, enumerating members, values |
 | [Updates](updates.md) | Bringing running objects in line with a changed document, design mode, includes |
 | [Live population](live-population.md) | Making placed `x:Class` controls follow their documents instead of their last build |
 
