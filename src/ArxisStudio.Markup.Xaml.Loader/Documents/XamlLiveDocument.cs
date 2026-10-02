@@ -351,6 +351,14 @@ public sealed class XamlLiveDocument : IAsyncDisposable
             return new XamlExternalTextResult { Outcome = XamlExternalTextOutcome.AlreadyCurrent };
         }
 
+        // The document's last save or read, reported late — a watcher settles a burst of writes before
+        // it reads the file, and the next edit can land in between. Nothing changed where the document
+        // is saved, and calling it a conflict would ask the author about their own save.
+        if (policy == XamlExternalTextPolicy.ApplyIfClean && SameText(text, SavedText))
+        {
+            return new XamlExternalTextResult { Outcome = XamlExternalTextOutcome.AlreadySaved };
+        }
+
         if (policy == XamlExternalTextPolicy.KeepMine)
         {
             await RaiseChangedAsync(MarkSaved(text)).ConfigureAwait(false);

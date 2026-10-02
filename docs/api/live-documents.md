@@ -114,6 +114,7 @@ if (result.Outcome == XamlExternalTextOutcome.Conflict)
 | Outcome | What happened |
 | --- | --- |
 | `AlreadyCurrent` | The text is the document's own — the echo of its own save. It is now what is saved. |
+| `AlreadySaved` | The text is what is saved — an echo of the last save that a watcher reported after the next edit had landed. Nothing moved. Only `ApplyIfClean` answers it. |
 | `Taken` | The text became the document's as one step of its history, and is what is saved. Undo takes it back. |
 | `Conflict` | The document has unsaved changes and the policy said not to overwrite them. Nothing moved. |
 | `KeptMine` | The document kept its text and now reads as changed against the file. |

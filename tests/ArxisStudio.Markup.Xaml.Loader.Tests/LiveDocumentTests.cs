@@ -262,6 +262,45 @@ public sealed class LiveDocumentTests
     }
 
     [AvaloniaFact]
+    public async Task ALateEchoOfTheLastSaveIsNotAConflict()
+    {
+        await using XamlLiveDocument document = await OpenAsync(View("one"));
+
+        await document.EditAsync(editor => SetTitle(editor, "two"), "Two", TestContext.Current.CancellationToken);
+        await document.MarkSavedAsync(document.Document.SourceText, TestContext.Current.CancellationToken);
+        await document.EditAsync(editor => SetTitle(editor, "three"), "Three", TestContext.Current.CancellationToken);
+
+        var changes = new List<XamlLiveDocumentChanges>();
+
+        document.Changed += (_, e) => changes.Add(e.Changes);
+
+        // A watcher reports the save after the next edit has already landed: the file says what the
+        // document last wrote, so nothing changed where it is saved.
+        XamlExternalTextResult echo = await document.AcceptExternalTextAsync(
+            SourceText.From(View("two")),
+            "Changed outside the designer",
+            XamlExternalTextPolicy.ApplyIfClean,
+            TestContext.Current.CancellationToken);
+
+        Assert.Equal(XamlExternalTextOutcome.AlreadySaved, echo.Outcome);
+        Assert.Equal(View("three"), document.Document.GetText());
+        Assert.True(document.IsDirty);
+        Assert.Equal("Three", document.UndoDescription);
+        Assert.Empty(changes);
+
+        // Asked for explicitly, the same text is taken: going back to the file is a choice a host may make.
+        XamlExternalTextResult taken = await document.AcceptExternalTextAsync(
+            SourceText.From(View("two")),
+            "Taken from disk",
+            XamlExternalTextPolicy.TakeTheirs,
+            TestContext.Current.CancellationToken);
+
+        Assert.Equal(XamlExternalTextOutcome.Taken, taken.Outcome);
+        Assert.False(document.IsDirty);
+        Assert.Equal("two", ShownTitle(document).Text);
+    }
+
+    [AvaloniaFact]
     public async Task WhetherTheDocumentIsChangedIsADifferenceOfText()
     {
         await using XamlLiveDocument document = await OpenAsync(View("one"));

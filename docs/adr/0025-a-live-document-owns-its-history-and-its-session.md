@@ -47,7 +47,9 @@ what was there, leaves the document clean.
 **Text from outside is a step of the history, under a description the host gives, and is what is
 saved.** It came from where the document is saved, so after it the document reads as clean — and the
 author can take it back, after which it reads as changed. Text that is already the document's — the
-echo of the document's own save — only becomes what is saved. Unsaved changes are never overwritten
+echo of the document's own save — only becomes what is saved, and text that is what is saved — that
+echo reported late, after the next edit has landed — is nothing new and is not a conflict; the stand
+of the designer sample found the second case, a watcher settling a burst of writes before reading. Unsaved changes are never overwritten
 silently: `ApplyIfClean` reports the conflict and changes nothing, and the host asks the author and
 comes back with `TakeTheirs`, which takes the text as a step and leaves the author's one undo away,
 or `KeepMine`, which records the outside text as what is saved and leaves the document's own.
