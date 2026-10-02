@@ -13,11 +13,12 @@ Written against **0.2.0-preview.2**. Every example here uses only public API.
 
 | Guide | What it covers |
 | --- | --- |
-| [Documents](documents.md) | Text, spans, parsing, round-trip, navigating a syntax tree, element paths, style declarations, diagnostics |
-| [Editing](editing.md) | Changing attributes and elements without disturbing anything else; names in namespaces the document lacks; markup from another document |
-| [Workspace and history](workspace.md) | Several open documents, transactions, undo and redo |
-| [Loading](loading.md) | Environments, resolvers, what a document is, sessions, objects ↔ elements, enumerating members, values |
+| [Documents](documents.md) | Text, spans, parsing, round-trip, navigating a syntax tree, element paths and their text, style declarations, diagnostics |
+| [Editing](editing.md) | Changing attributes and elements without disturbing anything else; members written as elements; names in namespaces the document lacks; markup from another document |
+| [Workspace and history](workspace.md) | Several open documents, transactions, undo and redo, documents that move |
+| [Loading](loading.md) | Environments, resolvers, what a document is, sessions, objects ↔ elements, enumerating members, what a document can name, what a binding reads, values |
 | [Updates](updates.md) | Bringing running objects in line with a changed document, design mode, includes |
+| [Live documents](live-documents.md) | One document with its own history kept in step with its session; saved and changed; text from outside; attaching and detaching |
 | [Live population](live-population.md) | Making placed `x:Class` controls follow their documents instead of their last build |
 
 [Known limitations](../limitations.md) is the honest list of what these packages do not do. Read it

@@ -206,6 +206,24 @@ the document — see `docs/adr/0005-resource-includes.md` for why. That leaves f
 - **A declaration below a fragment's own element travels as written.** Avalonia refuses `xmlns` on
   anything but the root, in the fragment's source as much as in its destination, so markup that has
   one did not load where it came from either.
+- **A member written as an element is found by its spelling's meaning, not by the property.**
+  `SetPropertyElement` matches the namespace a prefix is bound to and the dotted local name, so
+  `Grid.Resources` and `Panel.Resources` on a grid are two members to it — the package has no types to
+  say they are one. Changing a member the document already writes takes the name it wrote it with.
+  Where an element writes one member twice, the first is changed and the second left for the loader.
+- **A live document's history is its own.** Each `XamlLiveDocument` keeps a history of one document,
+  so a change that spans a form and the resource dictionary it reads is two steps in two histories.
+  A host that needs one step keeps those documents in a `XamlWorkspace` of its own instead.
+- **The history does not survive the process.** A live document restored in the next copy of a tool
+  has its text and what is saved — it reads as changed — and nothing to undo.
+- **A text that does not parse is never shown.** A live document whose text does not parse leaves the
+  session showing the last text that did, as `Behind`; it is not built from a recovered parse, which
+  would show something nobody wrote. Nor is a session built for a text whose update was refused when a
+  load of it fails as well: the session in place stays and the document is `Behind` until the text
+  loads.
+- **A live document is moved by its file, not with its includes.** `RetargetAsync` builds the session
+  again so that relative includes are found from the new place, but files the document includes that
+  moved with it are the host's to follow.
 
 ## Members
 
@@ -242,6 +260,14 @@ the document — see `docs/adr/0005-resource-includes.md` for why. That leaves f
 - **A property registered both as an ordinary and as an attached property is listed once**, under
   its simple name. `KeyboardNavigation.IsTabStop` and `IsTabStop` are both valid XAML for the same
   property; a tool that needs the qualified spelling writes it itself.
+- **A binding path is read as far as types go.** Dotted members, integer and string indexers and a
+  leading `!` are followed; an attached property in parentheses, a cast, `$parent`, `#name`, the
+  stream operator and a step typed `object` or resolved at run time are `NotUnderstood`. The path may
+  well work — an indicator shows such a binding as not checked, never as broken.
+- **A catalog lists what a document can name by itself.** Nested types, generic definitions, static
+  classes, attributes and delegates are left out. A type's namespace is the first its own assembly
+  maps the CLR namespace to — the mapping the loader's resolver reads — so a namespace mapped by a
+  different assembly is not followed, and the type is listed under `using:`.
 
 ## Classification
 

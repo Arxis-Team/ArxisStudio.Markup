@@ -11,6 +11,55 @@ the source of truth, an unchanged document round-trips byte for byte, and unknow
 
 ## Unreleased
 
+### A live document
+
+`XamlLiveDocument` is one document with its own history, the text last saved, and the session that
+shows it. An edit, an undo and a redo are one step each, recorded in the text first and then shown: the
+session follows in place where it can, a new one is built where it cannot (`SessionReplaced`, on the
+owning thread, while the previous session is still open), and where nothing can be built the session in
+place stays and the document is `Behind`, or `Broken` with nothing to show it. A text that does not
+parse is never built from. Opening is not a step; whether the document is changed is a difference of
+text against what was saved. Text from outside is a step under the host's description and is what is
+saved — `ApplyIfClean` refuses over unsaved changes and reports the conflict, `TakeTheirs` and
+`KeepMine` resolve it. `DetachAsync` lets go of the environment, the options and the session and keeps
+the text and the history; `AttachAsync` shows the text in an environment; `RetargetAsync` follows a
+renamed file. Operations run one at a time, in the order asked for.
+
+`MarkupWorkspace.ChangeUri` moves a document to another URI without losing its history; the move is
+not a step, and undo restores a step at the document's current URI.
+
+Public API added: `XamlLiveDocument`, `XamlLiveDocumentState`, `XamlLiveDocumentChanges`,
+`XamlLiveDocumentChangedEventArgs`, `XamlSessionReplacedEventArgs`, `XamlLiveEditResult`,
+`XamlExternalTextPolicy`, `XamlExternalTextOutcome`, `XamlExternalTextResult`,
+`MarkupWorkspace.ChangeUri`. `docs/adr/0025`.
+
+### What a document can name, and what a binding reads
+
+`XamlTypeCatalog` reads the types assemblies offer a document — the namespace a document writes each
+in, the prefix the library suggests, and what kind of type it is — holding no type and no assembly.
+`XamlLoadSession.GetDataContextAsync` says what the bindings written on an element read from: the
+nearest `x:DataType`, the design data's type and whether bindings compile there.
+`XamlMemberResolver.EnumerateBindable` lists what a binding can name on a source, by name, and
+`ResolveBindingPath` reads a path against a type: resolved, broken at a step, or not understood —
+never claimed broken beyond what types can say. An assembly some of whose types cannot be read is
+reported with `UnreadableTypes` (`AXM2013`).
+
+Public API added: `XamlTypeCatalog`, `XamlTypeEntry`, `XamlTypeKinds`, `XamlDataContextInfo`,
+`XamlLoadSession.GetDataContextAsync`, `XamlBindableMember`, `XamlBindingPathResult`,
+`XamlBindingPathStatus`, `XamlMemberResolver.EnumerateBindable`, `XamlMemberResolver.ResolveBindingPath`,
+`XamlLoaderDiagnosticCodes.UnreadableTypes`. `docs/adr/0026`.
+
+### Members written as elements, and paths written down
+
+`XamlDocumentEditor.SetPropertyElement` sets a member written as a property element — replacing what an
+existing one says and keeping its tags and the comments around the value, or writing a new one where
+members go, laid out as the file is — and `RemovePropertyElement` takes one out; both on `XamlDocument`
+as well. `XamlElementPath.Parse` and `TryParse` read back the text `ToString` writes.
+
+Public API added: `XamlDocumentEditor.SetPropertyElement`, `XamlDocumentEditor.RemovePropertyElement`,
+`XamlDocument.SetPropertyElement`, `XamlDocument.RemovePropertyElement`, `XamlElementPath.Parse`,
+`XamlElementPath.TryParse`.
+
 ### Updates keep the class
 
 A form whose `x:Class` resolved — the form a designer shows beside the IDE that edits it — met the

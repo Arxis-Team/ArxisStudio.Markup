@@ -16,7 +16,7 @@ The current development scope is limited to the markup libraries described in th
 
 ## Status
 
-Milestones 0 to 17 are implemented, and every item under *Definition of done for the first preview release* holds. The state at the end of Milestone 11 is tagged `v0.1.0-preview`; milestones 12 to 17 came after it, and the current version is `0.2.0-preview.2`. This document stays the contract: the milestones below are the plan, not a record of what happened.
+Milestones 0 to 18 are implemented, and every item under *Definition of done for the first preview release* holds. The state at the end of Milestone 11 is tagged `v0.1.0-preview`; milestones 12 to 18 came after it, and the current version is `0.2.0-preview.2`. This document stays the contract: the milestones below are the plan, not a record of what happened.
 
 The three libraries are consumed by **project reference**. They are not published to NuGet, the repository builds no packages, and it runs no CI workflow of its own; the version above names a state of the source rather than something installable. Two items of the plan below are deliberately not carried out, both for the same reason: milestone 11's preview packages, and milestone 12's `PublicAPI.Shipped.txt`. A declared surface is a promise made to whoever installs a package, and nothing here is installed.
 
