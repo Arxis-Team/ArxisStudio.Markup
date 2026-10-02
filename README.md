@@ -1986,6 +1986,54 @@ Exit criteria:
   its class outlives the rebuild;
 - rebuilding named elements replaces their objects and the map follows.
 
+### Milestone 18: a live document, and models a tool can hold
+
+Every host built on these packages wires the same thing out of four parts: a workspace for the
+history, a document, a session, and the rule that keeps the three describing one text. The designer
+sample in ArxisStudio.Surface did it with an undo stack of its own beside the workspace's, lost the
+difference between a document edited here and one changed on disk, and took a new session for
+granted wherever an update refused. And the questions a property inspector asks about types and data
+— which controls an assembly offers and under which names, what a binding at this element binds to,
+whether a path resolves — were answered by reflecting over `Type` objects a tool then held, which is
+what keeps a collectible generation of a project's assemblies alive after the tool has moved on.
+
+- A live document: a document with a history of its own, the text last saved, and the session over
+  it when one is attached. An edit, an undo and a redo are one step each, recorded on the document
+  and carried to the session; a refused update leaves the document advanced and says the objects are
+  behind, and a document that needs a new session gets one, raising that it did. Opening a document
+  is not a step. A document attaches to an environment and detaches from it — the text, the history
+  and whether it differs from what was saved stay, the environment and the options go — and is
+  retargeted when its file is renamed.
+- Text that arrives from outside — the IDE beside the designer saving the file — is a step of the
+  history of its own, under a description the host gives, when the document has nothing unsaved; a
+  document with unsaved edits does not take it without being told which side wins.
+- A document's identity can move to another URI in a workspace without losing its history.
+- A path to an element is text a host can write down and read back.
+- An element's member is written as a property element, or taken out, as one edit.
+- A catalog of the types assemblies offer to markup — names, the namespace a document writes each
+  under and the prefix its library suggests, and what kind of control it is — holding no `Type`.
+- What an element's bindings bind to: the declared data type, the data context a design-time
+  declaration supplies, and the members a binding can name on it — by name; and whether a binding
+  path resolves on a type, and where it stops when it does not.
+
+Exit criteria:
+
+- an edit is one step of the document's history and the session follows it; undo and redo are steps
+  the session follows too, and undoing to the saved text leaves the document clean;
+- text from outside on a clean document is an undoable step and leaves it clean; on a document with
+  unsaved edits it changes nothing until the host chooses, and either choice leaves the document and
+  the session agreeing;
+- an update that needs a new session gets one, and the host is told the root changed;
+- detaching keeps the text, the history and the unsaved state, and lets go of the environment;
+- opening is not undoable, and two edits in flight reach the session in the order they were made;
+- a renamed document keeps its history;
+- a path round-trips through its text;
+- a property element is written where none was, replaces the one that was, and is removed;
+- the catalog names a library's controls under the namespace and prefix the library declares, and
+  holds no type;
+- an element under `x:DataType` reports that type and its bindable members, a design-time data
+  context reports its own type, and a binding path reports where it stops.
+
 ## Definition of done for the first preview release
 
 The first preview release is ready when all of the following are true:
