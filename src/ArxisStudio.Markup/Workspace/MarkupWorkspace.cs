@@ -228,6 +228,63 @@ public sealed class MarkupWorkspace
         return true;
     }
 
+    /// <summary>Moves an open document to another URI, keeping its identity and its history.</summary>
+    /// <remarks>
+    /// <para>
+    /// What a host does when the file behind a document is renamed somewhere else — by the IDE beside
+    /// it, or in a file manager. The document is the same document: its identity, its text and every
+    /// step of its history stay, and only where it lives changes.
+    /// </para>
+    /// <para>
+    /// This is not a step of the history. The rename happened to the file, outside the workspace, and
+    /// undoing it here would put the document back at a path the file is no longer at. Undo and redo
+    /// restore text at the URI the document has when they run.
+    /// </para>
+    /// </remarks>
+    /// <param name="id">The document's identity.</param>
+    /// <param name="uri">Where it lives now.</param>
+    /// <returns>The document's snapshot at its new URI, or the existing one when the URI is unchanged.</returns>
+    /// <exception cref="ArgumentNullException"><paramref name="uri"/> is <see langword="null"/>.</exception>
+    /// <exception cref="InvalidOperationException">
+    /// The document is not open, or another document is open at <paramref name="uri"/>.
+    /// </exception>
+    public MarkupDocument ChangeUri(MarkupDocumentId id, Uri uri)
+    {
+        ArgumentNullException.ThrowIfNull(uri);
+
+        MarkupDocument moved;
+        DocumentChangedEventArgs notification;
+
+        lock (_gate)
+        {
+            WorkspaceState state = _state;
+
+            if (!state.Documents.TryGetValue(id, out MarkupDocument? current))
+            {
+                throw new InvalidOperationException($"Document '{id}' is not open in this workspace.");
+            }
+
+            if (current.Uri == uri)
+            {
+                return current;
+            }
+
+            if (state.DocumentsByUri.ContainsKey(uri))
+            {
+                throw new InvalidOperationException(
+                    $"Another document is open at '{uri}'. Two documents cannot live at one URI.");
+            }
+
+            moved = MarkupDocument.Create(id, uri, current.Text, state.NextVersion(id));
+            _state = state.WithoutDocument(current).WithDocument(moved);
+            notification = new DocumentChangedEventArgs(DocumentChangeKind.Changed, current, moved);
+        }
+
+        Raise([notification]);
+
+        return moved;
+    }
+
     /// <summary>Reverses the most recently committed transaction.</summary>
     /// <remarks>
     /// The earlier text is restored as a new snapshot at a version that has never been used.
@@ -338,9 +395,18 @@ public sealed class MarkupWorkspace
             ? state.WithoutDocument(current)
             : state;
 
-    private static WorkspaceState Restore(WorkspaceState state, DocumentTransition transition, SourceText text) =>
-        state.WithDocument(
-            MarkupDocument.Create(transition.Id, transition.Uri, text, state.NextVersion(transition.Id)));
+    /// <summary>Puts a document's earlier or later text back.</summary>
+    /// <remarks>
+    /// At the URI the document has now when it is open: the identity is what a transition records, and
+    /// a document moved since (<see cref="ChangeUri"/>) is the same document at another place. One that
+    /// is not open — undoing its close — comes back where it was.
+    /// </remarks>
+    private static WorkspaceState Restore(WorkspaceState state, DocumentTransition transition, SourceText text)
+    {
+        Uri uri = state.Documents.TryGetValue(transition.Id, out MarkupDocument? open) ? open.Uri : transition.Uri;
+
+        return state.WithDocument(MarkupDocument.Create(transition.Id, uri, text, state.NextVersion(transition.Id)));
+    }
 
     private static List<DocumentChangedEventArgs> DescribeChanges(
         WorkspaceState before,

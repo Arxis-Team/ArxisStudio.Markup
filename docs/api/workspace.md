@@ -107,6 +107,33 @@ transaction.Commit();       // or let the using block roll it back
 A transaction that is disposed without `Commit` changes nothing; a failed one never leaves a
 document partly written.
 
+## Adding is a step; opening a file usually is not
+
+`AddDocument` and `OpenDocumentAsync` record the document's arrival as a step, so undoing far enough
+closes it — the right answer for a tool that creates files and the wrong one for a tool that opens
+them. Clear the history after opening when arriving is not something the user did:
+
+```csharp
+MarkupDocument opened = workspace.Workspace.AddDocument(uri, text);
+
+workspace.Workspace.ClearHistory();
+```
+
+A tool with one history per document gets this, and the rest of the bookkeeping, from
+[`XamlLiveDocument`](live-documents.md).
+
+## A document that moves
+
+A file renamed or moved by somebody else keeps its document:
+
+```csharp
+workspace.Workspace.ChangeUri(id, new Uri(renamedPath));
+```
+
+The document keeps its identity and its history and gets a new version at the new URI; the move is
+not a step, so undo does not move it back. Steps already in the history come back at the document's
+current URI rather than the one they were recorded at. A URI another open document holds is refused.
+
 ## Saving
 
 There is no `Save`. Where a document goes is the host's business, and a library that wrote files

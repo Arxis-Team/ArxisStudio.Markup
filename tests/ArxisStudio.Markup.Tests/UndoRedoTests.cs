@@ -263,4 +263,83 @@ public sealed class UndoRedoTests
         Assert.False(workspace.CanRedo);
         Assert.Equal("original", workspace.GetDocument(view.Id).Text.ToString());
     }
+
+    [Fact]
+    public void ChangeUri_MovesTheDocumentAndKeepsItsIdentity()
+    {
+        MarkupWorkspace workspace = CreateWorkspace();
+        MarkupDocument view = workspace.AddDocument(ViewUri, SourceText.From("<UserControl />"));
+        var renamed = new Uri("file:///Views/Renamed.axaml");
+
+        MarkupDocument moved = workspace.ChangeUri(view.Id, renamed);
+
+        Assert.Equal(view.Id, moved.Id);
+        Assert.Equal(renamed, workspace.GetDocument(view.Id).Uri);
+        Assert.Equal("<UserControl />", moved.Text.ToString());
+        Assert.True(workspace.TryGetDocumentByUri(renamed, out _));
+        Assert.False(workspace.TryGetDocumentByUri(ViewUri, out _));
+    }
+
+    [Fact]
+    public void ChangeUri_IsNotAStepOfTheHistory()
+    {
+        MarkupWorkspace workspace = CreateWorkspace();
+        MarkupDocument view = workspace.AddDocument(ViewUri, SourceText.From("<UserControl />"));
+
+        workspace.ClearHistory();
+        workspace.ChangeUri(view.Id, new Uri("file:///Views/Renamed.axaml"));
+
+        // The file was renamed somewhere else; undoing in the editor would put the document back at a
+        // path the file is no longer at.
+        Assert.False(workspace.CanUndo);
+    }
+
+    [Fact]
+    public void UndoAndRedo_AfterChangeUri_RestoreTextAtTheNewUri()
+    {
+        MarkupWorkspace workspace = CreateWorkspace();
+        MarkupDocument view = workspace.AddDocument(ViewUri, SourceText.From("<UserControl />"));
+        var renamed = new Uri("file:///Views/Renamed.axaml");
+
+        workspace.UpdateDocument(view.Id, SourceText.From("<Border />"));
+        workspace.ChangeUri(view.Id, renamed);
+
+        Assert.True(workspace.Undo());
+        Assert.Equal("<UserControl />", workspace.GetDocument(view.Id).Text.ToString());
+        Assert.Equal(renamed, workspace.GetDocument(view.Id).Uri);
+        Assert.False(workspace.TryGetDocumentByUri(ViewUri, out _));
+
+        Assert.True(workspace.Redo());
+        Assert.Equal("<Border />", workspace.GetDocument(view.Id).Text.ToString());
+        Assert.Equal(renamed, workspace.GetDocument(view.Id).Uri);
+    }
+
+    [Fact]
+    public void ChangeUri_ToAUriAnotherDocumentHolds_IsRefused()
+    {
+        MarkupWorkspace workspace = CreateWorkspace();
+        MarkupDocument view = workspace.AddDocument(ViewUri, SourceText.From("<UserControl />"));
+
+        workspace.AddDocument(ThemeUri, SourceText.From("<ResourceDictionary />"));
+
+        Assert.Throws<InvalidOperationException>(() => workspace.ChangeUri(view.Id, ThemeUri));
+        Assert.Equal(ViewUri, workspace.GetDocument(view.Id).Uri);
+    }
+
+    [Fact]
+    public void ChangeUri_RaisesOneChangeWithBothSnapshots()
+    {
+        MarkupWorkspace workspace = CreateWorkspace();
+        MarkupDocument view = workspace.AddDocument(ViewUri, SourceText.From("<UserControl />"));
+        var raised = new List<DocumentChangedEventArgs>();
+
+        workspace.DocumentChanged += (_, e) => raised.Add(e);
+        workspace.ChangeUri(view.Id, new Uri("file:///Views/Renamed.axaml"));
+
+        DocumentChangedEventArgs change = Assert.Single(raised);
+
+        Assert.Equal(DocumentChangeKind.Changed, change.Kind);
+        Assert.Equal(ViewUri, change.OldDocument!.Uri);
+        Assert.Equal(new Uri("file:///Views/Renamed.axaml"), change.NewDocument!.Uri);
+    }
 }
