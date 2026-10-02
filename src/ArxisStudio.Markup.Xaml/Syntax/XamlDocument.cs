@@ -199,6 +199,21 @@ public sealed class XamlDocument : XamlSyntaxNode
     public XamlDocument MoveElement(XamlElement element, XamlElement newParent, int index) =>
         Edit().MoveElement(element, newParent, index).Apply();
 
+    /// <summary>Sets a member of an element to markup, written as a property element.</summary>
+    /// <param name="element">The element whose member is set.</param>
+    /// <param name="name">The property element's name as it should be written, <c>Owner.Member</c>.</param>
+    /// <param name="contentXaml">What the member contains.</param>
+    /// <returns>A new document with the change applied.</returns>
+    public XamlDocument SetPropertyElement(XamlElement element, XamlQualifiedName name, string contentXaml) =>
+        Edit().SetPropertyElement(element, name, contentXaml).Apply();
+
+    /// <summary>Takes out a member an element writes as a property element.</summary>
+    /// <param name="element">The element whose member is taken out.</param>
+    /// <param name="name">The property element's name, <c>Owner.Member</c>.</param>
+    /// <returns>A new document with the change applied, or this one when the element does not write the member.</returns>
+    public XamlDocument RemovePropertyElement(XamlElement element, XamlQualifiedName name) =>
+        Edit().RemovePropertyElement(element, name).Apply();
+
     /// <summary>
     /// Writes the document out in the requested mode.
     /// </summary>

@@ -101,6 +101,37 @@ Property elements — `<Grid.ColumnDefinitions>`, `<Border.Resources>` — are m
 rather than things beside their siblings. They are not unwrapped out into the open, and they take
 no part in reordering.
 
+## Members written as elements
+
+A member whose value is an object rather than text — `Design.DataContext`, `Button.Flyout`,
+`Grid.ColumnDefinitions` — is set or taken out as one edit:
+
+```csharp
+XamlQualifiedName member = editor.Qualify(root, AvaloniaNamespace, "Design.DataContext");
+XamlQualifiedName type = editor.Qualify(root, "using:App.ViewModels", "MainViewModel", "vm");
+
+editor.SetPropertyElement(root, member, $"<{type} />");
+editor.RemovePropertyElement(root, member);
+```
+
+The member is found by the name a reader reads — the namespace its prefix is bound to and the dotted
+local name — so `av:Design.DataContext` is found by `Design.DataContext` where `av` is bound to the
+default namespace. Two names for one property, `Grid.Resources` and `Panel.Resources` on a grid, are
+two names here: the package has no types to tell it otherwise, so pass the name the document wrote
+when changing a member it already has.
+
+An existing member keeps its tags and what surrounds its value: the replaced run goes from the first
+element, text or character data inside it to the last, so the comment Avalonia's templates write above
+the value inside `Design.DataContext` stays where it is. A new member goes in front of the element's
+content, or after the members it has when it has no content, and is laid out as the siblings beside it
+are — on lines of its own, with its value one step further in, where they are on lines of their own.
+A self-closing element is opened for it.
+
+The value is written as given, apart from its line breaks, which become the document's, and its lines
+after the first, which are indented to where it lands — except inside a value, where a line break is
+part of what the value says. A value that says nothing is refused: taking a member out is
+`RemovePropertyElement`. A property element has no members of its own, and is refused as the element.
+
 ## Duplicating
 
 ```csharp

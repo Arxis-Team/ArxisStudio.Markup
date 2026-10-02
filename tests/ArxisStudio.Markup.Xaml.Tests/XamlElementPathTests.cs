@@ -107,6 +107,65 @@ public sealed class XamlElementPathTests
     }
 
     [Fact]
+    public void APathWrittenDownReadsBackAsThePathItWas()
+    {
+        XamlDocument document = Parse();
+
+        // Every element there is, the root and the ones inside a member included: what a tool
+        // writes down is what it gets back, and it still leads to the same element.
+        foreach (XamlElement element in document.DescendantElements().Where(static e => !e.IsPropertyElementSyntax))
+        {
+            XamlElementPath path = XamlElementPath.Of(element);
+            XamlElementPath read = XamlElementPath.Parse(path.ToString());
+
+            Assert.Equal(path, read);
+            Assert.Same(element, read.Resolve(document));
+        }
+
+        Assert.Same(XamlElementPath.Root, XamlElementPath.Parse("/"));
+    }
+
+    [Fact]
+    public void AMemberNameIsReadUpToTheLastColon()
+    {
+        // A malformed member name may hold a colon of its own; the index is what follows the last.
+        XamlElementPath path = XamlElementPath.Parse("/2/A:B:3");
+
+        Assert.Equal([new XamlPathStep(null, 2), new XamlPathStep("A:B", 3)], path.Steps);
+    }
+
+    [Theory]
+    [InlineData("")]
+    [InlineData("0")]
+    [InlineData("//")]
+    [InlineData("/0/")]
+    [InlineData("/Resources")]
+    [InlineData("/Resources:")]
+    [InlineData("/-1")]
+    [InlineData("/+1")]
+    [InlineData("/ 1")]
+    [InlineData("/1 ")]
+    [InlineData("/1x")]
+    [InlineData("/99999999999")]
+    public void TextThatIsNotAPathIsRefused(string text)
+    {
+        Assert.False(XamlElementPath.TryParse(text, out XamlElementPath? path));
+        Assert.Null(path);
+
+        FormatException refusal = Assert.Throws<FormatException>(() => XamlElementPath.Parse(text));
+
+        Assert.Contains($"'{text}'", refusal.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void NoTextIsNoPath()
+    {
+        Assert.False(XamlElementPath.TryParse(null, out XamlElementPath? path));
+        Assert.Null(path);
+        Assert.Throws<ArgumentNullException>(() => XamlElementPath.Parse(null!));
+    }
+
+    [Fact]
     public void ContentAndMembersAreToldApart()
     {
         XamlDocument document = Parse();

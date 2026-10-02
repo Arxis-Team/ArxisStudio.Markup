@@ -698,34 +698,34 @@ public sealed partial class XamlDocumentEditor
     }
 
     /// <summary>
-    /// Gets the whitespace immediately before an element, which is the indentation a sibling
+    /// Gets the whitespace immediately before a node, which is the indentation a sibling
     /// inserted next to it should match.
     /// </summary>
-    private string LeadingWhitespaceOf(XamlElement element)
+    private string LeadingWhitespaceOf(XamlSyntaxNode node)
     {
-        int start = element.Span.Start;
+        int start = node.Span.Start;
 
         while (start > 0 && char.IsWhiteSpace(_document.SourceText[start - 1]))
         {
             start--;
         }
 
-        return _document.SourceText.GetText(TextSpan.FromBounds(start, element.Span.Start));
+        return _document.SourceText.GetText(TextSpan.FromBounds(start, node.Span.Start));
     }
 
     /// <summary>
-    /// Gets the indentation an element sits at, when it starts a line of its own.
+    /// Gets the indentation a node sits at, when it starts a line of its own.
     /// </summary>
     /// <remarks>
-    /// Spaces and tabs only, and only when nothing else precedes it on its line. An element
-    /// written after something else has no indentation of its own to speak of, and pretending
-    /// otherwise would indent by whatever happened to come before it. Read from the element's own
-    /// document, which is what lets a fragment ask it of the document it is lifted from.
+    /// Spaces and tabs only, and only when nothing else precedes it on its line. A node written
+    /// after something else has no indentation of its own to speak of, and pretending otherwise
+    /// would indent by whatever happened to come before it. Read from the node's own document,
+    /// which is what lets a fragment ask it of the document it is lifted from.
     /// </remarks>
-    internal static string IndentOf(XamlElement element)
+    internal static string IndentOf(XamlSyntaxNode node)
     {
-        SourceText text = element.Document.SourceText;
-        int start = element.Span.Start;
+        SourceText text = node.Document.SourceText;
+        int start = node.Span.Start;
 
         while (start > 0 && text[start - 1] is ' ' or '\t')
         {
@@ -733,8 +733,23 @@ public sealed partial class XamlDocumentEditor
         }
 
         return start == 0 || LineBreakEndsAt(text, start)
-            ? text.GetText(TextSpan.FromBounds(start, element.Span.Start))
+            ? text.GetText(TextSpan.FromBounds(start, node.Span.Start))
             : string.Empty;
+    }
+
+    /// <summary>Reports whether a node is the first thing on its line.</summary>
+    private static bool StartsLine(XamlSyntaxNode node) =>
+        StartsLineAt(node.Document.SourceText, node.Span.Start);
+
+    /// <summary>Reports whether only spaces and tabs stand between a position and the start of its line.</summary>
+    private static bool StartsLineAt(SourceText text, int position)
+    {
+        while (position > 0 && text[position - 1] is ' ' or '\t')
+        {
+            position--;
+        }
+
+        return position == 0 || LineBreakEndsAt(text, position);
     }
 
     /// <summary>
@@ -745,12 +760,12 @@ public sealed partial class XamlDocumentEditor
     /// written with, whether that is two spaces, four, or a tab. Two spaces only when the
     /// document does not say — an element written inline, or a root with nothing above it.
     /// </remarks>
-    private static string StepFor(XamlElement element)
+    private static string StepFor(XamlSyntaxNode node)
     {
-        string indent = IndentOf(element);
+        string indent = IndentOf(node);
 
         if (indent.Length > 0
-            && element.Parent is XamlElement parent
+            && node.Parent is XamlElement parent
             && IndentOf(parent) is { } outer
             && indent.Length > outer.Length
             && indent.StartsWith(outer, StringComparison.Ordinal))

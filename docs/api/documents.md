@@ -139,6 +139,21 @@ same thing in two parses of the same text. They are *positions*, not identifiers
 sibling above an element changes its path, which is correct. Where a document names its elements,
 `Identity` is the stabler thing to key on.
 
+A path's text is a format a tool can write down and read back — a selection handed to the next copy
+of the tool, the expanded nodes kept with a session:
+
+```csharp
+string written = path.ToString();                       // "/1/Resources:0"
+XamlElementPath read = XamlElementPath.Parse(written);   // equal to path
+
+if (XamlElementPath.TryParse(stored, out XamlElementPath? restored)) { … }
+```
+
+`/` is the root. Each step is a slash and the index among content children, or the member's name, a
+colon and the index among what the member contains; the index follows the last colon, and is a
+decimal number with no sign and no spaces. `Parse` throws `FormatException` naming the text it was
+given, and `TryParse` answers `false`.
+
 ## Attributes and values
 
 ```csharp

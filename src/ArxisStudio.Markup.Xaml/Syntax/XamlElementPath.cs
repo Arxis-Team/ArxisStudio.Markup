@@ -1,6 +1,8 @@
 using System;
 using System.Collections.Generic;
 using System.Collections.Immutable;
+using System.Diagnostics.CodeAnalysis;
+using System.Globalization;
 using System.Linq;
 
 namespace ArxisStudio.Markup.Xaml;
@@ -102,6 +104,82 @@ public sealed class XamlElementPath : IEquatable<XamlElementPath>
         steps.Reverse();
 
         return new XamlElementPath([.. steps]);
+    }
+
+    /// <summary>Reads a path back from the text <see cref="ToString"/> writes.</summary>
+    /// <remarks>
+    /// <para>
+    /// A path is what a tool writes down when a position has to outlive the process that knew it —
+    /// a selection handed to the next copy of the tool, the expanded nodes of a tree kept with a
+    /// session. <c>/</c> is the root, and each step is a slash followed by the index among content
+    /// children, or by the member's name, a colon and the index among what the member contains.
+    /// </para>
+    /// <para>
+    /// The index follows the last colon: a member's name is what the document wrote, and a malformed
+    /// one may hold a colon of its own. An index is a decimal number with nothing around it — no
+    /// sign, no spaces.
+    /// </para>
+    /// </remarks>
+    /// <param name="text">The text, as <see cref="ToString"/> wrote it.</param>
+    /// <returns>The path.</returns>
+    /// <exception cref="ArgumentNullException"><paramref name="text"/> is <see langword="null"/>.</exception>
+    /// <exception cref="FormatException"><paramref name="text"/> is not a path.</exception>
+    public static XamlElementPath Parse(string text)
+    {
+        ArgumentNullException.ThrowIfNull(text);
+
+        return Read(text, out XamlElementPath? path) is { } problem
+            ? throw new FormatException($"'{text}' is not a path to an element: {problem}")
+            : path!;
+    }
+
+    /// <summary>Reads a path back from the text <see cref="ToString"/> writes, when it is one.</summary>
+    /// <param name="text">The text.</param>
+    /// <param name="path">The path, or <see langword="null"/> when the text is not one.</param>
+    /// <returns><see langword="true"/> when the text is a path.</returns>
+    public static bool TryParse([NotNullWhen(true)] string? text, [NotNullWhen(true)] out XamlElementPath? path)
+    {
+        path = null;
+
+        return text is not null && Read(text, out path) is null;
+    }
+
+    /// <summary>Reads a path, saying what is wrong with text that is not one.</summary>
+    /// <returns>What is wrong, or <see langword="null"/> when the text reads.</returns>
+    private static string? Read(string text, out XamlElementPath? path)
+    {
+        path = null;
+
+        if (string.Equals(text, "/", StringComparison.Ordinal))
+        {
+            path = Root;
+
+            return null;
+        }
+
+        if (!text.StartsWith('/'))
+        {
+            return "a path starts with '/'.";
+        }
+
+        var steps = ImmutableArray.CreateBuilder<XamlPathStep>();
+
+        foreach (string segment in text[1..].Split('/'))
+        {
+            int colon = segment.LastIndexOf(':');
+            ReadOnlySpan<char> index = colon < 0 ? segment : segment.AsSpan(colon + 1);
+
+            if (!int.TryParse(index, NumberStyles.None, CultureInfo.InvariantCulture, out int value))
+            {
+                return $"'{segment}' is not a step, which is an index, or a member's name, a colon and an index.";
+            }
+
+            steps.Add(new XamlPathStep(colon < 0 ? null : segment[..colon], value));
+        }
+
+        path = new XamlElementPath(steps.ToImmutable());
+
+        return null;
     }
 
     /// <summary>Finds the element a path leads to in a document.</summary>
