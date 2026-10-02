@@ -2003,7 +2003,9 @@ what keeps a collectible generation of a project's assemblies alive after the to
   behind, and a document that needs a new session gets one, raising that it did. Opening a document
   is not a step. A document attaches to an environment and detaches from it — the text, the history
   and whether it differs from what was saved stay, the environment and the options go — and is
-  retargeted when its file is renamed.
+  retargeted when its file is renamed. It builds again only the elements a host chooses — the ones
+  that place a control whose own markup changed — keeping its session where the session can do that,
+  and building the whole text where it cannot.
 - Text that arrives from outside — the IDE beside the designer saving the file — is a step of the
   history of its own, under a description the host gives, when the document has nothing unsaved; a
   document with unsaved edits does not take it without being told which side wins.
@@ -2025,6 +2027,8 @@ Exit criteria:
   the session agreeing;
 - an update that needs a new session gets one, and the host is told the root changed;
 - detaching keeps the text, the history and the unsaved state, and lets go of the environment;
+- elements built again at a host's request keep the session and every object they do not hold, are
+  no step of the history, and the root among them builds the whole text again;
 - opening is not undoable, and two edits in flight reach the session in the order they were made;
 - a renamed document keeps its history;
 - a path round-trips through its text;

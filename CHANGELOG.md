@@ -28,10 +28,16 @@ renamed file. Operations run one at a time, in the order asked for.
 `MarkupWorkspace.ChangeUri` moves a document to another URI without losing its history; the move is
 not a step, and undo restores a step at the document's current URI.
 
+`RebuildAsync` takes a chooser: it builds again only the elements chosen — those placing a control
+whose own markup changed — in place, keeping the session, the root and every other object, and says
+`XamlLiveDocumentChanges.Objects`; the root among them builds the whole text again. The elements are
+chosen in the document's turn, from the text the session shows then.
+
 Public API added: `XamlLiveDocument`, `XamlLiveDocumentState`, `XamlLiveDocumentChanges`,
 `XamlLiveDocumentChangedEventArgs`, `XamlSessionReplacedEventArgs`, `XamlLiveEditResult`,
 `XamlExternalTextPolicy`, `XamlExternalTextOutcome`, `XamlExternalTextResult`,
-`MarkupWorkspace.ChangeUri`. `docs/adr/0025`.
+`MarkupWorkspace.ChangeUri`, `XamlLiveDocument.RebuildAsync(Func<XamlDocument, IEnumerable<XamlElement>>, CancellationToken)`,
+`XamlLiveDocumentChanges.Objects`. `docs/adr/0025`.
 
 ### What a document can name, and what a binding reads
 

@@ -132,8 +132,24 @@ outside keep landing while a document is detached, and `AttachAsync` shows what 
 A document nobody is looking at — a hidden tab — can stay detached until it is shown.
 
 `RebuildAsync` builds the session again from the same text, for a change to something the text names
-rather than to the text. `RetargetAsync` follows the file to a new path, keeping the history; the move
-is not a step, and the session is built again because includes are found relative to the document.
+rather than to the text. Given a chooser, it builds only what the chooser picks — the elements that
+place a control whose own markup a host has just given its population — and keeps the session, the
+root and every other object:
+
+```csharp
+await live.RebuildAsync(shown => shown.DescendantElements()
+    .Where(element => element.Name.LocalName == "CustomerCard"));      // Changed says Objects
+```
+
+The chooser runs in the document's turn, against the document the session shows then, so it never
+picks an element an edit queued ahead of it has replaced. A document that shows no text as it reads —
+detached, `Behind`, `Broken` — is not asked. The root among the chosen, or a part the session cannot
+build in place, builds the whole text again, as `RebuildAsync` without a chooser does. Nothing is
+recorded in the history: the text did not move. A host holding one of the rebuilt objects — a
+selection, an adorner — finds it again through the session's map when `Changed` says `Objects`.
+
+`RetargetAsync` follows the file to a new path, keeping the history; the move is not a step, and the
+session is built again because includes are found relative to the document.
 
 A session handed to the next copy of a tool is restored with the text and what was saved:
 

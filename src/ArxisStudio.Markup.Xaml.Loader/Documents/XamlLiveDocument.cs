@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Collections.Immutable;
 using System.Threading;
 using System.Threading.Tasks;
@@ -81,7 +82,7 @@ public sealed class XamlLiveDocument : IAsyncDisposable
     }
 
     /// <summary>
-    /// Raised once an operation has moved the text, what is saved, the state or the URI.
+    /// Raised once an operation has moved the text, what is saved, the state, the URI or the objects.
     /// </summary>
     /// <remarks>On the thread that owns the objects, after the operation is over.</remarks>
     public event EventHandler<XamlLiveDocumentChangedEventArgs>? Changed;
@@ -509,6 +510,77 @@ public sealed class XamlLiveDocument : IAsyncDisposable
         ThrowIfDisposed();
 
         return await ShowAsync(XamlLiveDocumentChanges.None, rebuild: true, keepOnFailure: true).ConfigureAwait(false);
+    }
+
+    /// <summary>
+    /// Builds elements of the document again, as the text reads — because something they name changed
+    /// rather than the text: a control whose own markup a host has given its population anew.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// Building the whole text again for that is a new session — a new root, the author's constructor of
+    /// a window run again, the map and the handlers started over — for one placed control. The chosen
+    /// elements are built again in place instead (<see cref="XamlLoadSession.ApplyRebuildAsync"/>), and the
+    /// session and every object they do not hold stay. Where the session cannot do that — the root is
+    /// among them, or a part will not build in place — the whole text is built again, as
+    /// <see cref="RebuildAsync(CancellationToken)"/> does.
+    /// </para>
+    /// <para>
+    /// The elements are chosen inside the document's turn, from the document the session shows then:
+    /// an operation queued ahead of this one can replace it while this one waits, and an element chosen
+    /// before would belong to nothing the objects describe. A document that shows no text as it reads —
+    /// detached, <see cref="XamlLiveDocumentState.Behind"/> or <see cref="XamlLiveDocumentState.Broken"/>
+    /// — is not asked: the next text that builds builds everything. Nothing chosen is nothing done.
+    /// </para>
+    /// <para>
+    /// The text does not move, so this is no step of the history. <see cref="Changed"/> says
+    /// <see cref="XamlLiveDocumentChanges.Objects"/> when anything was built again in place.
+    /// </para>
+    /// </remarks>
+    /// <param name="elements">Chooses the elements to build again, from the document the session shows.</param>
+    /// <param name="cancellationToken">A token to give up waiting for the turn with.</param>
+    /// <returns>What rebuilding did.</returns>
+    /// <exception cref="ArgumentNullException"><paramref name="elements"/> is <see langword="null"/>.</exception>
+    /// <exception cref="ObjectDisposedException">The document has been disposed.</exception>
+    /// <exception cref="OperationCanceledException">The token was cancelled before the turn came.</exception>
+    public async ValueTask<XamlLiveEditResult> RebuildAsync(
+        Func<XamlDocument, IEnumerable<XamlElement>> elements,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(elements);
+
+        using XamlMutationGate.XamlMutationLease lease =
+            await _gate.EnterAsync(cancellationToken).ConfigureAwait(false);
+
+        ThrowIfDisposed();
+
+        if (State != XamlLiveDocumentState.Live || Session is not { State: XamlSessionState.Usable } session)
+        {
+            return Unchanged();
+        }
+
+        XamlElement[] chosen = [.. elements(session.Document)];
+
+        if (chosen.Length == 0)
+        {
+            return Unchanged();
+        }
+
+        // Never cancelled once begun, for the reason an edit's update is not: a session left part-way
+        // through an update is worse than a slow one.
+        XamlUpdateResult update = await session.ApplyRebuildAsync(chosen, CancellationToken.None).ConfigureAwait(false);
+
+        if (!update.Applied)
+        {
+            return await ShowAsync(XamlLiveDocumentChanges.None, rebuild: true, keepOnFailure: true).ConfigureAwait(false);
+        }
+
+        (XamlLiveEditResult result, XamlLiveDocumentChanges shown) = Settle(
+            textChanged: false, replaced: false, XamlLiveDocumentState.Live, update.Diagnostics, update, load: null);
+
+        await RaiseChangedAsync(update.Changes.IsEmpty ? shown : shown | XamlLiveDocumentChanges.Objects).ConfigureAwait(false);
+
+        return result;
     }
 
     /// <summary>

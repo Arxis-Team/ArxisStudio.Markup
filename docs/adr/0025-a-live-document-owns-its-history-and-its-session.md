@@ -110,3 +110,19 @@ inspector's subject — for a refusal that a keystroke would have fixed.
 - The history does not outlive the process. A host handing a session to the next copy of itself
   passes the text and what is saved — `Open(uri, text, savedText)` — and the document reads as
   changed from the start, with nothing to undo.
+
+## Addition, 2026-10-03: elements built again in place
+
+A host that gave a placed control's class new markup — the IDE saved the control's own document —
+asked every document placing it for `RebuildAsync`, and got a new session for each: a new root, the
+author's constructor of a window run again, the map, the handlers and whatever the host held of the
+objects started over, for one control. The session could already build named elements again in place
+(`ApplyRebuildAsync`, ADR 0024); the live document had no way to ask for it in its own turn.
+
+`RebuildAsync(chooser)` does. The chooser picks the elements inside the turn, from the document the
+session shows then — an element picked before the turn could belong to a document an edit queued
+ahead has replaced, and the session would refuse it. A document that shows no text as it reads is not
+asked. The elements are built in place, the session stays, and `Changed` says
+`XamlLiveDocumentChanges.Objects`: the objects moved while the text stood still, which is no step of
+the history and no change to what is saved. Where the session cannot build in place — the root is
+among the chosen, or a part refuses — the whole text is built again, as before.
