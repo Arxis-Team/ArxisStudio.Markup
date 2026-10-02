@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Immutable;
+using System.ComponentModel;
 using System.Linq;
 using System.Threading.Tasks;
 using ArxisStudio.Markup.Xaml.Loader.TestControls;
@@ -8,6 +9,7 @@ using Avalonia.Controls;
 using Avalonia.Input;
 using Avalonia.Layout;
 using Avalonia.Headless.XUnit;
+using Avalonia.Threading;
 using Xunit;
 
 namespace ArxisStudio.Markup.Xaml.Loader.Tests;
@@ -249,6 +251,33 @@ public sealed class PropertyMatrixTests
             result.Diagnostics,
             static d => d.Code == XamlLoaderDiagnosticCodes.ExpressionReplaced
                 && d.Severity == MarkupDiagnosticSeverity.Warning);
+    }
+
+    [AvaloniaFact]
+    public async Task AReplacedBindingStopsFollowingItsSource()
+    {
+        // The document says the property is a literal now. A binding left running on the object
+        // would write over that literal the next time its source changed — the document and the
+        // objects disagreeing with nobody told, which is the one state this library exists to
+        // prevent.
+        await using XamlLoadSession session = await Load(
+            $"<TextBlock xmlns=\"{AvaloniaNamespace}\" Text=\"{{Binding Name}}\" />");
+
+        TextBlock text = session.GetRoot<TextBlock>();
+        var source = new NamedSource { Name = "first" };
+
+        text.DataContext = source;
+        Dispatcher.UIThread.RunJobs();
+
+        Assert.Equal("first", text.Text);
+        Assert.True(session.SetValue(text, TextBlock.TextProperty, "literal now").Applied);
+
+        source.Name = "second";
+        Dispatcher.UIThread.RunJobs();
+
+        Assert.Equal("literal now", text.Text);
+        Assert.False(session.GetValueInfo(text, TextBlock.TextProperty).HasBinding);
+        Assert.Contains("Text=\"literal now\"", session.Document.GetText(), StringComparison.Ordinal);
     }
 
     [AvaloniaFact]
@@ -704,6 +733,25 @@ public sealed class PropertyMatrixTests
 
     /// <summary>Something a binding could put in a collection, which no markup declares.</summary>
     private sealed class Customer;
+
+    /// <summary>A source a binding follows, which says when its one value changes.</summary>
+    private sealed class NamedSource : INotifyPropertyChanged
+    {
+        private string _name = string.Empty;
+
+        public event PropertyChangedEventHandler? PropertyChanged;
+
+        public string Name
+        {
+            get => _name;
+
+            set
+            {
+                _name = value;
+                PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(Name)));
+            }
+        }
+    }
 
 
 

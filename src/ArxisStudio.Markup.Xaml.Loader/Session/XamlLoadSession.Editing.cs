@@ -204,8 +204,16 @@ public sealed partial class XamlLoadSession
 
         object? previous = target.GetValue(property);
 
+        // A binding the document applied runs at local-value priority, and setting a local value
+        // does not end it: it would write over the literal the next time its source changed, with
+        // the document already saying the literal. The value replaces the binding, so the binding
+        // ends here — and once it has, putting the old value back is no longer putting the object
+        // back, which the failure path below has to know.
+        BindingExpressionBase? binding = BindingOperations.GetBindingExpressionBase(target, property);
+
         try
         {
+            binding?.Dispose();
             target.SetValue(property, value);
         }
         catch (Exception error)
@@ -235,10 +243,17 @@ public sealed partial class XamlLoadSession
             // The object was changed and the document was not. Putting the object back is the
             // only way to leave the two agreeing — and where the property will not take its own
             // old value back, nothing here can make them agree, so the session says so rather
-            // than letting the next edit be written onto a tree that describes nothing.
+            // than letting the next edit be written onto a tree that describes nothing. An ended
+            // binding is one of those: its old value is not the binding, and nothing here can
+            // start the document's binding again.
             try
             {
                 target.SetValue(property, previous);
+
+                if (binding is not null)
+                {
+                    RequireRecreation();
+                }
             }
             catch (Exception)
             {
