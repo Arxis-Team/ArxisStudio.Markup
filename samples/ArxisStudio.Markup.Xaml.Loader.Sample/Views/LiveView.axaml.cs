@@ -5,8 +5,10 @@ using System.Threading;
 using System.Threading.Tasks;
 using ArxisStudio.Markup.Xaml.Loader.Sample.Controls;
 using ArxisStudio.Markup.Xaml.Loader.Sample.Reporting;
+using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Interactivity;
+using Avalonia.Layout;
 using Avalonia.Threading;
 
 namespace ArxisStudio.Markup.Xaml.Loader.Sample.Views;
@@ -141,6 +143,53 @@ internal sealed partial class LiveView : UserControl
         Preview.Content = SampleData.Attach(session.RootObject);
 
         Show("загружено", true, result.Diagnostics, document.SourceText, []);
+    }
+
+    private void OnSetWidth(object? sender, RoutedEventArgs e) =>
+        Write("Save", "SetValue: Save.Width = 160", target => _session!.SetValue(target, Layoutable.WidthProperty, 160d));
+
+    private void OnSetLiteral(object? sender, RoutedEventArgs e) =>
+        Write(
+            "Title",
+            "SetValue: Title.Text = «Ада Лавлейс»",
+            target => _session!.SetValue(target, TextBlock.TextProperty, "Ада Лавлейс"));
+
+    private void OnSetBinding(object? sender, RoutedEventArgs e) =>
+        Write(
+            "Title",
+            "SetXamlValue: Title.Text = {Binding Customer.Name}",
+            target => _session!.SetXamlValue(target, TextBlock.TextProperty, XamlValue.Parse("{Binding Customer.Name}")));
+
+    /// <summary>
+    /// Writes a value to an object through the session, and shows the document the session wrote.
+    /// </summary>
+    /// <remarks>
+    /// The session validates the member, converts the value, sets it on the object and writes the
+    /// attribute — and puts the object back if the document cannot be written. The editor is then
+    /// filled from the session's document, which is the only copy that changed; the update the
+    /// editor schedules for that finds nothing to do, because the text is already the session's.
+    /// </remarks>
+    private void Write(string name, string what, Func<AvaloniaObject, XamlEditResult> write)
+    {
+        if (_session?.Document.DescendantElements().FirstOrDefault(element => element.Identity == name) is not { } element
+            || _session.GetObject(element) is not AvaloniaObject target)
+        {
+            _report.Clear().Note($"в документе нет объекта с именем {name}, писать некуда");
+
+            return;
+        }
+
+        XamlEditResult result = write(target);
+        string text = _session.Document.GetText();
+
+        Editor.Text = text;
+
+        _report.Clear()
+            .Field("запись через сессию", what)
+            .Verdict(result.Applied ? "объект изменён, документ дописан" : "не записано — объект как был", result.Applied)
+            .Verdict("документ в редакторе — тот, что написала сессия", Editor.Text == text)
+            .Caption("ДИАГНОСТИКА")
+            .Diagnostics(result.Diagnostics, _session.Document.SourceText);
     }
 
     private void Show(

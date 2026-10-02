@@ -1,0 +1,11 @@
+<Border xmlns="https://github.com/avaloniaui"
+        Padding="14,10"
+        CornerRadius="8"
+        Background="#FFE4F3EC">
+
+  <!-- Корнем может быть любой контрол — здесь Border самой Avalonia. -->
+  <TextBlock Text="Договор продлён до августа"
+             Foreground="#FF17805A"
+             FontWeight="SemiBold" />
+
+</Border>

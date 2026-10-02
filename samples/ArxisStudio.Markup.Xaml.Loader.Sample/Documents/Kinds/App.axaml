@@ -1,0 +1,20 @@
+<Application xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             x:Class="Contoso.Crm.App"
+             RequestedThemeVariant="Light">
+
+  <!-- Визуального корня нет: всё, что здесь есть, достаётся окнам приложения. -->
+  <Application.Styles>
+    <FluentTheme />
+    <StyleInclude Source="/Themes/StatusBadge.axaml" />
+  </Application.Styles>
+
+  <Application.Resources>
+    <ResourceDictionary>
+      <ResourceDictionary.MergedDictionaries>
+        <ResourceInclude Source="/Themes/Palette.axaml" />
+      </ResourceDictionary.MergedDictionaries>
+    </ResourceDictionary>
+  </Application.Resources>
+
+</Application>

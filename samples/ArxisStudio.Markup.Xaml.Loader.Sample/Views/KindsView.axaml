@@ -1,0 +1,187 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:controls="using:ArxisStudio.Markup.Xaml.Loader.Sample.Controls"
+             xmlns:kinds="using:ArxisStudio.Markup.Xaml.Loader.Sample.Kinds"
+             xmlns:reporting="using:ArxisStudio.Markup.Xaml.Loader.Sample.Reporting"
+             xmlns:edit="using:AvaloniaEdit"
+             x:Class="ArxisStudio.Markup.Xaml.Loader.Sample.Views.KindsView">
+
+  <UserControl.DataTemplates>
+
+    <!--
+      A file, and what the classifier said about it. The kind is written out, not only coloured:
+      the colour groups the kinds, the word is what says which one it is.
+    -->
+    <DataTemplate DataType="kinds:DocumentEntry">
+      <StackPanel Spacing="4">
+        <TextBlock Text="{Binding FileName}"
+                   FontWeight="SemiBold"
+                   TextTrimming="CharacterEllipsis"
+                   ToolTip.Tip="{Binding FileName}" />
+        <WrapPanel>
+          <Border Classes="kind"
+                  Classes.visual="{Binding IsVisual}"
+                  Classes.look="{Binding IsLook}"
+                  Classes.plain="{Binding IsPlain}"
+                  Classes.unknown="{Binding IsUnknown}"
+                  Margin="0,0,8,2">
+            <TextBlock Text="{Binding Kind}" />
+          </Border>
+          <TextBlock Classes="muted" FontSize="11" Text="{Binding Detail}" VerticalAlignment="Center" />
+        </WrapPanel>
+      </StackPanel>
+    </DataTemplate>
+
+    <!--
+      The facts panel is narrow, and a label column as wide as the window's other reports would
+      leave the values a word to a line.
+    -->
+    <DataTemplate DataType="reporting:FieldRow">
+      <Grid ColumnDefinitions="118,*" Margin="0,0,0,4">
+        <TextBlock Grid.Column="0" Classes="muted" Text="{Binding Label}" TextWrapping="Wrap" Margin="0,0,10,0" />
+        <TextBlock Grid.Column="1" Classes="mono" Text="{Binding Value}" TextWrapping="Wrap" />
+      </Grid>
+    </DataTemplate>
+
+    <!-- The same narrowness: what and where on one line, the message under it at full width. -->
+    <DataTemplate DataType="reporting:DiagnosticRow">
+      <StackPanel Margin="0,0,0,8" Spacing="2">
+        <StackPanel Orientation="Horizontal" Spacing="8">
+          <TextBlock Classes="mono severity"
+                     Classes.error="{Binding IsError}"
+                     Classes.warning="{Binding IsWarning}"
+                     Text="{Binding Severity}" />
+          <TextBlock Classes="mono" Text="{Binding Code}" />
+          <TextBlock Classes="mono muted" Text="{Binding Where}" />
+        </StackPanel>
+        <TextBlock Text="{Binding Message}" FontSize="12" TextWrapping="Wrap" />
+      </StackPanel>
+    </DataTemplate>
+
+    <!-- A style declaration as the syntax package reads it, nested ones indented under their parent. -->
+    <DataTemplate DataType="kinds:StyleRow">
+      <StackPanel Margin="{Binding Indent}" Spacing="3">
+        <StackPanel Orientation="Horizontal" Spacing="7">
+          <Border Classes="kind plain">
+            <TextBlock Text="{Binding Kind}" />
+          </Border>
+          <Border Classes="kind look" IsVisible="{Binding SetsTemplate}">
+            <TextBlock Text="Template" />
+          </Border>
+        </StackPanel>
+        <TextBlock Classes="mono" Text="{Binding Head}" TextWrapping="Wrap" />
+        <TextBlock Classes="mono muted" FontSize="11" Text="{Binding Targets}" TextWrapping="Wrap" />
+        <!-- One long word to a text layout: trimmed, and whole in the tooltip. -->
+        <TextBlock Classes="mono muted"
+                   FontSize="11"
+                   Text="{Binding Namespaces}"
+                   TextTrimming="CharacterEllipsis"
+                   ToolTip.Tip="{Binding Namespaces}" />
+        <TextBlock Classes="muted" FontSize="11" Text="{Binding Setters}" TextWrapping="Wrap" />
+      </StackPanel>
+    </DataTemplate>
+
+  </UserControl.DataTemplates>
+
+  <Grid RowDefinitions="Auto,*" Margin="24">
+
+    <Grid Grid.Row="0" ColumnDefinitions="*,Auto" Margin="0,0,0,18">
+      <StackPanel>
+        <TextBlock Classes="h1" Text="Что за файл перед инструментом" />
+        <TextBlock Classes="lede"
+                   Text="Окно, UserControl, шаблонный контрол, стили, словарь — ответ даёт корень и его базовые типы, а где корень молчит, говорят объявленные стили: файл, который задаёт Template контролу вне пространства Avalonia, — это внешний вид шаблонного контрола, хотя у него в корне Styles. Объявления читает синтаксический пакет, без единого типа; типы разрешает загрузчик. Правьте любой файл — ответ пересчитается." />
+      </StackPanel>
+
+      <!--
+        The showcase is its own project and is built, so its controls resolve. Switching this off
+        puts a resolver in front that knows Avalonia and nothing of the project — what a designer
+        has before the project's first build.
+      -->
+      <StackPanel Grid.Column="1" Margin="24,0,0,0" VerticalAlignment="Top">
+        <TextBlock Classes="caption" Text="СБОРКА ПРОЕКТА" />
+        <ToggleSwitch x:Name="Built"
+                      IsChecked="True"
+                      OnContent="собрана"
+                      OffContent="ещё не собрана"
+                      ToolTip.Tip="Выключите, чтобы среда не видела контролов самой витрины" />
+      </StackPanel>
+    </Grid>
+
+    <Grid Grid.Row="1">
+
+      <Grid.ColumnDefinitions>
+        <ColumnDefinition Width="268" MinWidth="200" MaxWidth="400" />
+        <ColumnDefinition Width="12" />
+        <ColumnDefinition Width="*" MinWidth="320" />
+        <ColumnDefinition Width="12" />
+        <ColumnDefinition Width="380" MinWidth="260" MaxWidth="560" />
+      </Grid.ColumnDefinitions>
+
+      <Border Grid.Column="0" Classes="card">
+        <DockPanel>
+          <TextBlock DockPanel.Dock="Top" Classes="caption" Text="ФАЙЛЫ ПРОЕКТА" Margin="0,0,0,10" />
+          <ListBox x:Name="Files" Classes="rows" />
+        </DockPanel>
+      </Border>
+
+      <GridSplitter Grid.Column="1" Classes="gutter" />
+
+      <Grid Grid.Column="2" RowDefinitions="1.25*,12,1*">
+
+        <Border Grid.Row="0" Classes="card">
+          <DockPanel>
+            <Grid DockPanel.Dock="Top" ColumnDefinitions="*,Auto" Margin="0,0,0,10">
+              <TextBlock Classes="caption" Text="ДОКУМЕНТ" />
+              <TextBlock x:Name="FileUri" Grid.Column="1" Classes="mono muted" FontSize="11" />
+            </Grid>
+            <edit:TextEditor x:Name="Editor" Classes="code" />
+          </DockPanel>
+        </Border>
+
+        <Border Grid.Row="2" Classes="card">
+          <DockPanel>
+            <TextBlock DockPanel.Dock="Top" Classes="caption" Text="КАК ЕГО ПОКАЗАТЬ" Margin="0,0,0,10" />
+            <ItemsControl x:Name="PreviewNotes" DockPanel.Dock="Top" Margin="0,0,0,10" />
+            <ScrollViewer x:Name="PreviewScroller" HorizontalScrollBarVisibility="Auto">
+              <controls:PreviewSurface x:Name="Preview" />
+            </ScrollViewer>
+          </DockPanel>
+        </Border>
+
+      </Grid>
+
+      <GridSplitter Grid.Column="3" Classes="gutter" />
+
+      <Grid Grid.Column="4" RowDefinitions="1.15*,12,1*">
+
+        <Border Grid.Row="0" Classes="card">
+          <DockPanel>
+            <TextBlock DockPanel.Dock="Top" Classes="caption" Text="ЧТО ЭТО" Margin="0,0,0,6" />
+            <ScrollViewer>
+              <ItemsControl x:Name="Facts" Margin="0,0,12,0" />
+            </ScrollViewer>
+          </DockPanel>
+        </Border>
+
+        <Border Grid.Row="2" Classes="card">
+          <DockPanel>
+            <StackPanel DockPanel.Dock="Top" Margin="0,0,0,8">
+              <TextBlock Classes="caption" Text="ОБЪЯВЛЕНИЯ СТИЛЕЙ" />
+              <TextBlock Classes="note" Text="Выберите объявление — его цель выделится в тексте." />
+            </StackPanel>
+            <TextBlock x:Name="NoDeclarations"
+                       DockPanel.Dock="Top"
+                       Classes="note"
+                       Text="В документе нет ни Style, ни ControlTheme."
+                       IsVisible="False" />
+            <ListBox x:Name="Declarations" Classes="rows" />
+          </DockPanel>
+        </Border>
+
+      </Grid>
+
+    </Grid>
+
+  </Grid>
+
+</UserControl>

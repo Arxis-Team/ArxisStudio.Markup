@@ -36,4 +36,13 @@
     <Content Include="Documents/**/*.axaml" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
 
+  <!--
+    The one compiled control whose source the showcase also reads at run time: the section that
+    registers a live document for it starts from the very file it was compiled from. Copied beside
+    the assembly, because Avalonia keeps no copy of markup it has compiled.
+  -->
+  <ItemGroup>
+    <Content Include="Controls/CustomerChip.axaml" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+
 </Project>

@@ -13,7 +13,7 @@
   <UserControl.DataTemplates>
 
     <DataTemplate DataType="inspector:TextPropertyRow">
-      <Grid ColumnDefinitions="132,*" Margin="0,0,0,5">
+      <Grid ColumnDefinitions="132,*,24" Margin="0,0,0,5">
         <TextBlock Grid.Column="0"
                    Classes="muted"
                    Text="{Binding Name}"
@@ -25,11 +25,19 @@
                  Classes="field"
                  Text="{Binding Text, Mode=TwoWay, UpdateSourceTrigger=LostFocus}"
                  KeyDown="OnFieldKeyDown" />
+        <!-- Takes the attribute out of the document; the value falls back to what is inherited. -->
+        <Button Grid.Column="2"
+                Classes="reset"
+                Content="×"
+                IsVisible="{Binding IsStated}"
+                Click="OnReset"
+                AutomationProperties.Name="Сбросить"
+                ToolTip.Tip="Сбросить: убрать атрибут из документа" />
       </Grid>
     </DataTemplate>
 
     <DataTemplate DataType="inspector:TogglePropertyRow">
-      <Grid ColumnDefinitions="132,*" Margin="0,0,0,5">
+      <Grid ColumnDefinitions="132,*,24" Margin="0,0,0,5">
         <TextBlock Grid.Column="0"
                    Classes="muted"
                    Text="{Binding Name}"
@@ -37,11 +45,19 @@
                    VerticalAlignment="Center"
                    Margin="0,0,10,0" />
         <CheckBox Grid.Column="1" IsChecked="{Binding IsChecked, Mode=TwoWay}" />
+        <!-- Takes the attribute out of the document; the value falls back to what is inherited. -->
+        <Button Grid.Column="2"
+                Classes="reset"
+                Content="×"
+                IsVisible="{Binding IsStated}"
+                Click="OnReset"
+                AutomationProperties.Name="Сбросить"
+                ToolTip.Tip="Сбросить: убрать атрибут из документа" />
       </Grid>
     </DataTemplate>
 
     <DataTemplate DataType="inspector:ChoicePropertyRow">
-      <Grid ColumnDefinitions="132,*" Margin="0,0,0,5">
+      <Grid ColumnDefinitions="132,*,24" Margin="0,0,0,5">
         <TextBlock Grid.Column="0"
                    Classes="muted"
                    Text="{Binding Name}"
@@ -52,11 +68,19 @@
                   HorizontalAlignment="Stretch"
                   ItemsSource="{Binding Options}"
                   SelectedItem="{Binding Selected, Mode=TwoWay}" />
+        <!-- Takes the attribute out of the document; the value falls back to what is inherited. -->
+        <Button Grid.Column="2"
+                Classes="reset"
+                Content="×"
+                IsVisible="{Binding IsStated}"
+                Click="OnReset"
+                AutomationProperties.Name="Сбросить"
+                ToolTip.Tip="Сбросить: убрать атрибут из документа" />
       </Grid>
     </DataTemplate>
 
     <DataTemplate DataType="inspector:ExpressionPropertyRow">
-      <Grid ColumnDefinitions="132,*" Margin="0,0,0,5">
+      <Grid ColumnDefinitions="132,*,24" Margin="0,0,0,5">
         <TextBlock Grid.Column="0"
                    Classes="muted"
                    Text="{Binding Name}"
@@ -69,6 +93,14 @@
                      TextTrimming="CharacterEllipsis"
                      ToolTip.Tip="{Binding Text}" />
         </Border>
+        <!-- Takes the attribute out of the document; the value falls back to what is inherited. -->
+        <Button Grid.Column="2"
+                Classes="reset"
+                Content="×"
+                IsVisible="{Binding IsStated}"
+                Click="OnReset"
+                AutomationProperties.Name="Сбросить"
+                ToolTip.Tip="Сбросить: убрать атрибут из документа" />
       </Grid>
     </DataTemplate>
 
@@ -148,7 +180,7 @@
       <Border Grid.Column="0" Classes="card">
         <DockPanel>
           <TextBlock DockPanel.Dock="Top" Classes="caption" Text="ОБЪЕКТЫ ДОКУМЕНТА" Margin="0,0,0,10" />
-          <!-- Wrapping, because the panel beside it is resizable and three buttons are wider
+          <!-- Wrapping, because the panel beside it is resizable and the buttons are wider
                than its narrowest useful width. -->
           <WrapPanel DockPanel.Dock="Bottom" Margin="0,10,-6,-6">
             <Button x:Name="DeleteButton" Classes="tool" Content="Удалить" Click="OnDelete" />
@@ -158,6 +190,21 @@
                     Content="В Border"
                     Click="OnWrap"
                     ToolTip.Tip="Обернуть выбранный элемент в Border" />
+            <Button x:Name="UnwrapButton"
+                    Classes="tool"
+                    Content="Развернуть"
+                    Click="OnUnwrap"
+                    ToolTip.Tip="Убрать обёртку, оставив её содержимое на её месте" />
+            <Button x:Name="UpButton"
+                    Classes="tool"
+                    Content="Выше"
+                    Click="OnMoveUp"
+                    ToolTip.Tip="Переставить перед предыдущим соседом" />
+            <Button x:Name="DownButton"
+                    Classes="tool"
+                    Content="Ниже"
+                    Click="OnMoveDown"
+                    ToolTip.Tip="Переставить после следующего соседа" />
           </WrapPanel>
           <!-- Scrolls sideways rather than trimming: a name down a deep branch is worth reading
                in full, and the panel beside it is meant to be the wide one. -->
@@ -236,7 +283,7 @@
           </StackPanel>
 
           <ScrollViewer>
-            <ItemsControl x:Name="Properties" />
+            <ItemsControl x:Name="Properties" Margin="0,0,12,0" />
           </ScrollViewer>
 
         </DockPanel>

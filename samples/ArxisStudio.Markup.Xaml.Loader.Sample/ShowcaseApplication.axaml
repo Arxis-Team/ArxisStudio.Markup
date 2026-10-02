@@ -11,11 +11,10 @@
     a choice the window does not actually offer. The variant above is what the Fluent theme wears,
     and these colours are chosen to match it.
 
-    The surface a previewed document is drawn on holds a light scope of its own regardless. That
-    scope reaches what a control wears through its control theme — every Fluent control in a
-    previewed document — but not a plain TextBlock, whose colour is set by the class style below
-    and so follows this palette rather than the scope, for the same reason. Keeping the palette
-    light is what makes the two agree; the scope alone would not.
+    The surface a previewed document is drawn on holds a light scope of its own regardless, and
+    the window's typography stops at its edge (Themes/Showcase.axaml): what a previewed document
+    shows is what its own application would — the Fluent theme it was written against, in the
+    light variant it was written for.
   -->
   <Application.Resources>
     <ResourceDictionary>
@@ -29,6 +28,10 @@
       <SolidColorBrush x:Key="AppAccentBrush" Color="#2A63CC" />
       <SolidColorBrush x:Key="AppAccentSoftBrush" Color="#E4EDFC" />
       <SolidColorBrush x:Key="AppPositiveBrush" Color="#17805A" />
+      <!-- Soft fills for the kind badges, and ink dark enough to read on them at badge size. -->
+      <SolidColorBrush x:Key="AppPositiveSoftBrush" Color="#E4F3EC" />
+      <SolidColorBrush x:Key="AppPositiveInkBrush" Color="#0F6B4A" />
+      <SolidColorBrush x:Key="AppNegativeSoftBrush" Color="#FBE9E7" />
       <SolidColorBrush x:Key="AppNegativeBrush" Color="#C0392F" />
       <SolidColorBrush x:Key="AppWarningBrush" Color="#8A6209" />
       <SolidColorBrush x:Key="AppCodeBrush" Color="#F1F3F7" />

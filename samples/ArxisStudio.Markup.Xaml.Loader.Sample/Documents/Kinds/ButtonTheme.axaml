@@ -1,0 +1,29 @@
+<Styles xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+
+  <Design.PreviewWith>
+    <StackPanel Orientation="Horizontal" Spacing="8" Margin="12">
+      <Button Content="Сохранить" />
+      <Button Classes="quiet" Content="Отмена" />
+    </StackPanel>
+  </Design.PreviewWith>
+
+  <!-- Шаблон задан кнопке самой Avalonia: это тема, а не свой шаблонный контрол. -->
+  <Style Selector="Button">
+    <Setter Property="Background" Value="#FF2A63CC" />
+    <Setter Property="Foreground" Value="White" />
+    <Setter Property="Template">
+      <ControlTemplate>
+        <Border Background="{TemplateBinding Background}" CornerRadius="6" Padding="14,6">
+          <ContentPresenter Content="{TemplateBinding Content}" />
+        </Border>
+      </ControlTemplate>
+    </Setter>
+  </Style>
+
+  <Style Selector="Button.quiet">
+    <Setter Property="Background" Value="#FFE7ECF3" />
+    <Setter Property="Foreground" Value="#FF16191F" />
+  </Style>
+
+</Styles>

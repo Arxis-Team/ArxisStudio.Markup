@@ -1,0 +1,33 @@
+<Styles xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:controls="using:ArxisStudio.Markup.Xaml.Loader.Sample.Controls">
+
+  <!-- Так пишет внешний вид шаблон Avalonia «Templated Control»: корень — Styles. -->
+  <Design.PreviewWith>
+    <StackPanel Orientation="Horizontal" Spacing="8" Margin="12">
+      <controls:StatusBadge Content="Активен" />
+      <controls:StatusBadge Classes="warning" Content="Ждёт оплаты" />
+    </StackPanel>
+  </Design.PreviewWith>
+
+  <Style Selector="controls|StatusBadge">
+    <!-- Set Defaults -->
+    <Setter Property="Background" Value="#FFE4F3EC" />
+    <Setter Property="Foreground" Value="#FF17805A" />
+    <Setter Property="Template">
+      <ControlTemplate>
+        <Border Background="{TemplateBinding Background}" CornerRadius="11" Padding="10,3">
+          <ContentPresenter Content="{TemplateBinding Content}"
+                            FontSize="11"
+                            FontWeight="SemiBold" />
+        </Border>
+      </ControlTemplate>
+    </Setter>
+  </Style>
+
+  <Style Selector="controls|StatusBadge.warning">
+    <Setter Property="Background" Value="#FFFDF1DC" />
+    <Setter Property="Foreground" Value="#FF8A6209" />
+  </Style>
+
+</Styles>

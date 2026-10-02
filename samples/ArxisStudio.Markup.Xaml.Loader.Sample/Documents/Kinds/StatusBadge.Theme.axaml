@@ -1,0 +1,29 @@
+<ResourceDictionary xmlns="https://github.com/avaloniaui"
+                    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+                    xmlns:controls="using:ArxisStudio.Markup.Xaml.Loader.Sample.Controls">
+
+  <Design.PreviewWith>
+    <controls:StatusBadge Content="Тема через BasedOn" Margin="12" />
+  </Design.PreviewWith>
+
+  <!-- Шаблон один, у базовой темы для ContentControl самой Avalonia. -->
+  <ControlTheme x:Key="PillBase" TargetType="ContentControl">
+    <Setter Property="Background" Value="#FFE4EDFC" />
+    <Setter Property="Foreground" Value="#FF2A63CC" />
+    <Setter Property="Template">
+      <ControlTemplate>
+        <Border Background="{TemplateBinding Background}" CornerRadius="11" Padding="10,3">
+          <ContentPresenter Content="{TemplateBinding Content}"
+                            FontSize="11"
+                            FontWeight="SemiBold" />
+        </Border>
+      </ControlTemplate>
+    </Setter>
+  </ControlTheme>
+
+  <!-- Тема бейджа шаблона не задаёт — только наследует его. -->
+  <ControlTheme x:Key="{x:Type controls:StatusBadge}"
+                TargetType="controls:StatusBadge"
+                BasedOn="{StaticResource PillBase}" />
+
+</ResourceDictionary>

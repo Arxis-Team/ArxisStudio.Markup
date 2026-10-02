@@ -1,0 +1,11 @@
+<controls:AccentTile xmlns="https://github.com/avaloniaui"
+                     xmlns:controls="using:ArxisStudio.Markup.Xaml.Loader.Sample.Controls"
+                     Padding="16,12">
+
+  <!-- Корень — контрол проекта: тот же вид «контрол», но написан вне пространства Avalonia. -->
+  <StackPanel Spacing="2">
+    <TextBlock Text="ВЫРУЧКА ЗА ГОД" FontSize="11" Foreground="#FF5A6472" />
+    <TextBlock Text="1 284 000 ₽" FontSize="20" FontWeight="SemiBold" />
+  </StackPanel>
+
+</controls:AccentTile>

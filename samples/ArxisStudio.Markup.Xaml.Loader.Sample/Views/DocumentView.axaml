@@ -9,7 +9,7 @@
       <StackPanel>
         <TextBlock Classes="h1" Text="Источник истины — документ" />
         <TextBlock Classes="lede"
-                   Text="Документ хранит ровно тот снимок текста, из которого разобран, и каждый узел указывает внутрь него. Запись неизменённого документа — это копия, а не переформатирование, а правка выражается изменениями к его собственным диапазонам, так что не переписывается ничего, чего она не назвала. Для всего этого Avalonia не нужна: это та половина библиотеки, которой инструмент может пользоваться, не построив ни одного объекта." />
+                   Text="Документ хранит ровно тот снимок текста, из которого разобран, и каждый узел указывает внутрь него. Запись неизменённого документа — это копия, а не переформатирование, а правка выражается изменениями к его собственным диапазонам, так что не переписывается ничего, чего она не назвала. Правки копятся в редакторе и ложатся одной пачкой; воркспейс превращает их в одно действие истории — даже когда оно задевает два файла. Для всего этого Avalonia не нужна: это та половина библиотеки, которой инструмент может пользоваться, не построив ни одного объекта." />
       </StackPanel>
 
       <Border Classes="card">
@@ -19,13 +19,18 @@
         </StackPanel>
       </Border>
 
-      <Grid ColumnDefinitions="1*,16,1*">
+      <Grid ColumnDefinitions="1.15*,16,1*">
 
         <Border Grid.Column="0" Classes="card">
           <StackPanel>
-            <TextBlock Classes="caption" Text="ДВЕ ПРАВКИ, ОДНОЙ ПАЧКОЙ" Margin="0,0,0,10" />
-            <edit:TextEditor x:Name="EditedRegion" Classes="code" IsReadOnly="True" Height="196" />
+            <TextBlock Classes="caption" Text="ЧЕТЫРЕ ПРАВКИ ОДНОЙ ПАЧКОЙ" Margin="0,0,0,4" />
+            <TextBlock Classes="note"
+                       Text="SetAttribute, RemoveAttribute, ReplaceElement и InsertElement, записанные в один редактор и применённые разом."
+                       Margin="0,0,0,10" />
+            <edit:TextEditor x:Name="EditedText" Classes="code" IsReadOnly="True" Height="300" />
             <ItemsControl x:Name="EditFacts" Margin="0,12,0,0" />
+            <TextBlock Classes="caption" Text="ВО ЧТО ПАЧКА ВЫЛИЛАСЬ — GetTextChanges()" Margin="0,14,0,6" />
+            <ItemsControl x:Name="ChangeList" />
           </StackPanel>
         </Border>
 
@@ -39,12 +44,54 @@
 
       </Grid>
 
+      <Grid ColumnDefinitions="1*,16,1*">
+
+        <Border Grid.Column="0" Classes="card">
+          <StackPanel>
+            <TextBlock Classes="caption" Text="ПРОСТРАНСТВА ИМЁН В ОБЛАСТИ КОРНЯ" Margin="0,0,0,10" />
+            <ItemsControl x:Name="Namespaces" />
+          </StackPanel>
+        </Border>
+
+        <Border Grid.Column="2" Classes="card">
+          <StackPanel>
+            <TextBlock Classes="caption"
+                       Text="ЧТО СИНТАКСИЧЕСКАЯ МОДЕЛЬ ЗНАЕТ О ЗНАЧЕНИИ, НЕ ВИДЯ НИ ОДНОГО CLR-ТИПА"
+                       Margin="0,0,0,10" />
+            <ItemsControl x:Name="Extensions" />
+          </StackPanel>
+        </Border>
+
+      </Grid>
+
+      <!--
+        Two documents, one action: the edit spans the view and the palette it includes, and one
+        undo takes both back. The texts below are redrawn from DocumentChanged rather than after
+        each button, because undo and redo change them too.
+      -->
       <Border Classes="card">
         <StackPanel>
-          <TextBlock Classes="caption"
-                     Text="ЧТО СИНТАКСИЧЕСКАЯ МОДЕЛЬ ЗНАЕТ О ЗНАЧЕНИИ, НЕ ВИДЯ НИ ОДНОГО CLR-ТИПА"
-                     Margin="0,0,0,10" />
-          <ItemsControl x:Name="Extensions" />
+          <Grid ColumnDefinitions="*,Auto" Margin="0,0,0,10">
+            <StackPanel>
+              <TextBlock Classes="caption" Text="ОДНО ДЕЙСТВИЕ — ДВА ДОКУМЕНТА" />
+              <TextBlock Classes="note"
+                         Text="Ключ кисти живёт в палитре, ссылка на него — в представлении. Переименование правит оба файла одной записью истории, и одна отмена возвращает оба." />
+            </StackPanel>
+            <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="8" VerticalAlignment="Top">
+              <Button x:Name="RenameButton" Content="Переименовать Accent → Highlight" Click="OnRename" />
+              <Button x:Name="UndoButton" Content="Отменить" Click="OnUndo" />
+              <Button x:Name="RedoButton" Content="Повторить" Click="OnRedo" />
+            </StackPanel>
+          </Grid>
+
+          <Grid ColumnDefinitions="1*,16,1*" RowDefinitions="Auto,Auto">
+            <TextBlock Grid.Column="0" Classes="mono muted" FontSize="11" Text="file:///Views/CustomerView.axaml" Margin="0,0,0,6" />
+            <TextBlock Grid.Column="2" Classes="mono muted" FontSize="11" Text="file:///Themes/Palette.axaml" Margin="0,0,0,6" />
+            <edit:TextEditor x:Name="ViewText" Grid.Row="1" Grid.Column="0" Classes="code" IsReadOnly="True" Height="250" />
+            <edit:TextEditor x:Name="PaletteText" Grid.Row="1" Grid.Column="2" Classes="code" IsReadOnly="True" Height="250" />
+          </Grid>
+
+          <ItemsControl x:Name="WorkspaceReport" Margin="0,12,0,0" />
         </StackPanel>
       </Border>
 

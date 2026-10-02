@@ -1,0 +1,15 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        x:Class="Contoso.Crm.MainWindow"
+        Title="Клиенты — Contoso CRM"
+        Width="960" Height="600">
+
+  <DockPanel>
+    <TextBlock DockPanel.Dock="Top" Text="Клиенты" FontSize="20" Margin="16" />
+    <ListBox Margin="16,0,16,16">
+      <ListBoxItem Content="Grace Hopper" />
+      <ListBoxItem Content="Ada Lovelace" />
+    </ListBox>
+  </DockPanel>
+
+</Window>

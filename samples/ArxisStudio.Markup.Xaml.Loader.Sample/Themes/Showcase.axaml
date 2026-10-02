@@ -14,8 +14,7 @@
       <!--
         The surface a loaded document is drawn on. It declares a light variant so the controls in
         a previewed document wear the control themes the document was written against, whatever
-        the window around them wears. That covers the controls; it does not cover text coloured by
-        one of the class styles below, which is why the window's palette is light too.
+        the window around them wears, and the window's own typography below stops at its edge.
 
         A backdrop and nothing else: nothing is drawn over the content and nothing in it is
         selected.
@@ -43,9 +42,14 @@
     </ResourceDictionary>
   </Styles.Resources>
 
-  <!-- Typography. -->
+  <!--
+    Typography. The window's own text, and not a previewed document's: a style setter outranks
+    anything a TextBlock inherits, so applied inside a preview it would overrule the foreground and
+    size a document gives a control for its text to inherit — a badge's green, a template's 11px.
+    A previewed control has to look the way its own application draws it.
+  -->
 
-  <Style Selector="TextBlock">
+  <Style Selector="TextBlock:not(controls|PreviewSurface TextBlock)">
     <Setter Property="Foreground" Value="{DynamicResource AppTextBrush}" />
     <Setter Property="FontSize" Value="13" />
   </Style>
@@ -339,6 +343,29 @@
     <Setter Property="VerticalAlignment" Value="Center" />
   </Style>
 
+  <!-- Takes a stated attribute out again: quiet until it is pointed at. -->
+
+  <Style Selector="Button.reset">
+    <Setter Property="Background" Value="Transparent" />
+    <Setter Property="BorderThickness" Value="0" />
+    <Setter Property="Padding" Value="0" />
+    <Setter Property="Width" Value="20" />
+    <Setter Property="Height" Value="20" />
+    <Setter Property="MinWidth" Value="0" />
+    <Setter Property="MinHeight" Value="0" />
+    <Setter Property="FontSize" Value="14" />
+    <Setter Property="Foreground" Value="{DynamicResource AppMutedBrush}" />
+    <Setter Property="HorizontalAlignment" Value="Right" />
+    <Setter Property="VerticalAlignment" Value="Center" />
+    <Setter Property="HorizontalContentAlignment" Value="Center" />
+    <Setter Property="VerticalContentAlignment" Value="Center" />
+  </Style>
+
+  <Style Selector="Button.reset:pointerover /template/ ContentPresenter">
+    <Setter Property="Background" Value="{DynamicResource AppNegativeSoftBrush}" />
+    <Setter Property="Foreground" Value="{DynamicResource AppNegativeBrush}" />
+  </Style>
+
   <Style Selector="TextBox.field">
     <Setter Property="FontSize" Value="12" />
     <Setter Property="Padding" Value="7,3" />
@@ -357,6 +384,93 @@
 
   <Style Selector="Border.expression > TextBlock">
     <Setter Property="Foreground" Value="{DynamicResource AppAccentBrush}" />
+  </Style>
+
+  <!--
+    A list to choose from — files, declarations — drawn like the tree: a row that lights up under
+    the pointer and stays lit when chosen, and a ring when the keyboard has reached it. The arrows
+    move through it because it is a ListBox, not rows that only answer a click.
+  -->
+
+  <Style Selector="ListBox.rows">
+    <Setter Property="Background" Value="Transparent" />
+    <Setter Property="BorderThickness" Value="0" />
+    <Setter Property="Padding" Value="0" />
+  </Style>
+
+  <Style Selector="ListBox.rows ListBoxItem">
+    <Setter Property="Padding" Value="10,8" />
+    <Setter Property="MinHeight" Value="0" />
+    <Setter Property="Template">
+      <ControlTemplate>
+        <Border Name="PART_Surface"
+                Background="Transparent"
+                BorderBrush="Transparent"
+                BorderThickness="1"
+                CornerRadius="7"
+                Padding="{TemplateBinding Padding}"
+                Margin="0,0,0,2">
+          <ContentPresenter Content="{TemplateBinding Content}"
+                            ContentTemplate="{TemplateBinding ContentTemplate}" />
+        </Border>
+      </ControlTemplate>
+    </Setter>
+  </Style>
+
+  <Style Selector="ListBox.rows ListBoxItem:pointerover /template/ Border#PART_Surface">
+    <Setter Property="Background" Value="{DynamicResource AppElevatedBrush}" />
+  </Style>
+
+  <Style Selector="ListBox.rows ListBoxItem:selected /template/ Border#PART_Surface">
+    <Setter Property="Background" Value="{DynamicResource AppAccentSoftBrush}" />
+  </Style>
+
+  <Style Selector="ListBox.rows ListBoxItem:focus-visible /template/ Border#PART_Surface">
+    <Setter Property="BorderBrush" Value="{DynamicResource AppAccentBrush}" />
+  </Style>
+
+  <!--
+    What the classifier said a document is. The word is the API's own and always written out; the
+    fill only groups the kinds — something to show, a look, nothing to show by itself, unresolved.
+  -->
+
+  <Style Selector="Border.kind">
+    <Setter Property="Background" Value="{DynamicResource AppElevatedBrush}" />
+    <Setter Property="CornerRadius" Value="9" />
+    <Setter Property="Padding" Value="7,1" />
+    <Setter Property="VerticalAlignment" Value="Center" />
+    <Setter Property="HorizontalAlignment" Value="Left" />
+  </Style>
+
+  <Style Selector="Border.kind > TextBlock">
+    <Setter Property="FontFamily" Value="{DynamicResource AppMonoFont}" />
+    <Setter Property="FontSize" Value="11" />
+    <Setter Property="FontWeight" Value="SemiBold" />
+    <Setter Property="Foreground" Value="{DynamicResource AppMutedBrush}" />
+  </Style>
+
+  <Style Selector="Border.kind.visual">
+    <Setter Property="Background" Value="{DynamicResource AppAccentSoftBrush}" />
+  </Style>
+
+  <Style Selector="Border.kind.visual > TextBlock">
+    <Setter Property="Foreground" Value="{DynamicResource AppAccentBrush}" />
+  </Style>
+
+  <Style Selector="Border.kind.look">
+    <Setter Property="Background" Value="{DynamicResource AppPositiveSoftBrush}" />
+  </Style>
+
+  <Style Selector="Border.kind.look > TextBlock">
+    <Setter Property="Foreground" Value="{DynamicResource AppPositiveInkBrush}" />
+  </Style>
+
+  <Style Selector="Border.kind.unknown">
+    <Setter Property="Background" Value="{DynamicResource AppNegativeSoftBrush}" />
+  </Style>
+
+  <Style Selector="Border.kind.unknown > TextBlock">
+    <Setter Property="Foreground" Value="{DynamicResource AppNegativeBrush}" />
   </Style>
 
   <!-- Report rows. -->

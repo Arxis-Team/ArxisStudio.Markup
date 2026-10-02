@@ -71,6 +71,30 @@ internal static class Fixtures
         </ResourceDictionary>
         """;
 
+    /// <summary>Where the compiled control's own document is parsed under.</summary>
+    internal static Uri ChipUri { get; } = new("file:///Controls/CustomerChip.axaml");
+
+    /// <summary>Where the document that places it is parsed under.</summary>
+    internal static Uri ChipHostUri { get; } = new("file:///Views/DealView.axaml");
+
+    /// <summary>A document that places the compiled control, twice.</summary>
+    /// <remarks>
+    /// Loaded at run time, so every chip in it is constructed by Avalonia — and populated from
+    /// whatever its type says, which is the compiled markup unless a document is registered.
+    /// </remarks>
+    internal static string ChipHost { get; } =
+        $$"""
+        <StackPanel xmlns="{{AvaloniaNamespace}}"
+                    xmlns:controls="using:ArxisStudio.Markup.Xaml.Loader.Sample.Controls"
+                    Spacing="10">
+          <TextBlock Text="Ответственные по сделке" FontWeight="SemiBold" />
+          <StackPanel Orientation="Horizontal" Spacing="8">
+            <controls:CustomerChip />
+            <controls:CustomerChip />
+          </StackPanel>
+        </StackPanel>
+        """;
+
     /// <summary>A document that does not parse, to show what survives one.</summary>
     internal static string Malformed { get; } =
         $$"""

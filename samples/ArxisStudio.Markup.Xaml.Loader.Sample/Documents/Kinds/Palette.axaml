@@ -1,0 +1,16 @@
+<ResourceDictionary xmlns="https://github.com/avaloniaui"
+                    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+
+  <Design.PreviewWith>
+    <StackPanel Orientation="Horizontal" Spacing="8" Margin="12">
+      <Border Width="56" Height="36" CornerRadius="6" Background="{DynamicResource Accent}" />
+      <Border Width="56" Height="36" CornerRadius="6" Background="{DynamicResource Positive}" />
+      <Border Width="56" Height="36" CornerRadius="6" Background="{DynamicResource Warning}" />
+    </StackPanel>
+  </Design.PreviewWith>
+
+  <SolidColorBrush x:Key="Accent" Color="#FF2A63CC" />
+  <SolidColorBrush x:Key="Positive" Color="#FF17805A" />
+  <SolidColorBrush x:Key="Warning" Color="#FF8A6209" />
+
+</ResourceDictionary>

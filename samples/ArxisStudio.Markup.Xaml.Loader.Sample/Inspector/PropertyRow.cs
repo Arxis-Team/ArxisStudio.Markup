@@ -15,11 +15,20 @@ namespace ArxisStudio.Markup.Xaml.Loader.Sample.Inspector;
 /// </remarks>
 internal abstract class PropertyRow(string name, string origin) : INotifyPropertyChanged
 {
+    /// <summary>What a row says about where its value came from when the document writes it.</summary>
+    internal const string StatedOrigin = "задано в документе";
+
     /// <inheritdoc />
     public event PropertyChangedEventHandler? PropertyChanged;
 
     /// <summary>Gets the member's name.</summary>
     public string Name { get; } = name;
+
+    /// <summary>
+    /// Gets a value indicating whether the document writes this attribute — which is what makes it
+    /// something that can be taken out again.
+    /// </summary>
+    public virtual bool IsStated => string.Equals(Origin, StatedOrigin, StringComparison.Ordinal);
 
     /// <summary>Gets what to say about the row when it is pointed at.</summary>
     /// <remarks>
@@ -52,6 +61,7 @@ internal abstract class PropertyRow(string name, string origin) : INotifyPropert
 
             Raise();
             Raise(nameof(Hint));
+            Raise(nameof(IsStated));
         }
     }
 
@@ -163,4 +173,7 @@ internal sealed class ExpressionPropertyRow(string name, string origin, string t
 {
     /// <summary>Gets the expression, as the document writes it.</summary>
     public string Text { get; } = text;
+
+    /// <summary>Gets a value indicating that it is stated: an expression is only ever written.</summary>
+    public override bool IsStated => true;
 }

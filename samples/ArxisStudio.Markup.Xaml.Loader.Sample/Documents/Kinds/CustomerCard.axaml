@@ -1,0 +1,16 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             mc:Ignorable="d"
+             d:DesignWidth="320">
+
+  <Border Padding="16" CornerRadius="8" Background="#FFF7F8FA" Width="320">
+    <StackPanel Spacing="4">
+      <TextBlock Text="{Binding Customer.Name}" FontSize="16" FontWeight="SemiBold" />
+      <TextBlock Text="{Binding Customer.Title}" Foreground="#FF5A6472" />
+      <TextBlock Text="{Binding Customer.Email}" Foreground="#FF2A63CC" Margin="0,6,0,0" />
+    </StackPanel>
+  </Border>
+
+</UserControl>

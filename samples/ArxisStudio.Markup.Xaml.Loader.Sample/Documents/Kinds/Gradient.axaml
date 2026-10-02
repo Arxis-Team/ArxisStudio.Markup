@@ -1,0 +1,9 @@
+<LinearGradientBrush xmlns="https://github.com/avaloniaui"
+                     StartPoint="0%,0%"
+                     EndPoint="100%,100%">
+
+  <!-- Не контрол, не стили и не словарь: документ описывает кисть. -->
+  <GradientStop Color="#FF2A63CC" Offset="0" />
+  <GradientStop Color="#FF17805A" Offset="1" />
+
+</LinearGradientBrush>

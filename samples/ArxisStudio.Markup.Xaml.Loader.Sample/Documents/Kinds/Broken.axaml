@@ -1,0 +1,7 @@
+<reports:ReportCard xmlns="https://github.com/avaloniaui"
+                    xmlns:reports="using:Contoso.Reports">
+
+  <!-- Сборки Contoso.Reports у среды нет. По имени корня не понять, окно это или контрол. -->
+  <TextBlock Text="Отчёт за квартал" />
+
+</reports:ReportCard>

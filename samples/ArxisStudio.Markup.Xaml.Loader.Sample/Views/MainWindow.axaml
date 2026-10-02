@@ -26,11 +26,12 @@
         </StackPanel>
 
         <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
+          <!-- Read from the assemblies at run time, so the versions cannot drift from what is loaded. -->
           <Border Classes="chip">
-            <TextBlock Text="v0.1.0-preview" />
+            <TextBlock x:Name="LibraryVersion" />
           </Border>
           <Border Classes="chip quiet">
-            <TextBlock Text="Avalonia 12.1.1 · net10.0" />
+            <TextBlock x:Name="PlatformVersion" />
           </Border>
         </StackPanel>
 
@@ -77,6 +78,16 @@
       <TabItem Classes="nav">
         <TabItem.Header>
           <StackPanel>
+            <TextBlock Classes="nav-title" Text="Вид документа" />
+            <TextBlock Classes="nav-sub" Text="окно, контрол, шаблон, стили — и как его показать" />
+          </StackPanel>
+        </TabItem.Header>
+        <views:KindsView />
+      </TabItem>
+
+      <TabItem Classes="nav">
+        <TabItem.Header>
+          <StackPanel>
             <TextBlock Classes="nav-title" Text="Ресурсы" />
             <TextBlock Classes="nav-sub" Text="файлы, которые документ только включает" />
           </StackPanel>
@@ -102,6 +113,16 @@
           </StackPanel>
         </TabItem.Header>
         <views:DesignView />
+      </TabItem>
+
+      <TabItem Classes="nav">
+        <TabItem.Header>
+          <StackPanel>
+            <TextBlock Classes="nav-title" Text="Вложенные контролы" />
+            <TextBlock Classes="nav-sub" Text="скомпилированный контрол, который следует за своим файлом" />
+          </StackPanel>
+        </TabItem.Header>
+        <views:PopulationView />
       </TabItem>
 
     </TabControl>

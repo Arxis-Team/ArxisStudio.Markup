@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Collections.Immutable;
 using System.Collections.ObjectModel;
 using System.Globalization;
 using System.IO;
@@ -33,7 +34,7 @@ namespace ArxisStudio.Markup.Xaml.Loader.Sample.Views;
 /// </remarks>
 internal sealed partial class InspectorView : UserControl
 {
-    private const string Stated = "задано в документе";
+    private const string Stated = PropertyRow.StatedOrigin;
     private const string Inherited = "унаследовано: стиль, тема или значение по умолчанию";
 
     private readonly ObservableCollection<ObjectNode> _nodes = [];
@@ -54,6 +55,7 @@ internal sealed partial class InspectorView : UserControl
     private readonly Report _report = new();
 
     private XamlWorkspace? _workspace;
+    private XamlLoadEnvironment? _environment;
     private MarkupDocumentId _documentId;
     private XamlLoadSession? _session;
     private XamlElementPath _selected = XamlElementPath.Root;
@@ -139,6 +141,11 @@ internal sealed partial class InspectorView : UserControl
             return;
         }
 
+        // Opening a document is a transaction of the workspace's like any other, and it lands in
+        // the history. Nobody asked to be able to undo opening the file — undoing it would take the
+        // document out from under the inspector — so the history starts here, empty.
+        workspace.Workspace.ClearHistory();
+
         (XamlLoadEnvironment environment, _) = ShowcaseEnvironment.Create();
 
         (XamlLoadSession? session, XamlLoadResult result) = await XamlLoadSession.TryCreateAsync(
@@ -154,6 +161,7 @@ internal sealed partial class InspectorView : UserControl
         }
 
         _workspace = workspace;
+        _environment = environment;
         _documentId = workspace.Workspace.Documents.Single(open => open.Uri == document.Uri).Id;
         _session = session;
 
@@ -181,7 +189,10 @@ internal sealed partial class InspectorView : UserControl
             static workspace => workspace.Undo(),
             "Повторено");
 
-    private void OnDelete(object? sender, RoutedEventArgs e) =>
+    private void OnDelete(object? sender, RoutedEventArgs e)
+    {
+        XamlElementPath? container = _selected.Parent;
+
         _ = EditAsync(
             static (editor, element) => editor.RemoveElement(element),
             element => $"Удалить <{element.Name}>",
@@ -189,7 +200,8 @@ internal sealed partial class InspectorView : UserControl
             // Nothing is at that position any more, and the position now holds whatever moved up
             // into it. Selecting what contained the deleted element is the tool saying which of
             // those two it meant.
-            _selected.Parent);
+            _ => container);
+    }
 
     private void OnDuplicate(object? sender, RoutedEventArgs e) =>
         _ = EditAsync(
@@ -201,11 +213,88 @@ internal sealed partial class InspectorView : UserControl
             static (editor, element) => editor.WrapElement(element, "<Border Padding=\"8\"></Border>"),
             element => $"Обернуть <{element.Name}> в Border");
 
+    /// <summary>
+    /// Takes the wrapper away and leaves what it held where it stood. The selection stays on the
+    /// position, which now holds the first of the unwrapped children.
+    /// </summary>
+    private void OnUnwrap(object? sender, RoutedEventArgs e) =>
+        _ = EditAsync(
+            static (editor, element) => editor.UnwrapElement(element),
+            element => $"Развернуть <{element.Name}>");
+
+    private void OnMoveUp(object? sender, RoutedEventArgs e) => _ = MoveAsync(up: true);
+
+    private void OnMoveDown(object? sender, RoutedEventArgs e) => _ = MoveAsync(up: false);
+
+    /// <summary>Moves the selected element one place among its siblings, and the selection with it.</summary>
+    /// <remarks>
+    /// A move is a removal and an insertion recorded against the document as it stands, so the
+    /// index counts the siblings before the move: one place down is in front of the sibling after
+    /// next, not of the next one.
+    /// </remarks>
+    private Task MoveAsync(bool up)
+    {
+        XamlElementPath? container = _selected.Parent;
+
+        return EditAsync(
+            (editor, element) => editor.MoveElement(
+                element,
+                (XamlElement)element.Parent!,
+                up ? element.IndexInContent - 1 : element.IndexInContent + 2),
+            element => $"Переставить <{element.Name}> {(up ? "выше" : "ниже")}",
+            edited => container?.Resolve(edited) is { } parent && Moved(parent, up) is { } moved
+                ? XamlElementPath.Of(moved)
+                : null);
+    }
+
+    /// <summary>Finds where the moved element landed: one content position up or down from where it was.</summary>
+    private XamlElement? Moved(XamlElement parent, bool up)
+    {
+        int from = _selected.Steps[^1].Index;
+
+        return parent.ContentElements.ElementAtOrDefault(up ? from - 1 : from + 1);
+    }
+
+    /// <summary>Takes a stated attribute out of the document, so the value falls back to what is inherited.</summary>
+    private void OnReset(object? sender, RoutedEventArgs e)
+    {
+        if (sender is Control { DataContext: PropertyRow row })
+        {
+            _ = ResetAsync(row.Name);
+        }
+    }
+
+    private async Task ResetAsync(string name)
+    {
+        if (_workspace is null || _session is null)
+        {
+            return;
+        }
+
+        XamlDocument document = _workspace.GetDocument(_documentId);
+        var qualified = XamlQualifiedName.Parse(name);
+
+        if (ElementIn(document) is not { } element || element.GetAttribute(qualified) is null)
+        {
+            return;
+        }
+
+        string action = $"Сбросить {element.Name.LocalName}.{name}";
+
+        await SyncAsync(_workspace.Apply(document.Edit().RemoveAttribute(element, qualified), action), action);
+    }
+
     /// <summary>Records one structural edit, applies it, and lets everything follow.</summary>
+    /// <param name="record">Records the edit on an editor over the current document.</param>
+    /// <param name="describe">Names the action, for the history and the report.</param>
+    /// <param name="select">
+    /// Says what to select once the edit has applied, from the document it produced — the element
+    /// a structural edit moved is somewhere only the edited document can say.
+    /// </param>
     private async Task EditAsync(
         Func<XamlDocumentEditor, XamlElement, XamlDocumentEditor> record,
         Func<XamlElement, string> describe,
-        XamlElementPath? select = null)
+        Func<XamlDocument, XamlElementPath?>? select = null)
     {
         if (_workspace is null || _session is null || _selected.Steps.IsEmpty)
         {
@@ -219,10 +308,25 @@ internal sealed partial class InspectorView : UserControl
             return;
         }
 
-        await SyncAsync(
-            _workspace.Apply(record(document.Edit(), element), describe(element)),
-            describe(element),
-            select: select);
+        XamlDocument edited;
+
+        try
+        {
+            edited = _workspace.Apply(record(document.Edit(), element), describe(element));
+        }
+        catch (InvalidOperationException refused)
+        {
+            // The editor refuses what it cannot express — an element moved inside itself, two
+            // edits over the same text — and nothing has been written when it does.
+            _report.Clear()
+                .Field("действие", describe(element))
+                .Verdict("редактор отказал, документ не тронут", false)
+                .Note(refused.Message);
+
+            return;
+        }
+
+        await SyncAsync(edited, describe(element), select: select?.Invoke(edited));
     }
 
     /// <summary>Moves the history and brings everything else along.</summary>
@@ -255,14 +359,14 @@ internal sealed partial class InspectorView : UserControl
         Func<XamlWorkspace, bool>? rollback = null,
         XamlElementPath? select = null)
     {
-        XamlUpdateResult result = await _session!.ApplyDocumentUpdateAsync(document, CancellationToken.None);
+        Applied applied = await ApplyAsync(document);
 
         _report.Clear()
             .Field("действие", what)
-            .Field("стратегия", result.Strategy.ToString())
-            .Verdict("применено к работающим объектам", result.Applied);
+            .Field("стратегия", applied.Described)
+            .Verdict("применено к работающим объектам", applied.IsApplied);
 
-        if (result.Applied)
+        if (applied.IsApplied)
         {
             await SaveAsync();
         }
@@ -271,10 +375,10 @@ internal sealed partial class InspectorView : UserControl
             (rollback ?? (static workspace => workspace.Undo()))(_workspace!);
         }
 
-        _report.Caption("ДИАГНОСТИКА").Diagnostics(result.Diagnostics, _session.Document.SourceText);
+        _report.Caption("ДИАГНОСТИКА").Diagnostics(applied.Diagnostics, _session!.Document.SourceText);
         ShowMarkup();
 
-        if (result.Applied && select is not null)
+        if (applied.IsApplied && select is not null)
         {
             _selected = select;
         }
@@ -290,6 +394,60 @@ internal sealed partial class InspectorView : UserControl
         ShowTree();
         ShowProperties();
         ShowHistory();
+    }
+
+    /// <summary>Brings the objects in line with a document — through the session, or a new one.</summary>
+    /// <remarks>
+    /// <para>
+    /// An update says <see cref="XamlUpdateStrategy.RecreateSession"/> when what changed is the
+    /// root itself: taking an attribute off it, say, rebuilds the element, and the root is the one
+    /// object a session cannot rebuild — the caller holds it. That is not a refusal of the edit.
+    /// The tool's answer is the one the diagnostic names: a new session over the document as it
+    /// now reads, and the edit stays.
+    /// </para>
+    /// <para>
+    /// Anything else not applied is a refusal, and the caller takes the edit back out of the
+    /// history.
+    /// </para>
+    /// </remarks>
+    private async Task<Applied> ApplyAsync(XamlDocument document)
+    {
+        XamlUpdateResult result = await _session!.ApplyDocumentUpdateAsync(document, CancellationToken.None);
+
+        if (result.Applied || result.Strategy != XamlUpdateStrategy.RecreateSession || _environment is null)
+        {
+            return new Applied(result.Applied, result.Strategy, Recreated: false, result.Diagnostics);
+        }
+
+        (XamlLoadSession? session, XamlLoadResult loaded) = await XamlLoadSession.TryCreateAsync(
+            document, _environment, new XamlLoadOptions { Mode = XamlLoadMode.Runtime });
+
+        if (session is null)
+        {
+            return new Applied(false, result.Strategy, Recreated: false, [.. result.Diagnostics, .. loaded.Diagnostics]);
+        }
+
+        await _session.DisposeAsync();
+
+        _session = session;
+        Preview.Content = SampleData.Attach(session.RootObject);
+
+        return new Applied(true, result.Strategy, Recreated: true, loaded.Diagnostics);
+    }
+
+    /// <summary>What bringing the objects in line came to.</summary>
+    /// <param name="IsApplied">Whether the objects now describe the document.</param>
+    /// <param name="Strategy">The strategy the update chose.</param>
+    /// <param name="Recreated">Whether a new session had to be built for it.</param>
+    /// <param name="Diagnostics">What the update, or the new load, had to say.</param>
+    private sealed record Applied(
+        bool IsApplied,
+        XamlUpdateStrategy Strategy,
+        bool Recreated,
+        ImmutableArray<MarkupDiagnostic> Diagnostics)
+    {
+        /// <summary>Gets the strategy as the report names it.</summary>
+        public string Described => Recreated ? $"{Strategy} — построена новая сессия" : Strategy.ToString();
     }
 
     /// <summary>Says what undoing and redoing would do, and whether they can.</summary>
@@ -434,6 +592,15 @@ internal sealed partial class InspectorView : UserControl
         DeleteButton.IsEnabled = structural;
         DuplicateButton.IsEnabled = structural;
         WrapButton.IsEnabled = structural;
+
+        // Moving and unwrapping are about an element's place among its siblings, and something a
+        // member holds — a brush under <Border.Resources> — has a key rather than a place.
+        bool placed = structural && element.Parent is XamlElement { IsPropertyElementSyntax: false };
+        int siblings = placed ? ((XamlElement)element.Parent!).ContentElements.Count() : 0;
+
+        UnwrapButton.IsEnabled = placed && element.ContentElements.Any();
+        UpButton.IsEnabled = placed && element.IndexInContent > 0;
+        DownButton.IsEnabled = placed && element.IndexInContent < siblings - 1;
 
         // What the document already says about this element first, then everything else the type
         // has. The list comes from GetMembers rather than from a table of names kept here: which
@@ -621,14 +788,14 @@ internal sealed partial class InspectorView : UserControl
         XamlDocument edited = _workspace.Apply(
             document.Edit().SetAttribute(element, qualified, text), action);
 
-        XamlUpdateResult result = await _session.ApplyDocumentUpdateAsync(edited, CancellationToken.None);
+        Applied result = await ApplyAsync(edited);
 
         _report.Clear()
             .Field("действие", action)
-            .Field("стратегия", result.Strategy.ToString())
-            .Verdict("применено к работающим объектам", result.Applied);
+            .Field("стратегия", result.Described)
+            .Verdict("применено к работающим объектам", result.IsApplied);
 
-        if (result.Applied)
+        if (result.IsApplied)
         {
             await SaveAsync();
         }
@@ -644,7 +811,7 @@ internal sealed partial class InspectorView : UserControl
         // Setting a property changed the one attribute that was edited and nothing else, and the
         // row that was edited already shows what was typed in it. Rebuilding the rows here would
         // take the caret out of the field the instant Enter committed it, for no change to show.
-        if (result.Applied && result.Strategy == XamlUpdateStrategy.SetProperty)
+        if (result.IsApplied && !result.Recreated && result.Strategy == XamlUpdateStrategy.SetProperty)
         {
             foreach (PropertyRow row in _properties.Where(row => string.Equals(row.Name, name, StringComparison.Ordinal)))
             {

@@ -9,7 +9,7 @@
     <StackPanel Grid.Row="0" Margin="0,0,0,18">
       <TextBlock Classes="h1" Text="Живой документ" />
       <TextBlock Classes="lede"
-                 Text="Правьте документ слева. Ничего не компилируется и никакое приложение не перезапускается: уже работающие объекты приводятся в соответствие с тем, что вы написали, — наименьшей стратегией, которой заведомо достаточно. Какой именно, записано рядом, чтобы выбор был виден, а не выглядел магией." />
+                 Text="Правьте документ слева. Ничего не компилируется и никакое приложение не перезапускается: уже работающие объекты приводятся в соответствие с тем, что вы написали, — наименьшей стратегией, которой заведомо достаточно. Какой именно, записано рядом, чтобы выбор был виден, а не выглядел магией. Можно и в обратную сторону: записать значение в объект через сессию — она проверит его, поставит и допишет документ сама, а привязку, заменённую литералом, назовёт." />
     </StackPanel>
 
     <Grid Grid.Row="1" ColumnDefinitions="1.1*,16,1*">
@@ -35,6 +35,33 @@
                        Classes="caption"
                        Text="ОБЪЕКТЫ, КОТОРЫЕ ОПИСЫВАЕТ ДОКУМЕНТ"
                        Margin="0,0,0,10" />
+
+            <!--
+              The other direction: a value written to an object through the session, which checks
+              it, sets it and writes the document itself. No undo entry — this view keeps no
+              history — and the editor is filled from the session's document afterwards.
+            -->
+            <StackPanel DockPanel.Dock="Bottom" Margin="0,12,0,0">
+              <TextBlock Classes="caption" Text="ЗАПИСЬ В ОБЪЕКТ — СЕССИЯ ДОПИШЕТ ДОКУМЕНТ" Margin="0,0,0,6" />
+              <WrapPanel Margin="0,0,-6,-6">
+                <Button x:Name="WidthButton"
+                        Classes="tool"
+                        Content="Save.Width = 160"
+                        Click="OnSetWidth"
+                        ToolTip.Tip="session.SetValue(save, Layoutable.WidthProperty, 160)" />
+                <Button x:Name="LiteralButton"
+                        Classes="tool"
+                        Content="Title.Text = «Ада Лавлейс»"
+                        Click="OnSetLiteral"
+                        ToolTip.Tip="session.SetValue поверх привязки: заменить её литералом можно, но об этом будет сказано" />
+                <Button x:Name="BindingButton"
+                        Classes="tool"
+                        Content="Title.Text = {Binding Customer.Name}"
+                        Click="OnSetBinding"
+                        ToolTip.Tip="session.SetXamlValue: в документ ложится выражение, а не его значение" />
+              </WrapPanel>
+            </StackPanel>
+
             <ScrollViewer>
               <controls:PreviewSurface x:Name="Preview" />
             </ScrollViewer>

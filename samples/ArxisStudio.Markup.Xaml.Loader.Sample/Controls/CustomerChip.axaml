@@ -1,0 +1,20 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             x:Class="ArxisStudio.Markup.Xaml.Loader.Sample.Controls.CustomerChip">
+
+  <!-- Скомпилировано в сборку витрины. Раздел «Вложенные контролы» правит копию этого текста. -->
+  <Border Background="#FFE7ECF3" CornerRadius="17" Padding="5,5,14,5">
+    <StackPanel Orientation="Horizontal" Spacing="9">
+      <Border Width="24" Height="24" CornerRadius="12" Background="#FF5A6472">
+        <TextBlock Text="GH"
+                   Foreground="White"
+                   FontSize="10"
+                   FontWeight="SemiBold"
+                   HorizontalAlignment="Center"
+                   VerticalAlignment="Center" />
+      </Border>
+      <TextBlock Text="Grace Hopper" FontWeight="SemiBold" VerticalAlignment="Center" />
+    </StackPanel>
+  </Border>
+
+</UserControl>
