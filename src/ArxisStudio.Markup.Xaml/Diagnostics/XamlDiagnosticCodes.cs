@@ -84,6 +84,23 @@ public static class XamlDiagnosticCodes
     /// <summary>Two edits in one operation would change overlapping regions of the document.</summary>
     public const string ConflictingEdits = "AXM1041";
 
+    /// <summary>
+    /// A fragment offered for insertion is not one well-formed element, so nothing was inserted.
+    /// </summary>
+    public const string MalformedFragment = "AXM1042";
+
+    /// <summary>
+    /// A fragment writes its unprefixed names in a different default namespace from the one in
+    /// scope where it would land, so nothing was inserted: those names would have changed meaning.
+    /// </summary>
+    public const string FragmentDefaultNamespaceConflict = "AXM1043";
+
+    /// <summary>
+    /// A fragment's prefix was renamed where the syntax says it names a namespace, and still
+    /// appears in a value the syntax does not read as a name — which was left as written.
+    /// </summary>
+    public const string FragmentPrefixLeftAsWritten = "AXM1044";
+
     /// <summary>An include element has no <c>Source</c> attribute.</summary>
     public const string MissingIncludeSource = "AXM1050";
 

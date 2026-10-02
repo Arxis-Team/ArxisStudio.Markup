@@ -21,10 +21,11 @@ namespace ArxisStudio.Markup.Xaml;
 /// <para>
 /// Edits are computed against the document the editor was opened on and applied all at once.
 /// Nodes from a different document are rejected: their spans point into different text, so
-/// using them would corrupt this one.
+/// using them would corrupt this one. Markup <em>from</em> a different document arrives as a
+/// <see cref="XamlFragment"/>, which carries the namespaces its names are written in.
 /// </para>
 /// </remarks>
-public sealed class XamlDocumentEditor
+public sealed partial class XamlDocumentEditor
 {
     /// <summary>A name no real document uses, for the wrapper a copied fragment is parsed in.</summary>
     private const string FragmentName = "ArxisStudioMarkupFragment";
@@ -45,10 +46,18 @@ public sealed class XamlDocumentEditor
     /// Gets the diagnostics raised while recording edits.
     /// </summary>
     /// <remarks>
-    /// The two refusals below, said in a form a tool can route on. They are also thrown, because
-    /// both are the caller's mistake rather than the document's and an edit that silently did
-    /// nothing would be worse — this is the same fact with a code and a span attached, for a host
-    /// that catches the exception and wants to show something better than its message.
+    /// <para>
+    /// Two refusals, said in a form a tool can route on: a node from another document, and edits
+    /// that overlap. They are also thrown, because both are the caller's mistake rather than the
+    /// document's and an edit that silently did nothing would be worse — this is the same fact with
+    /// a code and a span attached, for a host that catches the exception and wants to show
+    /// something better than its message.
+    /// </para>
+    /// <para>
+    /// What <see cref="InsertFragment"/> reports is the other kind: facts about the markup being
+    /// inserted, which is a clipboard's or another file's rather than the caller's. Those are
+    /// reported here and not thrown.
+    /// </para>
     /// </remarks>
     public ImmutableArray<MarkupDiagnostic> Diagnostics => [.. _diagnostics];
 
@@ -297,6 +306,8 @@ public sealed class XamlDocumentEditor
                 "the element that declares it.");
         }
 
+        // RemoveConflicting is Remove here: every name in a copy is already declared, by the
+        // original the copy stands beside.
         string text = names == XamlDuplicateNames.Keep ? element.GetText() : Anonymous(element);
 
         return InsertElement(parent, element.IndexInContent + 1, text);
@@ -529,11 +540,23 @@ public sealed class XamlDocumentEditor
     }
 
     /// <summary>Gets the text changes these edits amount to, ordered and non-overlapping.</summary>
+    /// <remarks>
+    /// An insertion at the point where a replacement begins goes in front of it, whichever was
+    /// recorded first. Both describe that point, and "before the text that is being replaced" is
+    /// the only reading in which neither swallows the other — it is what lets a namespace be
+    /// declared after the last attribute of a self-closing root while the same editor opens that
+    /// root to put content in it. Insertions at one point keep the order they were recorded in.
+    /// </remarks>
     /// <returns>The changes, ready to apply to the document's snapshot.</returns>
     /// <exception cref="InvalidOperationException">Two edits would change overlapping regions.</exception>
     public ImmutableArray<TextChange> GetTextChanges()
     {
-        TextChange[] ordered = [.. _changes.OrderBy(static change => change.Span.Start)];
+        TextChange[] ordered =
+        [
+            .. _changes
+                .OrderBy(static change => change.Span.Start)
+                .ThenBy(static change => change.Span.Length > 0),
+        ];
 
         for (var index = 1; index < ordered.Length; index++)
         {
@@ -696,11 +719,12 @@ public sealed class XamlDocumentEditor
     /// <remarks>
     /// Spaces and tabs only, and only when nothing else precedes it on its line. An element
     /// written after something else has no indentation of its own to speak of, and pretending
-    /// otherwise would indent by whatever happened to come before it.
+    /// otherwise would indent by whatever happened to come before it. Read from the element's own
+    /// document, which is what lets a fragment ask it of the document it is lifted from.
     /// </remarks>
-    private string IndentOf(XamlElement element)
+    internal static string IndentOf(XamlElement element)
     {
-        SourceText text = _document.SourceText;
+        SourceText text = element.Document.SourceText;
         int start = element.Span.Start;
 
         while (start > 0 && text[start - 1] is ' ' or '\t')
@@ -721,7 +745,7 @@ public sealed class XamlDocumentEditor
     /// written with, whether that is two spaces, four, or a tab. Two spaces only when the
     /// document does not say — an element written inline, or a root with nothing above it.
     /// </remarks>
-    private string StepFor(XamlElement element)
+    private static string StepFor(XamlElement element)
     {
         string indent = IndentOf(element);
 
@@ -785,11 +809,11 @@ public sealed class XamlDocumentEditor
     /// exactly the kind of edit nobody asked for.
     /// </para>
     /// </remarks>
-    private static string Reindent(XamlElement element, string step) =>
-        Relayout(element, step, indent: true);
+    internal static string Reindent(XamlElement element, string step) =>
+        step.Length == 0 ? element.GetText() : Relayout(element, step, indent: true);
 
     /// <summary>Takes one level of indentation off every line of an element but the first.</summary>
-    private static string Outdent(XamlElement element, string step) =>
+    internal static string Outdent(XamlElement element, string step) =>
         step.Length == 0 ? element.GetText() : Relayout(element, step, indent: false);
 
     private static string Relayout(XamlElement element, string step, bool indent)
