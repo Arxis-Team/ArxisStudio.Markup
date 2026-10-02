@@ -188,7 +188,8 @@ public sealed class XamlObjectMap
 
         map._root = root;
 
-        map.Walk(document, root, XamlObjectOrigin.Document, new HashSet<object>(ReferenceEqualityComparer.Instance));
+        map.Walk(
+            document, root, XamlObjectOrigin.Document, new HashSet<object>(ReferenceEqualityComparer.Instance), within: null);
         map.PairTheRoot(document, root);
 
         return map;
@@ -367,7 +368,20 @@ public sealed class XamlObjectMap
     }
 
     /// <summary>Walks a tree, recording what each object came from.</summary>
-    private void Walk(XamlDocument document, object current, XamlObjectOrigin inherited, HashSet<object> seen)
+    /// <param name="document">The document the objects were built from.</param>
+    /// <param name="current">The object to record, and then its children.</param>
+    /// <param name="inherited">The origin the object takes when nothing more particular is known.</param>
+    /// <param name="seen">The objects already recorded.</param>
+    /// <param name="within">
+    /// The element of the nearest object above this one that was paired with an element, or
+    /// <see langword="null"/> at the root.
+    /// </param>
+    private void Walk(
+        XamlDocument document,
+        object current,
+        XamlObjectOrigin inherited,
+        HashSet<object> seen,
+        XamlElement? within)
     {
         if (!seen.Add(current))
         {
@@ -375,6 +389,30 @@ public sealed class XamlObjectMap
         }
 
         Declaration declaration = Locate(document, current);
+
+        // A child is declared inside its parent's element, or not by this document at all. The
+        // position Avalonia records says nothing about which text it was recorded against — every
+        // runtime load is named alike, the document, each fragment an update builds and the markup
+        // live population builds a placed control from — so a control's own markup, populated from
+        // its live document, read as positions in the form: its inner text block landed on the
+        // control's own element, or on a sibling's three lines down. Where a recorded position
+        // leaves the parent's element, it is somebody else's markup, and is left unpaired.
+        if (declaration.Element is { } located
+            && within is not null
+            && (ReferenceEquals(located, within) || !within.Span.Contains(located.Span)))
+        {
+            declaration = default;
+        }
+
+        // An object an update carried across or rebuilt is declared by the element the update paired
+        // it with, by the update's own account — which is better evidence than a position recorded
+        // against a text that may not be this one.
+        if (declaration.Element is null
+            && _carried.Contains(current)
+            && _elementsByObject.TryGetValue(current, out XamlElement? carried))
+        {
+            declaration = new Declaration(carried, document.Uri, IsFromIncludedDocument: false);
+        }
 
         // An object whose markup is in an included file is not part of this document however
         // deep in it the include sits, so it cannot inherit this document's origin: a style
@@ -425,9 +463,13 @@ public sealed class XamlObjectMap
             _objectsByElement.TryAdd(element, current);
         }
 
+        // What this object's children must be declared inside: its own element, when it has one —
+        // found here or carried across an update — and otherwise whatever held for it.
+        XamlElement? scope = _elementsByObject.TryGetValue(current, out XamlElement? own) ? own : within;
+
         foreach (object child in ChildrenOf(current))
         {
-            Walk(document, child, origin == XamlObjectOrigin.Document ? XamlObjectOrigin.Document : origin, seen);
+            Walk(document, child, origin == XamlObjectOrigin.Document ? XamlObjectOrigin.Document : origin, seen, scope);
         }
     }
 

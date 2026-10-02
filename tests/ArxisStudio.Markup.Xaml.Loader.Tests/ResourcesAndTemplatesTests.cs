@@ -208,6 +208,37 @@ public sealed class ResourcesAndTemplatesTests
     }
 
     [AvaloniaFact]
+    public async Task AStaticReferenceWrittenUnderAnIncludeIsReadFromTheInclude()
+    {
+        (XamlLoadEnvironment environment, InMemoryResourceResolver resources) = Setup();
+
+        resources.Update(ColorsUri, Dictionary("Accent", "Red"));
+
+        string View(string reads) =>
+            $"<Border xmlns=\"{AvaloniaNamespace}\" xmlns:x=\"http://schemas.microsoft.com/winfx/2006/xaml\">\n" +
+            "  <Border.Resources>\n" +
+            "    <ResourceDictionary>\n" +
+            "      <ResourceDictionary.MergedDictionaries>\n" +
+            "        <ResourceInclude Source=\"/Themes/Colors.axaml\" />\n" +
+            "      </ResourceDictionary.MergedDictionaries>\n" +
+            "    </ResourceDictionary>\n" +
+            "  </Border.Resources>\n" +
+            $"  <Border Name=\"Uses\"{reads} />\n" +
+            "</Border>";
+
+        await using XamlLoadSession session = await Load(View(string.Empty), environment);
+
+        // No element of the document declares the key — the include does — and a part built on its
+        // own has none of the dictionaries around it, the included ones least of all.
+        XamlUpdateResult result = await session.ApplyDocumentUpdateAsync(
+            XamlDocument.Parse(View(" Background=\"{StaticResource Accent}\""), new XamlParseOptions { DocumentUri = ViewUri }),
+            TestContext.Current.CancellationToken);
+
+        Assert.True(result.Applied, string.Join(" | ", result.Diagnostics));
+        Assert.Equal(Colors.Red, Assert.IsType<SolidColorBrush>(Inner(session.GetRoot<Border>()).Background).Color);
+    }
+
+    [AvaloniaFact]
     public async Task AStyleIncludeIsResolvedThroughTheEnvironmentsResolver()
     {
         (XamlLoadEnvironment environment, InMemoryResourceResolver resources) = Setup();

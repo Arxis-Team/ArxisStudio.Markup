@@ -189,8 +189,15 @@ public sealed partial class XamlLoadSession
     }
 
     /// <summary>Sets a property with the mutation gate already held.</summary>
+    /// <remarks>
+    /// With the root lent back for the whole of it, as an update is: the object is written and the
+    /// map rebuilt, and a host that borrowed the root's content would otherwise have the map walk a
+    /// root with nothing in it.
+    /// </remarks>
     private XamlEditResult SetValueCore(AvaloniaObject target, AvaloniaProperty property, object? value)
     {
+        using IDisposable lent = LendRoot();
+
         XamlMemberDescriptor member = Environment.MemberResolver.Resolve(target.GetType(), property);
 
         if (Reject(member, property, out XamlEditResult? rejected))
@@ -236,7 +243,7 @@ public sealed partial class XamlLoadSession
 
         try
         {
-            UpdateDocument(target, property.Name, new XamlLiteralValue(text), diagnostics);
+            UpdateDocument(target, property, new XamlLiteralValue(text), diagnostics);
         }
         catch (Exception)
         {
@@ -336,7 +343,10 @@ public sealed partial class XamlLoadSession
 
             // An expression cannot be evaluated here — resolving it is what a load does. The
             // document is updated and the object is left alone rather than given something wrong.
-            UpdateDocument(target, property.Name, value, diagnostics);
+            using (LendRoot())
+            {
+                UpdateDocument(target, property, value, diagnostics);
+            }
 
             diagnostics.Add(MarkupDiagnostic.Synchronization(
                 XamlLoaderDiagnosticCodes.ExpressionNotApplied,
@@ -440,9 +450,14 @@ public sealed partial class XamlLoadSession
     }
 
     /// <summary>Writes the change into the document, advancing the session's document.</summary>
+    /// <remarks>
+    /// Under the name the document reads it by: the attribute already setting the property, however
+    /// it is written, or a new one — <c>Owner.Member</c> for an attached property, with the owner's
+    /// namespace declared on the root in the same edit when the document lacks it.
+    /// </remarks>
     private void UpdateDocument(
         object target,
-        string memberName,
+        AvaloniaProperty property,
         XamlValue value,
         List<MarkupDiagnostic> diagnostics)
     {
@@ -463,17 +478,26 @@ public sealed partial class XamlLoadSession
             return;
         }
 
-        Document = Document.SetAttribute(element, XamlQualifiedName.Parse(memberName), value);
+        XamlDocument before = Document;
+        XamlDocumentEditor editor = Document.Edit();
+        XamlQualifiedName name = XamlPropertyNames.Find(element, property, target.GetType())?.Name
+            ?? XamlPropertyNames.NameFor(editor, element, property, target.GetType());
 
-        // Editing reparses, so every element the caller holds now describes text that has moved.
-        // The projection is the one the objects were built from, because the positions being
-        // read back are the ones Avalonia recorded against it.
+        Document = editor.SetAttribute(element, name, value).Apply();
+
+        // Editing reparses, so every element the caller holds now describes text that has moved —
+        // and the objects are the same objects. They are carried across by where their elements
+        // stand, as an update carries what it did not rebuild, with the fragments earlier updates
+        // built still known: read back through the load's text alone, an object a fragment built
+        // lands on whatever element sits at its line in the document. The projection is the one the
+        // objects were built from, because the positions read back are the ones Avalonia recorded
+        // against it.
         Objects = XamlObjectMap.Build(
             Document,
             RootObject,
             Projection,
-            System.Collections.Immutable.ImmutableDictionary<Uri, TextProjection>.Empty,
-            carried: null,
+            _fragments,
+            Objects.Carry(before, Document),
             Environment.MemberResolver);
     }
 
@@ -482,7 +506,9 @@ public sealed partial class XamlLoadSession
     {
         XamlElement? element = Objects.GetElement(target);
 
-        return element?.GetAttribute(property.Name)?.GetValue() ?? XamlValue.Unset;
+        return element is null
+            ? XamlValue.Unset
+            : XamlPropertyNames.Find(element, property, target.GetType())?.GetValue() ?? XamlValue.Unset;
     }
 
     /// <summary>Renders a value as the document would write it.</summary>

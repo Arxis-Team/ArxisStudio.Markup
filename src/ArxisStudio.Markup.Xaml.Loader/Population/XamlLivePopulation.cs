@@ -177,9 +177,9 @@ public sealed class XamlLivePopulation : IDisposable
         // The same preparation a session load performs, for the same reasons: an event attribute
         // naming a handler the type does not have would fail the whole population, and includes
         // have to be resolved through the environment because Avalonia offers no seam for them.
-        ImmutableArray<TextSpan> unloadable = await XamlAttributeChecks
+        ImmutableArray<TextSpan> unloadable = (await XamlAttributeChecks
             .RunAsync(document, type, _environment, diagnostics, cancellationToken)
-            .ConfigureAwait(false);
+            .ConfigureAwait(false)).Withheld;
 
         TextProjection projection = await XamlDocumentProjector
             .ProjectAsync(document, null, _environment, diagnostics, unloadable, cancellationToken)

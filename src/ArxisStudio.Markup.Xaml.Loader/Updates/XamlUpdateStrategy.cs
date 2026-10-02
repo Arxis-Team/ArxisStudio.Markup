@@ -23,6 +23,18 @@ public enum XamlUpdateStrategy
     /// <summary>A literal value on a writable member; the property is set where it stands.</summary>
     SetProperty,
 
+    /// <summary>
+    /// A value taken out of the document on an Avalonia property; the local value is cleared where
+    /// it stands, which lets a style, a theme or an inherited value show through again.
+    /// </summary>
+    ClearProperty,
+
+    /// <summary>
+    /// An expression the session can evaluate without building anything — a binding, a dynamic
+    /// resource, a static member or a null; it is set where the property stands.
+    /// </summary>
+    SetExpression,
+
     /// <summary>A design-time value; the design value is updated, and only in design mode.</summary>
     UpdateDesignValue,
 

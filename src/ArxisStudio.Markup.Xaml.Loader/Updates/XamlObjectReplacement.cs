@@ -309,7 +309,7 @@ internal static class XamlObjectReplacement
         XamlMemberResolver members,
         List<MarkupDiagnostic> diagnostics)
     {
-        if (target.GetType() != fresh.GetType())
+        if (!OfOneKind(target, fresh))
         {
             return Fail(element, diagnostics, "the rebuilt object is not the same kind of object");
         }
@@ -424,7 +424,7 @@ internal static class XamlObjectReplacement
     {
         // Neither is this question's to answer: a copy of another type and a dictionary are both
         // reported by the replacement itself, in its own words.
-        if (target.GetType() != fresh.GetType() || target is IResourceDictionary)
+        if (!OfOneKind(target, fresh) || target is IResourceDictionary)
         {
             return true;
         }
@@ -1073,6 +1073,19 @@ internal static class XamlObjectReplacement
 
         return XamlMutationOutcome.Inconsistent;
     }
+
+    /// <summary>
+    /// Reports whether a rebuilt copy is the kind of object that can hand its content over.
+    /// </summary>
+    /// <remarks>
+    /// The same type, or the type the object's class derives from. A root's content is rebuilt
+    /// without the root's <c>x:Class</c> — building the class again would run its constructor a
+    /// second time — so the copy is the element the root is written as, and the root is an
+    /// instance of a class derived from it. Every member that is moved across is one that type
+    /// declares, which is what makes the move the same move as between two of one type.
+    /// </remarks>
+    private static bool OfOneKind(object target, object fresh) =>
+        target.GetType() == fresh.GetType() || fresh.GetType().IsAssignableFrom(target.GetType());
 
     private static XamlMutationOutcome Fail(
         XamlElement element,

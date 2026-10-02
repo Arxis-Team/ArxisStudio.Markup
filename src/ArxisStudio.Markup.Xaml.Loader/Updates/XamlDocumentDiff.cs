@@ -67,6 +67,7 @@ internal static class XamlDocumentDiff
         [
             .. changes
                 .SelectMany(change => Consumers(change, loaded, updated))
+                .Select(Widened)
 
                 // Rebuilding the root object would leave nowhere to put it: the caller holds it,
                 // and a session is built around it. That is the one case a new session is for.
@@ -133,13 +134,9 @@ internal static class XamlDocumentDiff
         }
     }
 
-    /// <summary>Reports whether any of an element's attributes reads a key with <c>StaticResource</c>.</summary>
+    /// <summary>Reports whether an element reads a key with <c>StaticResource</c>.</summary>
     private static bool ReadsStatically(XamlElement element, string key) =>
-        element.Attributes.Any(attribute =>
-            attribute.GetValue() is XamlMarkupExtensionValue extension
-            && string.Equals(extension.TypeName.LocalName, "StaticResource", StringComparison.Ordinal)
-            && extension.PositionalArguments.Any(argument =>
-                string.Equals(argument.Value.ToXamlText(), key, StringComparison.Ordinal)));
+        KeysReadBy(element).Contains(key, StringComparer.Ordinal);
 
     /// <summary>
     /// Reports whether two elements standing in the same place describe different objects.
@@ -250,14 +247,18 @@ internal static class XamlDocumentDiff
         {
             XamlAttribute? previous = before.GetAttribute(attribute.Name);
 
-            if (previous is null)
+            if (previous is not null
+                && string.Equals(previous.GetValueText(), attribute.GetValueText(), StringComparison.Ordinal))
             {
-                changes.Add(Classify(before, after, attribute, isRemoval: false));
+                continue;
             }
-            else if (!string.Equals(previous.GetValueText(), attribute.GetValueText(), StringComparison.Ordinal))
+
+            if (IsIgnorable(attribute) && OnlyGrows(previous, attribute, before, after))
             {
-                changes.Add(Classify(before, after, attribute, isRemoval: false));
+                continue;
             }
+
+            changes.Add(Classify(before, after, attribute, isRemoval: false));
         }
 
         foreach (XamlAttribute attribute in Meaningful(before))
@@ -311,12 +312,263 @@ internal static class XamlDocumentDiff
             };
         }
 
-        // An expression is resolved while objects are built — a binding needs its source, a
-        // static resource its dictionary — so there is nothing to set and the element is rebuilt.
-        return isRemoval || attribute.GetValue() is not XamlLiteralValue
-            ? Structural(before, after)
-            : new XamlDocumentChange(XamlUpdateStrategy.SetProperty, before, after, name);
+        // A value taken out is cleared where it stands — which a load can only express by building
+        // the element without it — as long as the member is one with a local value of its own to
+        // clear; the session finds that out, and rebuilds when it is not.
+        if (isRemoval)
+        {
+            return new XamlDocumentChange(XamlUpdateStrategy.ClearProperty, before, after, name);
+        }
+
+        // An expression is resolved while objects are built — a static resource needs its
+        // dictionary, a converter is a resource — and is rebuilt; the few a session can evaluate
+        // with nothing to build are set where the property stands. Whether this one can is decided
+        // against the object's member, which the syntax cannot see.
+        return attribute.GetValue() switch
+        {
+            XamlLiteralValue => new XamlDocumentChange(XamlUpdateStrategy.SetProperty, before, after, name),
+            XamlMarkupExtensionValue extension when XamlInPlaceValues.IsCandidate(extension, after) =>
+                new XamlDocumentChange(XamlUpdateStrategy.SetExpression, before, after, name),
+            _ => Structural(before, after),
+        };
     }
+
+    /// <summary>
+    /// Describes what has to be rebuilt instead of a change that cannot be written where it stands.
+    /// </summary>
+    /// <remarks>
+    /// The change a load would need for the attribute if nothing could be written in place: its
+    /// element built again — or the smallest container around it — and at the root, which has no
+    /// slot to be put back into, a new session.
+    /// </remarks>
+    /// <param name="change">A value change the session found it cannot write in place.</param>
+    /// <param name="loadedRoot">The root element of the document the objects were built from.</param>
+    /// <returns>The change that rebuilds instead.</returns>
+    internal static XamlDocumentChange Escalate(XamlDocumentChange change, XamlElement? loadedRoot)
+    {
+        if (change.OldElement is not { } before || change.NewElement is not { } after)
+        {
+            return new XamlDocumentChange(XamlUpdateStrategy.RecreateSession, change.OldElement, change.NewElement, null);
+        }
+
+        XamlDocumentChange rebuilt = Widened(Structural(before, after));
+
+        return rebuilt.ReplacesObject && ReferenceEquals(rebuilt.OldElement, loadedRoot)
+            ? new XamlDocumentChange(XamlUpdateStrategy.RecreateSession, before, after, null)
+            : rebuilt;
+    }
+
+    /// <summary>
+    /// Moves a rebuild out to the element whose dictionary a static reference inside it reads.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// A part rebuilt on its own has none of the dictionaries around it, and a static reference is
+    /// read from the dictionaries in scope while the part is built: a text block whose foreground
+    /// became <c>{StaticResource Accent}</c>, with the brush on the form's resources, was rebuilt
+    /// with no brush at all. The same reference in markup the form loads whole read the brush.
+    /// </para>
+    /// <para>
+    /// So a rebuild whose markup reads a key from outside itself is moved out to the element that
+    /// answers it — the nearest one declaring the key, as the lookup goes — and what that element
+    /// holds is rebuilt instead: its dictionary is then part of the text the rebuild is built from.
+    /// A key no element declares may still come from a file an element includes, and which file
+    /// says what is not something the syntax answers, so the rebuild is moved out past the
+    /// outermost such element. A key neither declared nor possibly included is the application's
+    /// or a theme's, which a part built on its own still finds.
+    /// </para>
+    /// </remarks>
+    private static XamlDocumentChange Widened(XamlDocumentChange change)
+    {
+        if (change.Strategy != XamlUpdateStrategy.ReloadSubtree
+            || change.OldElement is not { } before
+            || change.NewElement is not { } after)
+        {
+            return change;
+        }
+
+        ImmutableArray<XamlElement> includes =
+            [.. after.Document.GetResourceReferences().Select(static reference => reference.Element)];
+
+        int widest = 0;
+
+        foreach ((XamlElement reader, string key) in StaticReads(after))
+        {
+            widest = Math.Max(widest, Reach(reader, key, after, includes));
+        }
+
+        if (widest == 0
+            || Ancestor(before, widest) is not { } outerBefore
+            || Ancestor(after, widest) is not { } outerAfter)
+        {
+            return change;
+        }
+
+        return Structural(outerBefore, outerAfter, replacesObject: false);
+    }
+
+    /// <summary>
+    /// Counts how many levels above a rebuilt part sits the element whose dictionaries answer a
+    /// static reference inside it — none when the part answers it itself, or nothing in the
+    /// document can.
+    /// </summary>
+    private static int Reach(XamlElement reader, string key, XamlElement part, ImmutableArray<XamlElement> includes)
+    {
+        int above = -1;
+        int included = 0;
+
+        foreach (XamlElement scope in reader.AncestorsAndSelf().OfType<XamlElement>())
+        {
+            if (ReferenceEquals(scope, part))
+            {
+                above = 0;
+            }
+            else if (above >= 0)
+            {
+                above++;
+            }
+
+            if (scope.IsPropertyElementSyntax)
+            {
+                continue;
+            }
+
+            // The nearest declaration is the one the lookup finds, and building from it builds
+            // everything nearer — any include on the way included.
+            if (Dictionaries(scope).Any(entry => string.Equals(entry.GetDirective("Key"), key, StringComparison.Ordinal)))
+            {
+                return Math.Max(above, 0);
+            }
+
+            if (above > 0 && Dictionaries(scope).Any(entry => includes.Contains(entry)))
+            {
+                included = above;
+            }
+        }
+
+        return included;
+    }
+
+    /// <summary>
+    /// Gets every element an element reads resources from: what it writes as its <c>Resources</c>,
+    /// and its <c>Styles</c>, whose dictionaries a lookup reaches through the element too.
+    /// </summary>
+    private static IEnumerable<XamlElement> Dictionaries(XamlElement element) =>
+        element.MemberElements
+            .Where(member => XamlObjectReplacement.Owns(element, member)
+                && member.MemberName is "Resources" or "Styles")
+            .SelectMany(static member => member.DescendantElements());
+
+    /// <summary>
+    /// Gets every key read with <c>StaticResource</c> in an element and everything inside it, with
+    /// the element it is written on.
+    /// </summary>
+    private static IEnumerable<(XamlElement Reader, string Key)> StaticReads(XamlElement part) =>
+        part.DescendantElements()
+            .Prepend(part)
+            .SelectMany(static element => KeysReadBy(element).Select(key => (element, key)));
+
+    /// <summary>Gets the literal keys one element reads with <c>StaticResource</c>.</summary>
+    private static IEnumerable<string> KeysReadBy(XamlElement element)
+    {
+        // Written as an element — <StaticResource ResourceKey="Accent" /> in a property element.
+        if (element.Name.LocalName is "StaticResource" or "StaticResourceExtension"
+            && element.Attributes.FirstOrDefault(static attribute =>
+                    string.Equals(attribute.Name.LocalName, "ResourceKey", StringComparison.Ordinal))
+                ?.GetValueText() is { Length: > 0 } written)
+        {
+            yield return written;
+        }
+
+        foreach (XamlAttribute attribute in element.Attributes)
+        {
+            if (attribute.GetValue() is XamlMarkupExtensionValue extension)
+            {
+                foreach (string key in StaticKeys(extension))
+                {
+                    yield return key;
+                }
+            }
+        }
+    }
+
+    /// <summary>Gets the literal keys an expression reads with <c>StaticResource</c>, nested ones too.</summary>
+    private static IEnumerable<string> StaticKeys(XamlMarkupExtensionValue extension)
+    {
+        if (extension.TypeName.LocalName is "StaticResource" or "StaticResourceExtension"
+            && extension.Arguments.FirstOrDefault()?.Value is XamlLiteralValue { Text.Length: > 0 } key)
+        {
+            yield return key.Text;
+        }
+
+        // A converter or a fallback written as a static reference inside another expression.
+        foreach (XamlMarkupExtensionArgument argument in extension.Arguments)
+        {
+            if (argument.Value is XamlMarkupExtensionValue nested)
+            {
+                foreach (string inner in StaticKeys(nested))
+                {
+                    yield return inner;
+                }
+            }
+        }
+    }
+
+    /// <summary>Reports whether an attribute is <c>mc:Ignorable</c>.</summary>
+    private static bool IsIgnorable(XamlAttribute attribute) =>
+        attribute.IsMarkupCompatibility
+        && string.Equals(attribute.Name.LocalName, "Ignorable", StringComparison.Ordinal);
+
+    /// <summary>
+    /// Reports whether <c>mc:Ignorable</c> only gained namespaces nothing in the loaded document used.
+    /// </summary>
+    /// <remarks>
+    /// A namespace a reader ignores is one whose markup it proceeds without, so making one ignorable
+    /// changes the objects only if markup in it was applied. A namespace nothing used — the design
+    /// namespace a tool declares and lists for the first design value it writes, which comes with it
+    /// as a change of its own — changes nothing, and rebuilding the root for it meant a new session,
+    /// and a new instance of the author's class, for a design width. A namespace that is taken off
+    /// the list, or that markup in the loaded document is written in, is structural as before.
+    /// </remarks>
+    private static bool OnlyGrows(XamlAttribute? previous, XamlAttribute current, XamlElement before, XamlElement after)
+    {
+        var was = Ignored(previous, before);
+        var now = Ignored(current, after);
+
+        if (!was.IsSubsetOf(now))
+        {
+            return false;
+        }
+
+        now.ExceptWith(was);
+
+        return !before.Document.DescendantElements().Any(element => Uses(element, now));
+    }
+
+    /// <summary>Gets the namespaces an <c>mc:Ignorable</c> attribute names, where it is written.</summary>
+    private static HashSet<string> Ignored(XamlAttribute? attribute, XamlElement element)
+    {
+        var namespaces = new HashSet<string>(StringComparer.Ordinal);
+
+        foreach (string prefix in (attribute?.GetValueText() ?? string.Empty)
+            .Split((char[]?)null, StringSplitOptions.RemoveEmptyEntries))
+        {
+            if (element.NamespaceContext.LookupNamespace(prefix) is { } namespaceUri)
+            {
+                namespaces.Add(namespaceUri);
+            }
+        }
+
+        return namespaces;
+    }
+
+    /// <summary>Reports whether an element, or any attribute on it, is written in one of the namespaces.</summary>
+    private static bool Uses(XamlElement element, HashSet<string> namespaces) =>
+        (element.NamespaceUri is { } own && namespaces.Contains(own))
+        || element.Attributes.Any(attribute => attribute is not XamlNamespaceDeclaration
+            && attribute.Name.Prefix is { } prefix
+            && element.NamespaceContext.LookupNamespace(prefix) is { } namespaceUri
+            && namespaces.Contains(namespaceUri));
 
     /// <summary>
     /// Finds the outermost style, theme, template or keyed resource the element sits in.

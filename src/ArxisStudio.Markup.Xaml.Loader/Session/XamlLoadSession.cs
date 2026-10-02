@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Collections.Immutable;
 using System.Linq;
+using System.Reflection;
 using System.Threading;
 using System.Threading.Tasks;
 using Avalonia.Markup.Xaml;
@@ -85,6 +86,16 @@ public sealed partial class XamlLoadSession : IAsyncDisposable
     /// <c>x:Class</c> is a new session rather than an update.
     /// </remarks>
     private readonly Type? _rootClass;
+
+    /// <summary>
+    /// Gets the assembly the document belongs to: the one the caller named, or the class's.
+    /// </summary>
+    /// <remarks>
+    /// A runtime load compiles the text into an assembly of its own, which reaches a non-public member
+    /// of another only when the load names that assembly as the document's — and a handler in
+    /// code-behind is private as a rule. Every load of the session names the same one.
+    /// </remarks>
+    private Assembly? LocalAssembly => Options.LocalAssembly ?? _rootClass?.Assembly;
 
     private XamlLoadSession(
         XamlDocument document,
@@ -236,9 +247,9 @@ public sealed partial class XamlLoadSession : IAsyncDisposable
         // its constructor runs. It is the type Avalonia compiles the handlers against either way.
         // With no class to use, the directive naming one is withheld too, and the root is built as
         // the element it is written as.
-        ImmutableArray<TextSpan> unloadable = await XamlAttributeChecks
+        ImmutableArray<TextSpan> unloadable = (await XamlAttributeChecks
             .RunAsync(document, rootType, environment, diagnostics, cancellationToken)
-            .ConfigureAwait(false);
+            .ConfigureAwait(false)).Withheld;
 
         // Includes are resolved before anything is created, because Avalonia resolves them
         // itself during the load and throws when it cannot. Resolving them here through the
@@ -419,13 +430,17 @@ public sealed partial class XamlLoadSession : IAsyncDisposable
     {
         if (rootType is null)
         {
-            return Load(document, projection, options, null, diagnostics);
+            return Load(document, projection, options, options.LocalAssembly, null, diagnostics);
         }
+
+        // The class's assembly is the one the document belongs to, unless the caller said otherwise —
+        // and the one a runtime load needs named before it may call the class's private handlers.
+        Assembly localAssembly = options.LocalAssembly ?? rootType.Assembly;
 
         object? rootInstance;
 
         XamlRootPopulation population = XamlRootPopulation.Lend(
-            rootType, instance => Load(document, projection, options, instance, diagnostics));
+            rootType, instance => Load(document, projection, options, localAssembly, instance, diagnostics));
 
         using (population)
         {
@@ -453,7 +468,7 @@ public sealed partial class XamlLoadSession : IAsyncDisposable
             }
         }
 
-        return Load(document, projection, options, rootInstance, diagnostics);
+        return Load(document, projection, options, localAssembly, rootInstance, diagnostics);
     }
 
     /// <summary>Hands the projected text to Avalonia's runtime loader.</summary>
@@ -461,12 +476,13 @@ public sealed partial class XamlLoadSession : IAsyncDisposable
         XamlDocument document,
         TextProjection projection,
         XamlLoadOptions options,
+        Assembly? localAssembly,
         object? rootInstance,
         List<MarkupDiagnostic> diagnostics)
     {
         var configuration = new RuntimeXamlLoaderConfiguration
         {
-            LocalAssembly = options.LocalAssembly,
+            LocalAssembly = localAssembly,
             UseCompiledBindingsByDefault = options.UseCompiledBindingsByDefault,
             DesignMode = options.Mode == XamlLoadMode.Design,
 

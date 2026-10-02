@@ -481,6 +481,44 @@ public sealed class UpdateTests
     }
 
     [AvaloniaFact]
+    public async Task ARebuildInsideAnotherIsLeftToTheOuterOne()
+    {
+        string Xaml(string reads, string added) =>
+            $"<StackPanel xmlns=\"{AvaloniaNamespace}\" xmlns:x=\"http://schemas.microsoft.com/winfx/2006/xaml\">\n" +
+            "  <StackPanel.Resources>\n" +
+            "    <SolidColorBrush x:Key=\"Accent\" Color=\"Red\" />\n" +
+            "  </StackPanel.Resources>\n" +
+            $"  <Border{reads} />\n" +
+            "  <StackPanel x:Name=\"Inner\">\n" +
+            $"    <TextBlock Text=\"one\" />{added}\n" +
+            "  </StackPanel>\n" +
+            "</StackPanel>";
+
+        await using XamlLoadSession session = await Load(Xaml(string.Empty, string.Empty));
+
+        // Two rebuilds, one around the other: the border now reads a key the root declares, so what
+        // the root holds is built again, and the inner panel gained a child, which on its own
+        // rebuilds the panel. The outer rebuild already builds the panel as the document says.
+        XamlUpdateResult result = await Update(
+            session, Xaml(" Background=\"{StaticResource Accent}\"", "<TextBlock Text=\"two\" />"));
+
+        Assert.True(result.Applied, string.Join(" | ", result.Diagnostics));
+
+        var root = session.GetRoot<StackPanel>();
+        var inner = (StackPanel)root.Children[1];
+
+        Assert.Equal(Avalonia.Media.Colors.Red, ((Avalonia.Media.SolidColorBrush)((Border)root.Children[0]).Background!).Color);
+        Assert.Equal(["one", "two"], inner.Children.OfType<TextBlock>().Select(static text => text.Text));
+
+        // And the map names the panel that is in the tree, not one built for the inner rebuild and
+        // then replaced by the outer one.
+        XamlElement element = session.Document.DescendantElements()
+            .Single(static candidate => candidate.GetDirective("Name") == "Inner");
+
+        Assert.Same(inner, session.GetObject(element));
+    }
+
+    [AvaloniaFact]
     public async Task AReloadedTemplateRecreatesTheContentItProduces()
     {
         string Xaml(string width) =>

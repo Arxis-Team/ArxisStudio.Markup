@@ -38,6 +38,11 @@ namespace ArxisStudio.Markup.Xaml.Loader;
 /// that put back what the load withheld would fail where the load succeeded — or, for a source
 /// update, differ from the load's text when nothing has changed.
 /// </para>
+/// <para>
+/// The handlers the class does answer are returned too. A load hands them to Avalonia, which hooks
+/// them up to the instance it populates; a part an update rebuilds has no instance to be hooked up
+/// to, so the update leaves them out of that part's text and hooks them up itself.
+/// </para>
 /// </remarks>
 internal static class XamlAttributeChecks
 {
@@ -51,8 +56,11 @@ internal static class XamlAttributeChecks
     /// <param name="environment">The environment the document's names are resolved through.</param>
     /// <param name="diagnostics">Collects everything noticed on the way.</param>
     /// <param name="cancellationToken">A token to observe while resolving.</param>
-    /// <returns>The attributes the projection has to leave out for the load to survive.</returns>
-    internal static async ValueTask<ImmutableArray<TextSpan>> RunAsync(
+    /// <returns>
+    /// The attributes the projection has to leave out for the load to survive, and the handlers the
+    /// class answers.
+    /// </returns>
+    internal static async ValueTask<XamlAttributeFindings> RunAsync(
         XamlDocument document,
         Type? rootType,
         XamlLoadEnvironment environment,
@@ -60,6 +68,7 @@ internal static class XamlAttributeChecks
         CancellationToken cancellationToken)
     {
         ImmutableArray<TextSpan>.Builder removals = ImmutableArray.CreateBuilder<TextSpan>();
+        ImmutableArray<XamlHandlerAttribute>.Builder handlers = ImmutableArray.CreateBuilder<XamlHandlerAttribute>();
 
         // Reported where it was resolved — unresolved, or not what the root says it is. Here it is
         // only kept out of the text, so that Avalonia does not go looking for it a second time.
@@ -115,22 +124,25 @@ internal static class XamlAttributeChecks
                 }
 
                 await CheckAsync(
-                        document, attribute, type, rootType, environment, diagnostics, removals, cancellationToken)
+                        document, element, attribute, type, rootType, environment, diagnostics, removals, handlers,
+                        cancellationToken)
                     .ConfigureAwait(false);
             }
         }
 
-        return removals.ToImmutable();
+        return new XamlAttributeFindings(removals.ToImmutable(), handlers.ToImmutable());
     }
 
     private static async ValueTask CheckAsync(
         XamlDocument document,
+        XamlElement element,
         XamlAttribute attribute,
         Type? type,
         Type? rootType,
         XamlLoadEnvironment environment,
         List<MarkupDiagnostic> diagnostics,
         ImmutableArray<TextSpan>.Builder removals,
+        ImmutableArray<XamlHandlerAttribute>.Builder handlers,
         CancellationToken cancellationToken)
     {
         if (attribute.GetValue() is XamlMarkupExtensionValue extension)
@@ -157,6 +169,8 @@ internal static class XamlAttributeChecks
 
         if (rootType is not null && HasHandler(rootType, handler))
         {
+            handlers.Add(new XamlHandlerAttribute(element, attribute, handler));
+
             return;
         }
 

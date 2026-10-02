@@ -303,6 +303,7 @@ internal static class XamlDocumentProjector
 
         XamlElement target = fragment ?? root;
         Dictionary<string, string> declarations = state.Hoisted;
+        string carried = string.Empty;
 
         if (fragment is not null)
         {
@@ -337,9 +338,11 @@ internal static class XamlDocumentProjector
             {
                 declarations.Remove(own.Prefix ?? string.Empty);
             }
+
+            carried = Carried(fragment);
         }
 
-        if (declarations.Count == 0)
+        if (declarations.Count == 0 && carried.Length == 0)
         {
             return;
         }
@@ -353,9 +356,52 @@ internal static class XamlDocumentProjector
                 .Append('"');
         }
 
+        text.Append(carried);
+
         // Straight after the element name, where an author would have written them, and before
         // any attribute so that nothing already on the tag has to move relative to anything else.
         builder.Replace(new TextSpan(target.NameSpan.End, 0), text.ToString());
+    }
+
+    /// <summary>The directives an element passes on to everything written inside it.</summary>
+    private static readonly string[] Inherited = [XamlDirectives.DataType, XamlDirectives.CompileBindings];
+
+    /// <summary>
+    /// Writes out the directives a part read from the elements around it, which it leaves behind.
+    /// </summary>
+    /// <remarks>
+    /// <c>x:DataType</c> is the type the bindings below it are compiled against, and
+    /// <c>x:CompileBindings</c> whether they are compiled at all; both are written once, on an
+    /// ancestor, and hold for everything inside it. A part rebuilt on its own has no ancestors, so a
+    /// part with compiled bindings under a form's <c>x:DataType</c> did not compile — "Cannot parse a
+    /// compiled binding without an explicit x:DataType directive" — and the update was refused. The
+    /// nearest of each is written onto the part's root, exactly as the author wrote it, unless the
+    /// part's root says otherwise itself. Its prefixes are in scope there: the declarations in scope
+    /// where the part sat are written onto it too.
+    /// </remarks>
+    private static string Carried(XamlElement fragment)
+    {
+        var text = new StringBuilder();
+
+        foreach (string directive in Inherited)
+        {
+            if (fragment.GetDirectiveAttribute(directive) is not null)
+            {
+                continue;
+            }
+
+            foreach (XamlElement ancestor in fragment.AncestorsAndSelf().OfType<XamlElement>().Skip(1))
+            {
+                if (ancestor.GetDirectiveAttribute(directive) is { } written)
+                {
+                    text.Append(' ').Append(written.GetText());
+
+                    break;
+                }
+            }
+        }
+
+        return text.ToString();
     }
 
     /// <summary>Gets every prefix bound where an element sits, innermost binding winning.</summary>

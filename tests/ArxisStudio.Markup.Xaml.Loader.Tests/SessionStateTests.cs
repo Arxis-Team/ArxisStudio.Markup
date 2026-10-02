@@ -461,7 +461,7 @@ public sealed class SessionStateTests
     }
 
     [AvaloniaFact]
-    public async Task CancellationAfterSomethingHasBeenWrittenRequiresANewSession()
+    public async Task CancellationCannotArriveBetweenTheWritesAndTheDocument()
     {
         var dispatcher = new ControllableDispatcher();
 
@@ -473,13 +473,13 @@ public sealed class SessionStateTests
 
         int loaded = dispatcher.Invocations;
 
-        // An update dispatches twice: once to write the changes onto the objects, and once to
-        // adopt the document they now describe. Cancelling as the second arrives is the only way
-        // in from outside, and it is exactly the case the classification has to be conservative
-        // about — the first one has already put the new width on the object.
+        // An update dispatched twice once — to write the changes onto the objects, and again to
+        // adopt the document they described — and a token cancelled as the second arrived left the
+        // width on the object and the document behind it. It dispatches once now, so the only place
+        // left to cancel is before anything is written, which is a refusal and not a break.
         dispatcher.Before = ordinal =>
         {
-            if (ordinal == loaded + 2)
+            if (ordinal == loaded + 1)
             {
                 cancellation.Cancel();
             }
@@ -489,23 +489,16 @@ public sealed class SessionStateTests
             await session.ApplyDocumentUpdateAsync(
                 Parse($"<Border xmlns=\"{AvaloniaNamespace}\" Width=\"20\" />"), cancellation.Token));
 
-        // The width is on the object and the session's document never advanced, which is exactly
-        // the disagreement this state exists to report.
-        Assert.Equal(XamlSessionState.RequiresNewSession, session.State);
-        Assert.Equal(20d, ((Border)session.RootObject).Width);
+        Assert.Equal(XamlSessionState.Usable, session.State);
+        Assert.Equal(10d, ((Border)session.RootObject).Width);
         Assert.Contains("Width=\"10\"", session.Document.GetText(), StringComparison.Ordinal);
 
-        // And the way out is kept. The guides tell a caller to build the replacement session from
-        // PendingDocument; a caller told that has to be given something to do it with.
-        XamlDocument pending = Assert.IsType<XamlDocument>(session.PendingDocument);
+        dispatcher.Before = null;
+        loaded = dispatcher.Invocations;
 
-        Assert.Contains("Width=\"20\"", pending.GetText(), StringComparison.Ordinal);
-
-        await using XamlLoadSession fresh = await XamlLoadSession.CreateAsync(
-            pending, Environment(), cancellationToken: TestContext.Current.CancellationToken);
-
-        Assert.Equal(XamlSessionState.Usable, fresh.State);
-        Assert.Equal(20d, fresh.GetRoot<Border>().Width);
+        Assert.True((await Update(session, $"<Border xmlns=\"{AvaloniaNamespace}\" Width=\"30\" />")).Applied);
+        Assert.Equal(1, dispatcher.Invocations - loaded);
+        Assert.Equal(30d, ((Border)session.RootObject).Width);
     }
 
     [AvaloniaFact]

@@ -5,7 +5,9 @@ using System.Linq;
 using System.Reflection;
 using System.Threading;
 using System.Threading.Tasks;
+using Avalonia;
 using Avalonia.Controls;
+using Avalonia.Data;
 using Avalonia.LogicalTree;
 using Avalonia.Markup.Xaml;
 using Avalonia.Markup.Xaml.Diagnostics;
@@ -125,7 +127,9 @@ public sealed partial class XamlLoadSession
                 "The document offered does not parse, so nothing was written to the objects.");
         }
 
-        ImmutableArray<XamlDocumentChange> changes = XamlDocumentDiff.Compare(Document, updated);
+        (ImmutableArray<XamlDocumentChange> changes, Dictionary<XamlDocumentChange, XamlInPlaceWrite> inPlace) =
+            await SettleAsync(XamlDocumentDiff.Compare(Document, updated), cancellationToken).ConfigureAwait(false);
+
         XamlUpdateStrategy strategy = XamlDocumentDiff.Largest(changes);
 
         if (strategy == XamlUpdateStrategy.RecreateSession)
@@ -138,12 +142,12 @@ public sealed partial class XamlLoadSession
                 changes,
                 diagnostics,
                 XamlLoaderDiagnosticCodes.UpdateRequiresNewSession,
-                "The root element or x:Class changed. Nothing was written to the objects, and this " +
-                "session goes on describing the document it loaded; create a new session to load the " +
-                "new one.");
+                "The root element or x:Class changed, or the root takes a value only a new root can. " +
+                "Nothing was written to the objects, and this session goes on describing the document it " +
+                "loaded; create a new session to load the new one.");
         }
 
-        return await ApplyAsync(updated, strategy, changes, diagnostics, cancellationToken)
+        return await ApplyAsync(updated, strategy, changes, inPlace, diagnostics, cancellationToken)
             .ConfigureAwait(false);
     }
 
@@ -191,12 +195,16 @@ public sealed partial class XamlLoadSession
                 fragment: null,
                 Environment,
                 diagnostics,
-                await WithheldAsync(Document, diagnostics, cancellationToken).ConfigureAwait(false),
+                (await FindingsAsync(Document, diagnostics, cancellationToken).ConfigureAwait(false)).Withheld,
                 cancellationToken)
             .ConfigureAwait(false);
 
-        // Nothing the document reaches changed, whatever the caller was told about the file.
-        if (string.Equals(projection.Text.ToString(), Projection.Text.ToString(), StringComparison.Ordinal))
+        // Nothing the document reaches changed, whatever the caller was told about the file. Asked
+        // of what the projections took from the includes rather than of the whole text: the
+        // document's own text moves under a synchronous edit, which writes the session's document
+        // and leaves the projection the objects were built from as it was — and read whole, the two
+        // differed after any SetValue, and an include nobody touched rebuilt what it reaches.
+        if (Spliced(projection).SequenceEqual(Spliced(Projection)))
         {
             return new XamlUpdateResult
             {
@@ -264,9 +272,253 @@ public sealed partial class XamlLoadSession
         }
 
         return await ApplyAsync(
-                Document, XamlUpdateStrategy.ReplaceResource, changes, diagnostics, cancellationToken)
+                Document, XamlUpdateStrategy.ReplaceResource, changes, [], diagnostics, cancellationToken)
             .ConfigureAwait(false);
     }
+
+    /// <summary>
+    /// Builds elements of the document again, as they stand — for a control whose own markup
+    /// changed while the document that places it did not.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// A control written with <c>x:Class</c> is populated from its own markup when it is
+    /// constructed, and an instance already in the tree goes on showing what that markup said
+    /// then. A host that has given the class a newer document to populate from
+    /// (<see cref="XamlLivePopulation"/>) asks for the elements that place it to be built again,
+    /// and they come back populated from that document.
+    /// </para>
+    /// <para>
+    /// Each element is rebuilt the way a change to it would be: in place of the object it produced,
+    /// or with the smallest container it sits in — a style, a theme, a template, a keyed resource —
+    /// and together with whatever around it a static reference inside it reads. An element inside
+    /// another one asked for is built by the outer one. The root is not an element this rebuilds:
+    /// the session is built around it, so asking for it is refused with nothing written and
+    /// <see cref="XamlUpdateStrategy.RecreateSession"/> — a new session from the same document is
+    /// what builds the root again.
+    /// </para>
+    /// <para>
+    /// The elements are elements of <see cref="Document"/> as it stands when this update's turn
+    /// comes. One of a document an earlier update has replaced since is refused with nothing
+    /// written; find it again in the session's document and ask again.
+    /// </para>
+    /// </remarks>
+    /// <param name="elements">The elements to build again.</param>
+    /// <param name="cancellationToken">A token to observe while waiting and while updating.</param>
+    /// <returns>What the update did, and everything noticed on the way.</returns>
+    /// <exception cref="ArgumentNullException">
+    /// <paramref name="elements"/> is <see langword="null"/>, or holds a <see langword="null"/>.
+    /// </exception>
+    /// <exception cref="ObjectDisposedException">The session has been disposed.</exception>
+    /// <exception cref="OperationCanceledException">The token was cancelled.</exception>
+    public async ValueTask<XamlUpdateResult> ApplyRebuildAsync(
+        IEnumerable<XamlElement> elements,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(elements);
+
+        XamlElement[] requested = [.. elements];
+
+        if (Array.Exists(requested, static element => element is null))
+        {
+            throw new ArgumentNullException(nameof(elements), "An element to rebuild cannot be null.");
+        }
+
+        using XamlMutationGate.XamlMutationLease lease =
+            await _mutation.EnterAsync(cancellationToken).ConfigureAwait(false);
+
+        // Inside the gate, where the answer cannot change under the caller. Reading either of
+        // these before taking a turn is reading a session somebody else may be part-way through.
+        ObjectDisposedException.ThrowIf(IsDisposed, this);
+
+        if (Unusable() is { } unusable)
+        {
+            return unusable;
+        }
+
+        var diagnostics = new List<MarkupDiagnostic>();
+
+        // Asked here rather than of the caller: an update queued ahead of this one replaces the
+        // document while this one waits, and an element found before it is then an element of
+        // nothing the objects describe.
+        if (Array.Find(requested, element => !ReferenceEquals(element.Document, Document)) is { } stale)
+        {
+            return Refuse(
+                Document,
+                XamlUpdateStrategy.None,
+                [],
+                diagnostics,
+                XamlLoaderDiagnosticCodes.UpdateNotApplied,
+                $"<{stale.Name}> is not an element of the document this session describes now; an update " +
+                "has replaced that document since. Nothing was written to the objects — find the element " +
+                "in the session's document and ask again.");
+        }
+
+        (ImmutableArray<XamlDocumentChange> changes, Dictionary<XamlDocumentChange, XamlInPlaceWrite> inPlace) =
+            await SettleAsync(
+                    [
+                        .. requested.Select(element => XamlDocumentDiff.Escalate(
+                            new XamlDocumentChange(XamlUpdateStrategy.ReloadSubtree, element, element, null),
+                            Document.Root)),
+                    ],
+                    cancellationToken)
+                .ConfigureAwait(false);
+
+        XamlUpdateStrategy strategy = XamlDocumentDiff.Largest(changes);
+
+        if (strategy == XamlUpdateStrategy.None)
+        {
+            return new XamlUpdateResult
+            {
+                Outcome = XamlUpdateOutcome.Applied,
+                Strategy = strategy,
+                Changes = [],
+                Diagnostics = [],
+            };
+        }
+
+        if (strategy == XamlUpdateStrategy.RecreateSession)
+        {
+            return Refuse(
+                Document,
+                strategy,
+                changes,
+                diagnostics,
+                XamlLoaderDiagnosticCodes.UpdateRequiresNewSession,
+                "The root element is among the elements to build again, and the session is built around " +
+                "the root. Nothing was written to the objects; create a new session from the same document " +
+                "to build the root again.");
+        }
+
+        return await ApplyAsync(Document, strategy, changes, inPlace, diagnostics, cancellationToken)
+            .ConfigureAwait(false);
+    }
+
+    /// <summary>
+    /// Decides, for every value change that might be written where it stands, whether it can be —
+    /// and has the element rebuilt instead where it cannot.
+    /// </summary>
+    /// <remarks>
+    /// Before anything is projected or written, because a change rebuilt instead needs a fragment
+    /// of its own, and a change found out to be unwritable once writing had begun would be a broken
+    /// session rather than a rebuilt element. The answers are kept: what a binding binds and what a
+    /// static member holds were worked out here, through the environment, and the writing turn is no
+    /// place to resolve a type.
+    /// </remarks>
+    private async ValueTask<(ImmutableArray<XamlDocumentChange> Changes, Dictionary<XamlDocumentChange, XamlInPlaceWrite> InPlace)>
+        SettleAsync(ImmutableArray<XamlDocumentChange> changes, CancellationToken cancellationToken)
+    {
+        var inPlace = new Dictionary<XamlDocumentChange, XamlInPlaceWrite>();
+        var settled = new List<XamlDocumentChange>(changes.Length);
+
+        foreach (XamlDocumentChange change in changes)
+        {
+            // A handler is not a value: it is hooked up when its element is built, so a handler
+            // written, renamed or moved is its element built again — with the handlers a rebuilt
+            // part gets — and at the root, whose own handlers were hooked up by its load, a new session.
+            if (change.Strategy == XamlUpdateStrategy.SetProperty && NamesAnEvent(change))
+            {
+                settled.Add(XamlDocumentDiff.Escalate(change, Document.Root));
+
+                continue;
+            }
+
+            if (change.Strategy is not (XamlUpdateStrategy.ClearProperty or XamlUpdateStrategy.SetExpression))
+            {
+                settled.Add(change);
+
+                continue;
+            }
+
+            if (await InPlaceAsync(change, cancellationToken).ConfigureAwait(false) is { } write)
+            {
+                inPlace[change] = write;
+                settled.Add(change);
+            }
+            else
+            {
+                settled.Add(XamlDocumentDiff.Escalate(change, Document.Root));
+            }
+        }
+
+        // An element rebuilt for several of its attributes is one rebuild, and is reported once.
+        var rebuilt = new HashSet<(XamlUpdateStrategy, XamlElement?, bool)>();
+
+        return (
+            [
+                .. settled
+                    .Where(change => !Rebuilds(change.Strategy)
+                        || rebuilt.Add((change.Strategy, change.OldElement, change.ReplacesObject)))
+                    .OrderBy(static change => change.Strategy),
+            ],
+            inPlace);
+    }
+
+    /// <summary>Reports whether the attribute a change names is an event of the object its element produced.</summary>
+    private bool NamesAnEvent(XamlDocumentChange change) =>
+        change.OldElement is { } element
+        && change.MemberName is { } name
+        && Objects.GetObject(element) is { } target
+        && Environment.MemberResolver.Resolve(target.GetType(), name).Kind == XamlMemberKind.Event;
+
+    /// <summary>Works out what a value change writes where it stands, or that it cannot be written there.</summary>
+    private async ValueTask<XamlInPlaceWrite?> InPlaceAsync(XamlDocumentChange change, CancellationToken cancellationToken)
+    {
+        if (change.OldElement is not { } element
+            || change.MemberName is not { } name
+            || Objects.GetObject(element) is not { } target)
+        {
+            return null;
+        }
+
+        XamlMemberDescriptor member = Environment.MemberResolver.Resolve(target.GetType(), name);
+
+        // A member nobody knows is a rebuild's to report, in Avalonia's words.
+        if (!member.IsResolved || member.IsReadOnly)
+        {
+            return null;
+        }
+
+        if (change.Strategy == XamlUpdateStrategy.ClearProperty)
+        {
+            // Only an Avalonia property has a local value of its own to take out. A CLR property
+            // holds what its type's constructor gave it, which only building the object again says.
+            return member.AvaloniaProperty is not null && target is AvaloniaObject ? XamlInPlaceWrite.Clear : null;
+        }
+
+        return change.NewElement is { } written
+            && AttributeOf(written, name)?.GetValue() is XamlMarkupExtensionValue extension
+                ? await XamlInPlaceValues
+                    .EvaluateAsync(
+                        extension, written, member, Environment, Options.UseCompiledBindingsByDefault, cancellationToken)
+                    .ConfigureAwait(false)
+                : null;
+    }
+
+    /// <summary>Finds the attribute a change names, whatever prefix it is written under.</summary>
+    /// <remarks>
+    /// A change carries the member's local name, and an attached property of another namespace is
+    /// written <c>prefix:Owner.Member</c> — looking it up unprefixed found nothing, and the value read
+    /// as empty.
+    /// </remarks>
+    private static XamlAttribute? AttributeOf(XamlElement element, string localName) =>
+        element.Attributes.FirstOrDefault(attribute => attribute is not XamlNamespaceDeclaration
+            && !attribute.IsDirective
+            && !attribute.IsDesignTime
+            && string.Equals(attribute.Name.LocalName, localName, StringComparison.Ordinal));
+
+    /// <summary>
+    /// Gets what a projection took from anywhere but the document's own text, run by run.
+    /// </summary>
+    /// <remarks>
+    /// The included files' text, and what was written in for them — the declarations an include
+    /// needed hoisted onto the root, the attributes taken out. That is what a source update can
+    /// change; the document's own text is the session's to change, and it is not this comparison's.
+    /// </remarks>
+    private static IEnumerable<(Uri? Source, string Text)> Spliced(TextProjection projection) =>
+        projection.Segments
+            .Where(static segment => !segment.IsOriginal || segment.IsSynthesized)
+            .Select(segment => (segment.SourceUri, projection.Text.GetText(segment.ProjectedSpan)));
 
     /// <summary>
     /// Finds the element an include was expanded inside, which is what has to be built again
@@ -297,7 +549,7 @@ public sealed partial class XamlLoadSession
 
     /// <summary>
     /// Works out what a projection of a version of the document leaves out, by the rule the load
-    /// used for the first.
+    /// used for the first, and which of its handlers the class answers.
     /// </summary>
     /// <remarks>
     /// The rule is <see cref="XamlAttributeChecks"/>, asked about the class this session populated:
@@ -305,37 +557,87 @@ public sealed partial class XamlLoadSession
     /// use. What it notices on the way is reported with the update, because it is as true of the
     /// document being offered as it was of the one loaded.
     /// </remarks>
-    private ValueTask<ImmutableArray<TextSpan>> WithheldAsync(
+    private ValueTask<XamlAttributeFindings> FindingsAsync(
         XamlDocument document,
         List<MarkupDiagnostic> diagnostics,
         CancellationToken cancellationToken) =>
         XamlAttributeChecks.RunAsync(document, _rootClass, Environment, diagnostics, cancellationToken);
+
+    /// <summary>
+    /// Works out what the projection of a part that is about to be rebuilt leaves out.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// What every projection of the session leaves out, and then two things only a rebuilt part
+    /// does. Every handler in it, because a part is built on its own, with no instance for Avalonia
+    /// to hook a handler up to — it refused the whole part over one, so a panel holding a button
+    /// the class handles could not be rebuilt at all. The handlers the class answers are hooked up
+    /// once the part's objects exist (<see cref="HookHandlers"/>).
+    /// </para>
+    /// <para>
+    /// And, when the part is the root, what makes the root the class: <c>x:Class</c> and the
+    /// directives that go with it. The root's content is rebuilt from a copy of the root, and a copy
+    /// built with the class is the class constructed a second time — the author's constructor run
+    /// again, and for a window a second window. Without them the copy is the element the root is
+    /// written as, which is all a copy is for.
+    /// </para>
+    /// </remarks>
+    private static HashSet<TextSpan> LeftOutOf(XamlElement part, XamlDocument document, XamlAttributeFindings findings)
+    {
+        var spans = new HashSet<TextSpan>(findings.Withheld);
+
+        foreach (XamlHandlerAttribute handler in findings.Handlers)
+        {
+            if (part.Span.Contains(handler.Attribute.Span))
+            {
+                spans.Add(handler.Attribute.Span);
+            }
+        }
+
+        if (ReferenceEquals(part, document.Root))
+        {
+            foreach (string directive in RootOnlyDirectives)
+            {
+                if (part.GetDirectiveAttribute(directive) is { } written)
+                {
+                    spans.Add(written.Span);
+                }
+            }
+        }
+
+        return spans;
+    }
+
+    /// <summary>The directives that make a root the class it names, and mean nothing anywhere else.</summary>
+    private static readonly string[] RootOnlyDirectives =
+        [XamlDirectives.Class, XamlDirectives.ClassModifier, "Subclass"];
 
     /// <summary>Applies an update that can be made on the objects that already exist.</summary>
     private async ValueTask<XamlUpdateResult> ApplyAsync(
         XamlDocument updated,
         XamlUpdateStrategy strategy,
         ImmutableArray<XamlDocumentChange> changes,
+        Dictionary<XamlDocumentChange, XamlInPlaceWrite> inPlace,
         List<MarkupDiagnostic> diagnostics,
         CancellationToken cancellationToken)
     {
         // What the load could not hand Avalonia, no part of this update hands it either — a class
         // that was never usable, a handler with nothing to hook up to. Worked out once for the
         // document, because every fragment below is a projection of the same text.
-        ImmutableArray<TextSpan> withheld =
-            await WithheldAsync(updated, diagnostics, cancellationToken).ConfigureAwait(false);
+        XamlAttributeFindings findings =
+            await FindingsAsync(updated, diagnostics, cancellationToken).ConfigureAwait(false);
 
         // Reprojecting before anything is touched means a failure to resolve an include is a
         // refused update rather than a half-updated tree.
         TextProjection projection = await XamlDocumentProjector
-            .ProjectAsync(updated, fragment: null, Environment, diagnostics, withheld, cancellationToken)
+            .ProjectAsync(updated, fragment: null, Environment, diagnostics, findings.Withheld, cancellationToken)
             .ConfigureAwait(false);
 
         // Every fragment is projected and parsed before any object is touched, for the same
         // reason: a fragment that will not build is a refused update, not a half-rebuilt tree.
-        var fragments = new List<(XamlDocumentChange Change, TextProjection Projection)>();
+        var fragments = new List<(XamlDocumentChange Change, TextProjection Projection, Type? Placed)>();
 
-        foreach (XamlDocumentChange change in changes.Where(static change => Rebuilds(change.Strategy)))
+        foreach (XamlDocumentChange change in Outermost(changes.Where(static change => Rebuilds(change.Strategy))))
         {
             if (change.NewElement is not { } element)
             {
@@ -351,19 +653,50 @@ public sealed partial class XamlLoadSession
             fragments.Add((
                 change,
                 await XamlDocumentProjector
-                    .ProjectAsync(updated, element, Environment, diagnostics, withheld, cancellationToken)
-                    .ConfigureAwait(false)));
+                    .ProjectAsync(
+                        updated, element, Environment, diagnostics, LeftOutOf(element, updated, findings), cancellationToken)
+                    .ConfigureAwait(false),
+                await PlacedClassAsync(element, updated, cancellationToken).ConfigureAwait(false)));
         }
 
         var rootMustBeRebuilt = false;
 
+        // One turn of the dispatcher for everything that touches the objects: the writes, the map
+        // rebuilt over them, the design values applied again and the handlers of the rebuilt parts
+        // hooked up. A host that has borrowed parts of the root gives them back for exactly this
+        // turn, so nothing renders a root that is half given back, and the map is never walked over
+        // a window whose content is somewhere else.
         XamlMutationOutcome written = await _dispatcher
             .InvokeAsync(
                 () =>
                 {
-                    XamlMutationOutcome outcome = Write(changes, fragments, diagnostics, out bool root);
+                    using IDisposable lent = LendRoot();
+
+                    var kept = new List<XamlElement>();
+                    XamlMutationOutcome outcome = Write(changes, inPlace, fragments, diagnostics, kept, out bool root);
 
                     rootMustBeRebuilt = root;
+
+                    if (outcome == XamlMutationOutcome.Applied)
+                    {
+                        // Past here the objects have moved. Anything that goes wrong from now on leaves
+                        // them describing something no document says, so the session is marked, and the
+                        // document it was moving towards is kept, before the failure is allowed out —
+                        // building a new session from PendingDocument is the documented way out, and a
+                        // caller told to do that has to be given something to do it with.
+                        try
+                        {
+                            Finish(updated, projection, fragments, findings, kept, diagnostics);
+                        }
+                        catch (Exception)
+                        {
+                            PendingDocument = updated;
+
+                            RequireRecreation();
+
+                            throw;
+                        }
+                    }
 
                     return outcome;
                 },
@@ -404,64 +737,6 @@ public sealed partial class XamlLoadSession
             return Break(updated, strategy, changes, diagnostics);
         }
 
-        // Past here the objects have moved. Anything that goes wrong from now on — including the
-        // token being cancelled — leaves them describing something no document says, so the
-        // session is marked, and the document it was moving towards is kept, before the failure is
-        // allowed out. Keeping it is not bookkeeping: the documented way out of this state is to
-        // build a new session from PendingDocument, and a caller told to do that has to be given
-        // something to do it with.
-        try
-        {
-            return await FinishAsync(updated, strategy, changes, projection, diagnostics, cancellationToken)
-                .ConfigureAwait(false);
-        }
-        catch (Exception)
-        {
-            PendingDocument = updated;
-
-            RequireRecreation();
-
-            throw;
-        }
-    }
-
-    /// <summary>Adopts the new document once its changes are on the objects.</summary>
-    /// <remarks>
-    /// On the owning thread, all of it. Rebuilding the map reads where Avalonia recorded that it
-    /// built each object, and that is read off the objects themselves — which have the same thread
-    /// affinity as everything else about them. Doing it on whatever thread the update happened to
-    /// resume on works for as long as every caller updates from the UI thread, and fails the
-    /// moment one does what the asynchronous API invites: call it from a file watcher.
-    /// </remarks>
-    private async ValueTask<XamlUpdateResult> FinishAsync(
-        XamlDocument updated,
-        XamlUpdateStrategy strategy,
-        ImmutableArray<XamlDocumentChange> changes,
-        TextProjection projection,
-        List<MarkupDiagnostic> diagnostics,
-        CancellationToken cancellationToken)
-    {
-        await _dispatcher
-            .InvokeAsync<object?>(
-                () =>
-                {
-                    Adopt(updated, projection);
-
-                    // Design values are re-applied from the document rather than patched one at a
-                    // time. Nothing re-evaluates on an update, so the document is the only place
-                    // that says what they are now, and applying all of them is the same walk a
-                    // design-mode load does.
-                    if (Options.Mode == XamlLoadMode.Design)
-                    {
-                        XamlDesignValues.Apply(
-                            updated, Objects, RootObject, Environment.MemberResolver, diagnostics);
-                    }
-
-                    return null;
-                },
-                cancellationToken)
-            .ConfigureAwait(false);
-
         return new XamlUpdateResult
         {
             Outcome = XamlUpdateOutcome.Applied,
@@ -469,6 +744,83 @@ public sealed partial class XamlLoadSession
             Changes = changes,
             Diagnostics = [.. diagnostics],
         };
+    }
+
+    /// <summary>Adopts the new document once its changes are on the objects.</summary>
+    /// <remarks>
+    /// On the owning thread, all of it, and in the same turn as the writes. Rebuilding the map reads
+    /// where Avalonia recorded that it built each object, and that is read off the objects themselves
+    /// — which have the same thread affinity as everything else about them; and it walks the root's
+    /// children, which a host that borrows them has given back only for this turn.
+    /// </remarks>
+    private void Finish(
+        XamlDocument updated,
+        TextProjection projection,
+        List<(XamlDocumentChange Change, TextProjection Projection, Type? Placed)> fragments,
+        XamlAttributeFindings findings,
+        List<XamlElement> kept,
+        List<MarkupDiagnostic> diagnostics)
+    {
+        Adopt(updated, projection);
+
+        // Design values are re-applied from the document rather than patched one at a time.
+        // Nothing re-evaluates on an update, so the document is the only place that says what they
+        // are now, and applying all of them is the same walk a design-mode load does.
+        if (Options.Mode == XamlLoadMode.Design)
+        {
+            XamlDesignValues.Apply(updated, Objects, RootObject, Environment.MemberResolver, diagnostics);
+        }
+
+        HookHandlers(fragments, findings, kept, diagnostics);
+    }
+
+    /// <summary>
+    /// Hooks the handlers of every rebuilt part up to the session's root, now that the part's objects
+    /// exist and the map knows them.
+    /// </summary>
+    /// <remarks>
+    /// Every handler the class answers that sits in a rebuilt part, except on an element whose object
+    /// was kept — the root, whose content alone was rebuilt, or any element rebuilt that way. Its
+    /// handlers were hooked up when it was built, and hooking them up again would run each one twice.
+    /// </remarks>
+    private void HookHandlers(
+        List<(XamlDocumentChange Change, TextProjection Projection, Type? Placed)> fragments,
+        XamlAttributeFindings findings,
+        List<XamlElement> kept,
+        List<MarkupDiagnostic> diagnostics)
+    {
+        foreach ((XamlDocumentChange change, _, _) in fragments)
+        {
+            if (change.NewElement is not { } part)
+            {
+                continue;
+            }
+
+            foreach (XamlHandlerAttribute handler in findings.Handlers)
+            {
+                if (!part.Span.Contains(handler.Element.Span)
+                    || kept.Exists(element => ReferenceEquals(element, handler.Element))
+                    || Objects.GetObject(handler.Element) is not { } target)
+                {
+                    continue;
+                }
+
+                XamlHandlers.Hook(target, handler, RootObject, Environment.MemberResolver, diagnostics, Document.Uri);
+            }
+        }
+    }
+
+    /// <summary>Asks a host that has borrowed parts of the root to give them back for one write.</summary>
+    private IDisposable LendRoot() => Options.RootAccess?.Lend(RootObject) ?? NothingLent.Instance;
+
+    /// <summary>The lease of a root nobody borrowed from.</summary>
+    private sealed class NothingLent : IDisposable
+    {
+        public static NothingLent Instance { get; } = new();
+
+        public void Dispose()
+        {
+        }
     }
 
     /// <summary>Moves the session onto the document its objects now describe.</summary>
@@ -523,11 +875,13 @@ public sealed partial class XamlLoadSession
     /// </remarks>
     private XamlMutationOutcome Write(
         ImmutableArray<XamlDocumentChange> changes,
-        List<(XamlDocumentChange Change, TextProjection Projection)> fragments,
+        Dictionary<XamlDocumentChange, XamlInPlaceWrite> inPlace,
+        List<(XamlDocumentChange Change, TextProjection Projection, Type? Placed)> fragments,
         List<MarkupDiagnostic> diagnostics,
+        List<XamlElement> kept,
         out bool rootMustBeRebuilt)
     {
-        var writes = new List<(object Target, XamlMemberDescriptor Member, object? Value)>();
+        var writes = new List<(object Target, XamlMemberDescriptor Member, XamlInPlaceWrite Write)>();
         var rebuilds = new List<(
             XamlDocumentChange Change, object Previous, object Fresh, Uri? RuntimeUri, bool ReplacesObject)>();
         var reorders = new List<(XamlElement Parent, IReadOnlyList<XamlElement> Order)>();
@@ -542,7 +896,7 @@ public sealed partial class XamlLoadSession
 
         // Building every fragment first means a fragment that will not build refuses the update
         // rather than stopping halfway through a tree that is already part-way rebuilt.
-        foreach ((XamlDocumentChange change, TextProjection fragment) in fragments)
+        foreach ((XamlDocumentChange change, TextProjection fragment, Type? placed) in fragments)
         {
             if (change.OldElement is not { } element || Objects.GetObject(element) is not { } previous)
             {
@@ -555,7 +909,7 @@ public sealed partial class XamlLoadSession
                 return XamlMutationOutcome.Refused;
             }
 
-            (object? fresh, Uri? runtimeUri) = Build(fragment, diagnostics);
+            (object? fresh, Uri? runtimeUri) = Build(fragment, placed, diagnostics);
 
             if (fresh is null)
             {
@@ -626,6 +980,28 @@ public sealed partial class XamlLoadSession
                 continue;
             }
 
+            if (inPlace.TryGetValue(change, out XamlInPlaceWrite? settled))
+            {
+                // Worked out before the turn began, against the object's own member; all that is
+                // left is that the object is still there to write it on.
+                if (change.OldElement is not { } holder
+                    || change.MemberName is not { } memberName
+                    || Objects.GetObject(holder) is not { } owner)
+                {
+                    diagnostics.Add(MarkupDiagnostic.Synchronization(
+                        XamlLoaderDiagnosticCodes.UpdateNotApplied,
+                        $"{change} names an element that produced no object.",
+                        MarkupDiagnosticSeverity.Error,
+                        Document.Uri));
+
+                    return XamlMutationOutcome.Refused;
+                }
+
+                writes.Add((owner, Environment.MemberResolver.Resolve(owner.GetType(), memberName), settled));
+
+                continue;
+            }
+
             if (change.OldElement is not { } element
                 || change.NewElement is not { } updatedElement
                 || change.MemberName is not { } name)
@@ -665,7 +1041,7 @@ public sealed partial class XamlLoadSession
                 return XamlMutationOutcome.Refused;
             }
 
-            XamlAttribute? written = updatedElement.GetAttribute(XamlQualifiedName.Parse(name));
+            XamlAttribute? written = AttributeOf(updatedElement, name);
             XamlValueConversionResult value = member.ConvertFromText(written?.GetValueText() ?? string.Empty);
 
             // Asked before anything is written rather than found out by the setter throwing. Text
@@ -683,7 +1059,7 @@ public sealed partial class XamlLoadSession
                 return XamlMutationOutcome.Refused;
             }
 
-            writes.Add((target, member, value.Value));
+            writes.Add((target, member, new XamlInPlaceWrite.Setting(value.Value)));
         }
 
         // Nothing above this line has touched a live object; everything below it does. Once one
@@ -721,6 +1097,19 @@ public sealed partial class XamlLoadSession
 
             mutated = true;
 
+            if (!replacesObject)
+            {
+                // The copy only carried the content across, and is finished with. A copy of a top
+                // level is a top level, with a platform window of its own that nothing else will
+                // close — and through which the copy, and every type it was built from, stays.
+                Retire(fresh, diagnostics);
+
+                if (change.NewElement is { } holder)
+                {
+                    kept.Add(holder);
+                }
+            }
+
             if (runtimeUri is not null)
             {
                 _fragments[runtimeUri] = fragments.First(entry => entry.Change == change).Projection;
@@ -734,11 +1123,14 @@ public sealed partial class XamlLoadSession
             }
         }
 
-        foreach ((object target, XamlMemberDescriptor member, object? value) in writes)
+        foreach ((object target, XamlMemberDescriptor member, XamlInPlaceWrite write) in writes)
         {
             try
             {
-                XamlDesignValues.Write(target, member, value);
+                // Each write ends whatever binding the document had written on the property first:
+                // a binding runs at local-value priority, which a new local value does not end, and
+                // the next change of its source would write over what the document now says.
+                write.Apply(target, member);
             }
             catch (Exception error) when (error is InvalidCastException
                 or ArgumentException
@@ -825,19 +1217,85 @@ public sealed partial class XamlLoadSession
         return new Uri(anchor, $"?fragment={++_fragmentNumber}");
     }
 
+    /// <summary>Closes a copy that carried a root's content across, when it is a window.</summary>
+    /// <remarks>
+    /// A window has a platform window from the moment it is constructed, never shown or not, and the
+    /// platform holds it — and everything it was built from — until it is closed. The copy is this
+    /// session's own object and nobody else knows it exists, so nobody else would close it.
+    /// </remarks>
+    private void Retire(object copy, List<MarkupDiagnostic> diagnostics)
+    {
+        if (copy is not Window window)
+        {
+            return;
+        }
+
+        try
+        {
+            window.Close();
+        }
+        catch (Exception error) when (error is InvalidOperationException or NullReferenceException)
+        {
+            // The update has been written and stands; what the platform still holds is reported,
+            // because it is held until the process ends and is the kind of thing nobody looks for.
+            diagnostics.Add(MarkupDiagnostic.Synchronization(
+                XamlLoaderDiagnosticCodes.TopLevelCopyNotClosed,
+                $"The copy of the {window.GetType().Name} the update built to carry its content could not " +
+                $"be closed: {error.Message} Its platform window stays open until the process ends.",
+                MarkupDiagnosticSeverity.Warning,
+                Document.Uri));
+        }
+    }
+
+    /// <summary>
+    /// Finds the class a rebuilt part places when the class loads markup of its own, which is when
+    /// the part's root cannot be left to Avalonia to construct.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// Avalonia's runtime loader treats the root of what it is given as the thing the text
+    /// defines. For an <c>x:Class</c> control it installs the text as the populate the control's
+    /// constructor runs — so a placed control rebuilt as the root of its part was populated from
+    /// the part, markup that places it rather than defines it, and came back empty. And it writes
+    /// <see langword="null"/> into the hook afterwards, which ended a live registration for the
+    /// class (ADR 0015). Such a root is constructed by the session instead, the way the document's
+    /// load constructed it — its own constructor populating it from its compiled markup or its live
+    /// document — and the part is loaded onto it.
+    /// </para>
+    /// <para>
+    /// Not the document's own root, whose content is rebuilt from a copy: that text is the root's
+    /// definition, and the copy is built from it as the load built the original.
+    /// </para>
+    /// </remarks>
+    private async ValueTask<Type?> PlacedClassAsync(XamlElement part, XamlDocument document, CancellationToken cancellationToken)
+    {
+        if (ReferenceEquals(part, document.Root) || part.IsPropertyElementSyntax || part.NamespaceUri is not { } namespaceUri)
+        {
+            return null;
+        }
+
+        XamlTypeResolution resolved = await Environment.TypeResolver
+            .ResolveAsync(new XamlTypeName(namespaceUri, part.Name.LocalName), part.NamespaceContext, cancellationToken)
+            .ConfigureAwait(false);
+
+        return resolved.Success && XamlPopulateHook.Find(resolved.Type) is not null ? resolved.Type : null;
+    }
+
     /// <summary>Builds the objects a projected fragment describes.</summary>
     /// <remarks>
     /// Through Avalonia's own runtime loader, like any other load. It names the text it is given,
     /// and that name is how the object map later tells objects built from this fragment from the
-    /// ones built from the document — which is what keeps them traceable to their markup.
+    /// ones built from the document — which is what keeps them traceable to their markup. A part
+    /// whose root places an <c>x:Class</c> control is loaded onto an instance constructed here
+    /// (<see cref="PlacedClassAsync"/>).
     /// </remarks>
-    private (object? Fresh, Uri? RuntimeUri) Build(TextProjection fragment, List<MarkupDiagnostic> diagnostics)
+    private (object? Fresh, Uri? RuntimeUri) Build(TextProjection fragment, Type? placed, List<MarkupDiagnostic> diagnostics)
     {
         Uri name = FragmentUri();
 
         var configuration = new RuntimeXamlLoaderConfiguration
         {
-            LocalAssembly = Options.LocalAssembly,
+            LocalAssembly = LocalAssembly,
             UseCompiledBindingsByDefault = Options.UseCompiledBindingsByDefault,
             DesignMode = Options.Mode == XamlLoadMode.Design,
             CreateSourceInfo = true,
@@ -857,7 +1315,10 @@ public sealed partial class XamlLoadSession
             using (Environment.CompilationScope?.Enter())
             {
                 fresh = AvaloniaRuntimeXamlLoader.Load(
-                    new RuntimeXamlLoaderDocument(name, fragment.Text.ToString()), configuration);
+                    placed is null
+                        ? new RuntimeXamlLoaderDocument(name, fragment.Text.ToString())
+                        : new RuntimeXamlLoaderDocument(name, Activator.CreateInstance(placed), fragment.Text.ToString()),
+                    configuration);
             }
 
             // What Avalonia recorded, when it recorded anything: the name given above is the
@@ -867,9 +1328,12 @@ public sealed partial class XamlLoadSession
         }
         catch (Exception error)
         {
+            // A constructor that throws arrives wrapped by the reflection that ran it.
+            Exception reported = error is TargetInvocationException { InnerException: { } inner } ? inner : error;
+
             diagnostics.Add(MarkupDiagnostic.Synchronization(
                 XamlLoaderDiagnosticCodes.UpdateNotApplied,
-                $"Rebuilding part of the document failed: {error.Message}",
+                $"Rebuilding part of the document failed: {reported.Message}",
                 MarkupDiagnosticSeverity.Error,
                 Document.Uri));
 
@@ -988,6 +1452,41 @@ public sealed partial class XamlLoadSession
             or XamlUpdateStrategy.ReloadTheme
             or XamlUpdateStrategy.ReloadTemplate
             or XamlUpdateStrategy.ReloadSubtree;
+
+    /// <summary>Leaves out every rebuild that another rebuild of the same update already does.</summary>
+    /// <remarks>
+    /// A rebuild inside another is built by the outer one, as the document says. Applied after it,
+    /// the inner one put its copy into a tree the outer one had already replaced, and the map named
+    /// the copy; applied before it, its copy was thrown away — and either way the handlers in the
+    /// part were hooked up twice, once for each. Of two rebuilds of one element, the one that
+    /// replaces the object does everything the one that rebuilds its content would.
+    /// </remarks>
+    private static IEnumerable<XamlDocumentChange> Outermost(IEnumerable<XamlDocumentChange> rebuilds)
+    {
+        XamlDocumentChange[] all = [.. rebuilds];
+        var kept = new List<XamlDocumentChange>(all.Length);
+
+        foreach (XamlDocumentChange change in all
+            .OrderBy(static change => change.OldElement?.AncestorsAndSelf().Count() ?? 0)
+            .ThenByDescending(static change => change.ReplacesObject))
+        {
+            if (!kept.Exists(outer => Covers(outer, change)))
+            {
+                kept.Add(change);
+            }
+        }
+
+        // In the order they were asked for, which is smallest first.
+        return all.Where(change => kept.Exists(outer => ReferenceEquals(outer, change)));
+    }
+
+    /// <summary>Reports whether one rebuild builds everything another would.</summary>
+    private static bool Covers(XamlDocumentChange outer, XamlDocumentChange change) =>
+        outer.OldElement is { } around
+        && change.OldElement is { } element
+        && (ReferenceEquals(around, element)
+            ? outer.ReplacesObject || !change.ReplacesObject
+            : element.AncestorsAndSelf().Skip(1).Contains(around));
 
     /// <summary>
     /// Records an update that was refused before anything was written, keeping the document it

@@ -214,12 +214,12 @@ public sealed class SessionOrderingTests
             .ApplyDocumentUpdateAsync(Parse(View("40")), TestContext.Current.CancellationToken)
             .AsTask();
 
-        // The owner writes and adopts; the next update's first dispatch is the third from here,
-        // and it is made to fail before it runs anything — so the failure is real, arrives while
-        // that update owns the gate, and has written nothing.
+        // The owner writes and adopts in one dispatch; the next update's dispatch is the second
+        // from here, and it is made to fail before it runs anything — so the failure is real,
+        // arrives while that update owns the gate, and has written nothing.
         dispatcher.Before = ordinal =>
         {
-            if (ordinal == loaded + 3)
+            if (ordinal == loaded + 2)
             {
                 throw new InvalidOperationException("thrown from inside the gate");
             }

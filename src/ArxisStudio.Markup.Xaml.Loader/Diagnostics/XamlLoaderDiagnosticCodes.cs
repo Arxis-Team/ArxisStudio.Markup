@@ -133,6 +133,18 @@ public static class XamlLoaderDiagnosticCodes
     public const string SessionBusy = "AXM3044";
 
     /// <summary>
+    /// A handler named in a part an update rebuilt cannot be delivered the event it is written on,
+    /// so it was not hooked up — and the rest of the update was applied.
+    /// </summary>
+    public const string HandlerSignatureMismatch = "AXM3045";
+
+    /// <summary>
+    /// The window an update built to carry a root's content across could not be closed, so its
+    /// platform window stays open until the process ends. The update itself was applied.
+    /// </summary>
+    public const string TopLevelCopyNotClosed = "AXM3046";
+
+    /// <summary>
     /// A type offered for live population carries no compiled markup to stand in for, so there is
     /// nothing to override.
     /// </summary>
