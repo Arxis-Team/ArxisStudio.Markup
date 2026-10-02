@@ -51,6 +51,12 @@ public static class XamlLoaderDiagnosticCodes
     /// <summary>A markup extension named a type that nothing in scope declares.</summary>
     public const string MarkupExtensionFailure = "AXM2012";
 
+    /// <summary>
+    /// Some of an assembly's public types could not be read — an assembly they depend on is
+    /// missing — so a <see cref="XamlTypeCatalog"/> lists the rest.
+    /// </summary>
+    public const string UnreadableTypes = "AXM2013";
+
     /// <summary>Avalonia reported a problem while loading the document.</summary>
     public const string RuntimeLoadFailure = "AXM3001";
 

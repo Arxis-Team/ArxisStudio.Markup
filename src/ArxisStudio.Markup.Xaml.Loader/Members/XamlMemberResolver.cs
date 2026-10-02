@@ -24,7 +24,7 @@ namespace ArxisStudio.Markup.Xaml.Loader;
 /// over, and reflection over a type's whole surface is not cheap.
 /// </para>
 /// </remarks>
-public sealed class XamlMemberResolver
+public sealed partial class XamlMemberResolver
 {
     private readonly ConcurrentDictionary<(Type Target, string Name), XamlMemberDescriptor> _cache = new();
     private readonly ConcurrentDictionary<Type, XamlMemberDescriptor?> _content = new();

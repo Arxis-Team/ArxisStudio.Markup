@@ -224,21 +224,13 @@ public sealed class XamlTypeResolver : IXamlTypeResolver
         return [.. assemblies.Distinct()];
     }
 
-    /// <summary>Reads an assembly's XAML namespace declarations, once.</summary>
+    /// <summary>Reads an assembly's XAML namespace declarations, once for as long as this resolver lives.</summary>
+    /// <remarks>
+    /// The same reading <see cref="XamlTypeCatalog"/> uses to say which namespace a type is written
+    /// in, so the two cannot disagree about where a type lives.
+    /// </remarks>
     private ImmutableArray<XmlnsDefinitionAttribute> XmlnsOf(Assembly assembly) =>
-        _xmlns.GetOrAdd(assembly, static value =>
-        {
-            try
-            {
-                return [.. value.GetCustomAttributes<XmlnsDefinitionAttribute>()];
-            }
-            catch (Exception error) when (error is TypeLoadException or FileNotFoundException or FileLoadException)
-            {
-                // An assembly whose attributes cannot be read contributes nothing. It is not a
-                // reason to fail the whole resolution.
-                return [];
-            }
-        });
+        _xmlns.GetOrAdd(assembly, XamlNamespaceAttributes.DefinitionsOf);
 
     private static string Describe(IReadOnlyList<Assembly> assemblies) =>
         assemblies.Count == 1

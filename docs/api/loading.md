@@ -323,6 +323,82 @@ watching the update roll it back. The member's `TypeConverter` first, then the p
 Markup extensions are not values of this kind: `{Binding Customer.Name}` is resolved by a load, so
 check for one with `XamlValue.Parse` before asking.
 
+## What a document can name
+
+A toolbox and a data panel ask the same question of different assemblies: which types a document can
+name, in which namespace, and what it can do with each.
+
+```csharp
+XamlTypeCatalog catalog = XamlTypeCatalog.Create([typeof(Button).Assembly, projectAssembly]);
+
+foreach (XamlTypeEntry entry in catalog.Entries.Where(static e =>
+    e.Kinds.HasFlag(XamlTypeKinds.Control | XamlTypeKinds.Creatable) && !e.Kinds.HasFlag(XamlTypeKinds.TopLevel)))
+{
+    // entry.Name, entry.XmlNamespace, entry.SuggestedPrefix, entry.FullName, entry.AssemblyName
+}
+```
+
+An entry's namespace is the first one its assembly maps the type's CLR namespace to with
+`XmlnsDefinition` — read the way `XamlTypeResolver` reads it when it resolves a document — and
+`using:` with the CLR namespace where the assembly maps none. `SuggestedPrefix` is what the library's
+`XmlnsPrefix` says for that namespace; pass it to `XamlDocumentEditor.Qualify` as the preferred prefix
+and the editor declares the namespace where the document lacks it.
+
+`Kinds` answers what a tool asks before offering a type: `Creatable` (a document can write it as an
+element), `Control` and its shapes — `Panel`, `ContentControl`, `Decorator`, `ItemsControl`,
+`TemplatedControl`, `UserControl`, `TopLevel` — `CompiledMarkup` for an `x:Class` whose markup was
+compiled into it, and `Data` for a type that is not an Avalonia object at all.
+
+**Nothing in a catalog holds a type or an assembly.** A toolbox filled from one generation of a
+project's code stays on screen while the next one loads, and a `Type` in it would keep the previous
+generation in memory. A catalog is a reading rather than a view, so a build that adds a control is a
+new catalog. `Diagnostics` names an assembly some of whose types could not be read (`AXM2013`).
+
+## What a binding reads
+
+What the bindings written on an element read from:
+
+```csharp
+XamlDataContextInfo data = await session.GetDataContextAsync(element, token);
+
+data.DataTypeElement          // where the x:DataType in scope is written, or null
+data.WrittenDataType          // "vm:MainViewModel" or "{x:Type vm:MainViewModel}", as written
+data.DataType                 // the type it names, resolved through the environment
+data.DesignDataContextType    // the type of the design data the element's object shows
+data.CompilesBindings         // the nearest x:CompileBindings, or the session's default
+```
+
+The data type is what compiled bindings are checked against and what a panel offers members of; the
+design data — `Design.DataContext`, or what the class sets in its constructor — is what a binding
+without a data type is read against in the preview. The element must be one of `session.Document`.
+
+What a binding can name on a source, and whether a path resolves:
+
+```csharp
+ImmutableArray<XamlBindableMember> members = environment.MemberResolver.EnumerateBindable(data.DataType!);
+// Name, TypeName ("string", "ObservableCollection<Customer>"), CanWrite, IsCollection, IsCommand
+
+XamlBindingPathResult path = environment.MemberResolver.ResolveBindingPath(data.DataType!, "Customer.Name");
+
+switch (path.Status)
+{
+    case XamlBindingPathStatus.Resolved: /* path.ResultType */ break;
+    case XamlBindingPathStatus.Broken: /* path.Step names nothing; path.Message says so */ break;
+    case XamlBindingPathStatus.NotUnderstood: /* not checked: say so, not "broken" */ break;
+}
+```
+
+Public instance properties with a public getter and no index are what a binding reads, each listed
+once: a property a derived type hides is listed as the derived type declares it, and an interface's
+list includes what the interfaces it extends declare. Paths are read as a binding reads them as far as
+types go — dotted members, integer and string indexers, a leading `!` — and anything further is
+`NotUnderstood`, never `Broken`: a step typed `object`, an attached property in parentheses, a cast,
+`$parent`, `#name`.
+
+The member list is names. The `Type` answers — `DataType`, `DesignDataContextType`, `ResultType` —
+belong to whatever generation of code the session was built in: read what is needed from them and let
+them go. ADR 0026 records the rule.
+
 ## Values
 
 Before writing a property, ask where its current value came from:
