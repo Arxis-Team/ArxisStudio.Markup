@@ -87,10 +87,17 @@ public static class XamlLoaderDiagnosticCodes
     /// <summary>An edit targeted an object nothing in this document declares.</summary>
     public const string NoSourceDeclaration = "AXM3016";
 
-    /// <summary>The type named by <c>x:Class</c> could not be resolved.</summary>
+    /// <summary>
+    /// The type named by <c>x:Class</c> could not be resolved, so the document was loaded without
+    /// it — a warning, because a class the project has not built yet is the ordinary state of a
+    /// new form.
+    /// </summary>
     public const string UnresolvedRootType = "AXM3020";
 
-    /// <summary>The type named by <c>x:Class</c> is not compatible with the root element.</summary>
+    /// <summary>
+    /// The type named by <c>x:Class</c> is not compatible with the root element, so the document
+    /// was loaded without it.
+    /// </summary>
     public const string IncompatibleRootType = "AXM3021";
 
     /// <summary>Creating the root instance threw.</summary>

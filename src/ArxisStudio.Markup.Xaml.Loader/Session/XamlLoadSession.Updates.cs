@@ -183,8 +183,16 @@ public sealed partial class XamlLoadSession
 
         var diagnostics = new List<MarkupDiagnostic>();
 
+        // Projected the way the load projected it, so that the comparison below compares includes
+        // and nothing else: text the load withheld and this did not would read as a change.
         TextProjection projection = await XamlDocumentProjector
-            .ProjectAsync(Document, Environment, diagnostics, cancellationToken)
+            .ProjectAsync(
+                Document,
+                fragment: null,
+                Environment,
+                diagnostics,
+                await WithheldAsync(Document, diagnostics, cancellationToken).ConfigureAwait(false),
+                cancellationToken)
             .ConfigureAwait(false);
 
         // Nothing the document reaches changed, whatever the caller was told about the file.
@@ -287,6 +295,22 @@ public sealed partial class XamlLoadSession
         return null;
     }
 
+    /// <summary>
+    /// Works out what a projection of a version of the document leaves out, by the rule the load
+    /// used for the first.
+    /// </summary>
+    /// <remarks>
+    /// The rule is <see cref="XamlAttributeChecks"/>, asked about the class this session populated:
+    /// the handlers it does not answer, and the <c>x:Class</c> directive when there was no class to
+    /// use. What it notices on the way is reported with the update, because it is as true of the
+    /// document being offered as it was of the one loaded.
+    /// </remarks>
+    private ValueTask<ImmutableArray<TextSpan>> WithheldAsync(
+        XamlDocument document,
+        List<MarkupDiagnostic> diagnostics,
+        CancellationToken cancellationToken) =>
+        XamlAttributeChecks.RunAsync(document, _rootClass, Environment, diagnostics, cancellationToken);
+
     /// <summary>Applies an update that can be made on the objects that already exist.</summary>
     private async ValueTask<XamlUpdateResult> ApplyAsync(
         XamlDocument updated,
@@ -295,10 +319,16 @@ public sealed partial class XamlLoadSession
         List<MarkupDiagnostic> diagnostics,
         CancellationToken cancellationToken)
     {
+        // What the load could not hand Avalonia, no part of this update hands it either — a class
+        // that was never usable, a handler with nothing to hook up to. Worked out once for the
+        // document, because every fragment below is a projection of the same text.
+        ImmutableArray<TextSpan> withheld =
+            await WithheldAsync(updated, diagnostics, cancellationToken).ConfigureAwait(false);
+
         // Reprojecting before anything is touched means a failure to resolve an include is a
         // refused update rather than a half-updated tree.
         TextProjection projection = await XamlDocumentProjector
-            .ProjectAsync(updated, Environment, diagnostics, cancellationToken)
+            .ProjectAsync(updated, fragment: null, Environment, diagnostics, withheld, cancellationToken)
             .ConfigureAwait(false);
 
         // Every fragment is projected and parsed before any object is touched, for the same
@@ -321,7 +351,7 @@ public sealed partial class XamlLoadSession
             fragments.Add((
                 change,
                 await XamlDocumentProjector
-                    .ProjectAsync(updated, element, Environment, diagnostics, [], cancellationToken)
+                    .ProjectAsync(updated, element, Environment, diagnostics, withheld, cancellationToken)
                     .ConfigureAwait(false)));
         }
 

@@ -73,17 +73,32 @@ public sealed partial class XamlLoadSession : IAsyncDisposable
     /// </remarks>
     private int _disposal;
 
+    /// <summary>
+    /// The class the document populated, or <see langword="null"/> when it named none or named
+    /// one the load could not use.
+    /// </summary>
+    /// <remarks>
+    /// Kept because it decides what every later projection leaves out, exactly as it decided for
+    /// the load's: the handlers its methods do not answer, and — when there is no class — the
+    /// <c>x:Class</c> directive itself. An update that projected the document any other way would
+    /// fail where the load succeeded. Fixed for the session's life, because a changed
+    /// <c>x:Class</c> is a new session rather than an update.
+    /// </remarks>
+    private readonly Type? _rootClass;
+
     private XamlLoadSession(
         XamlDocument document,
         XamlLoadEnvironment environment,
         XamlLoadOptions options,
         TextProjection projection,
         object rootObject,
+        Type? rootClass,
         ImmutableArray<MarkupDiagnostic> diagnostics)
     {
         Document = document;
         Environment = environment;
         Projection = projection;
+        _rootClass = rootClass;
         Objects = XamlObjectMap.Build(
             document,
             rootObject,
@@ -219,6 +234,8 @@ public sealed partial class XamlLoadSession : IAsyncDisposable
         // Against the class the document names rather than against an instance of it, because
         // there is no instance yet: the text the instance is populated from has to exist before
         // its constructor runs. It is the type Avalonia compiles the handlers against either way.
+        // With no class to use, the directive naming one is withheld too, and the root is built as
+        // the element it is written as.
         ImmutableArray<TextSpan> unloadable = await XamlAttributeChecks
             .RunAsync(document, rootType, environment, diagnostics, cancellationToken)
             .ConfigureAwait(false);
@@ -274,7 +291,7 @@ public sealed partial class XamlLoadSession : IAsyncDisposable
         // suspended, which for a factory that answers immediately is never.
         XamlLoadSession session = await environment.Dispatcher
             .InvokeAsync(
-                () => new XamlLoadSession(document, environment, options, projection, root, []),
+                () => new XamlLoadSession(document, environment, options, projection, root, rootType, []),
                 cancellationToken)
             .ConfigureAwait(false);
 

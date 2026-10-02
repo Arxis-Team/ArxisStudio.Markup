@@ -25,12 +25,29 @@ namespace ArxisStudio.Markup.Xaml.Loader;
 /// A markup extension is reported and left alone: dropping a value would change what the
 /// document says rather than what it can be given to Avalonia as.
 /// </para>
+/// <para>
+/// An <c>x:Class</c> the load cannot use goes the same way, for the same reason. The class was
+/// reported and the load carried on without it — but the directive still went to Avalonia, whose
+/// loader resolves it on its own and fails the whole document over a class nobody has built yet,
+/// which is the first state a new form is in. Without it the root is built as the element it is
+/// written as.
+/// </para>
+/// <para>
+/// What this returns has to be what every projection of one session leaves out, not only the
+/// first. An update rebuilds part of the document from a projection of its own, and a projection
+/// that put back what the load withheld would fail where the load succeeded — or, for a source
+/// update, differ from the load's text when nothing has changed.
+/// </para>
 /// </remarks>
 internal static class XamlAttributeChecks
 {
     /// <summary>Checks a document's attributes against the types they will be applied to.</summary>
     /// <param name="document">The document about to be loaded.</param>
-    /// <param name="rootType">The type whose methods an event handler names, when there is one.</param>
+    /// <param name="rootType">
+    /// The class the document populates, whose methods an event handler names — or
+    /// <see langword="null"/> when there is none to use, in which case the document's
+    /// <c>x:Class</c>, if it has one, is withheld as well.
+    /// </param>
     /// <param name="environment">The environment the document's names are resolved through.</param>
     /// <param name="diagnostics">Collects everything noticed on the way.</param>
     /// <param name="cancellationToken">A token to observe while resolving.</param>
@@ -43,6 +60,13 @@ internal static class XamlAttributeChecks
         CancellationToken cancellationToken)
     {
         ImmutableArray<TextSpan>.Builder removals = ImmutableArray.CreateBuilder<TextSpan>();
+
+        // Reported where it was resolved — unresolved, or not what the root says it is. Here it is
+        // only kept out of the text, so that Avalonia does not go looking for it a second time.
+        if (rootType is null && document.Root?.GetDirectiveAttribute(XamlDirectives.Class) is { } named)
+        {
+            removals.Add(named.Span);
+        }
 
         foreach (XamlElement element in document.DescendantElements())
         {

@@ -12,7 +12,15 @@ namespace ArxisStudio.Markup.Xaml.Loader;
 /// <para>
 /// Every step reports rather than throws. A document naming a class that has not been compiled
 /// yet is ordinary in an editor, and refusing to show anything would be worse than showing the
-/// markup with a diagnostic beside it.
+/// markup with a diagnostic beside it. A class that cannot be used is therefore left out of the
+/// load entirely — see <see cref="XamlAttributeChecks"/>, which keeps the directive out of the
+/// text Avalonia is given — and the root is built as the element it is written as.
+/// </para>
+/// <para>
+/// The two reasons are reported at different severities, because they are different facts. A
+/// class nobody has built yet is the environment lagging behind the document, and the load goes on
+/// without loss of anything the document can show: a warning. A class that is not what the root
+/// says it is, is the document contradicting itself: an error, though the root is still built.
 /// </para>
 /// <para>
 /// In two halves, because they belong on different threads. <see cref="ResolveAsync"/> asks the
@@ -57,8 +65,9 @@ internal static class XamlRootClass
         {
             diagnostics.Add(MarkupDiagnostic.Resolution(
                 XamlLoaderDiagnosticCodes.UnresolvedRootType,
-                $"x:Class names '{className}', which was not found in any assembly supplied to the environment.",
-                MarkupDiagnosticSeverity.Error,
+                $"x:Class names '{className}', which was not found in any assembly supplied to the environment. " +
+                $"The document is loaded without it, and its root is built as the '{root.Name}' it is written as.",
+                MarkupDiagnosticSeverity.Warning,
                 document.Uri,
                 root.GetDirectiveAttribute(XamlDirectives.Class)?.ValueSpan));
 
@@ -70,7 +79,8 @@ internal static class XamlRootClass
             diagnostics.Add(MarkupDiagnostic.Resolution(
                 XamlLoaderDiagnosticCodes.IncompatibleRootType,
                 $"x:Class names '{rootType.FullName}', which does not derive from the root element's type " +
-                $"'{root.Name}'. The document cannot populate it.",
+                $"'{root.Name}'. The document cannot populate it, and is loaded without it as the " +
+                $"'{root.Name}' it is written as.",
                 MarkupDiagnosticSeverity.Error,
                 document.Uri,
                 root.GetDirectiveAttribute(XamlDirectives.Class)?.ValueSpan));

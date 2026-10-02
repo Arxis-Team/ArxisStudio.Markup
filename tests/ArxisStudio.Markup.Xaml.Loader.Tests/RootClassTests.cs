@@ -199,9 +199,10 @@ public sealed class RootClassTests
     }
 
     [AvaloniaFact]
-    public async Task AnIncompatibleRootTypeIsReportedRatherThanLoaded()
+    public async Task AnIncompatibleRootTypeIsReportedRatherThanPopulated()
     {
-        // CustomerView is a UserControl, so a document rooted at Button cannot populate it.
+        // CustomerView is a UserControl, so a document rooted at Button cannot populate it. The
+        // root is still built, as the Button it is written as — UnusableClassTests says so.
         (XamlLoadSession? session, XamlLoadResult result) = await XamlLoadSession.TryCreateAsync(
             Parse(ViewXaml("Button")),
             Environment(),
