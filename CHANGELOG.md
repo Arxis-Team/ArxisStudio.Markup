@@ -11,6 +11,17 @@ the source of truth, an unchanged document round-trips byte for byte, and unknow
 
 ## Unreleased
 
+### Several children into an empty element in one edit
+
+Two children one editor put into an element with none collided. Into a self-closing element each
+insertion opened it on its own, over the same slash, and the editor refused the whole edit as two
+overlapping changes; into an element holding nothing but its tags each brought the line its end tag
+goes back to, and the second arrived after a blank line. Pasting two controls into an empty panel
+met both. The second child now joins the change that gave the element its first, in the order they
+were put, one under another — `InsertElement`, `InsertFragment` and `MoveElement` alike.
+
+No public API changed.
+
 ### Siblings wrapped together
 
 `XamlDocumentEditor.WrapElements` and `XamlDocument.WrapElements` put several siblings into one

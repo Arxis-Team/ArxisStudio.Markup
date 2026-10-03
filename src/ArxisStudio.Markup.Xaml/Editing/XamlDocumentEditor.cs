@@ -34,6 +34,12 @@ public sealed partial class XamlDocumentEditor
     private readonly List<TextChange> _changes = [];
     private readonly List<MarkupDiagnostic> _diagnostics = [];
 
+    /// <summary>
+    /// Elements that held no children when this editor gave them their first, and the change that did:
+    /// a later child put into the same element joins that change.
+    /// </summary>
+    private Dictionary<XamlElement, FirstContent>? _firstContent;
+
     internal XamlDocumentEditor(XamlDocument document) => _document = document;
 
     /// <summary>Gets the document these edits are computed against.</summary>
@@ -179,6 +185,12 @@ public sealed partial class XamlDocumentEditor
     /// <summary>
     /// Inserts XAML as a child of an element, at a position among its existing child elements.
     /// </summary>
+    /// <remarks>
+    /// An element with no children takes what one editor puts into it in the order it was put, each
+    /// child on a line of its own where the element is laid out on lines — the index has nothing to
+    /// count there. Pasting two controls into an empty panel is that: the second goes after the first,
+    /// inside the same opening of the element.
+    /// </remarks>
     /// <param name="parent">The element to insert into.</param>
     /// <param name="index">
     /// The position among <paramref name="parent"/>'s content children — property elements are
@@ -196,26 +208,61 @@ public sealed partial class XamlDocumentEditor
         ArgumentOutOfRangeException.ThrowIfNegative(index);
         Validate(parent);
 
+        if (_firstContent?.GetValueOrDefault(parent) is { } first)
+        {
+            return JoinFirstContent(first, xaml);
+        }
+
         if (parent.IsEmpty)
         {
-            return OpenAndInsert(parent, LaysOutOnLines(parent) ? OnLinesOfItsOwn(parent, xaml) : xaml);
+            return OpenForChildren(parent, xaml);
         }
 
         (int position, string prefix, string suffix) = ContentInsertionPointFor(parent, index);
+
+        // The first child of an element holding nothing brings the line its end tag goes back to; a second
+        // one recorded beside it would bring another, and leave a blank line between the two.
+        if (suffix.Length > 0 && !parent.ContentElements.Any())
+        {
+            return FirstChild(parent, new TextSpan(position, 0), prefix, prefix, suffix, xaml);
+        }
 
         return Insert(position, prefix + xaml + suffix);
     }
 
     /// <summary>
-    /// The first child of an element that begins a line, written on a line of its own one step in from
-    /// the element, with the end tag back on a line at the element's indentation.
+    /// Records the change that gives an element without children its first, remembering how it is
+    /// written so that a later child can join it.
     /// </summary>
-    private string OnLinesOfItsOwn(XamlElement parent, string xaml)
+    /// <param name="parent">The element.</param>
+    /// <param name="span">What the change replaces.</param>
+    /// <param name="head">What goes before the first child.</param>
+    /// <param name="between">What goes between two children.</param>
+    /// <param name="tail">What goes after the last child.</param>
+    /// <param name="xaml">The first child.</param>
+    private XamlDocumentEditor FirstChild(
+        XamlElement parent,
+        TextSpan span,
+        string head,
+        string between,
+        string tail,
+        string xaml)
     {
-        string newLine = NewLineFor(parent);
-        string indent = IndentOf(parent);
+        (_firstContent ??= new Dictionary<XamlElement, FirstContent>(ReferenceEqualityComparer.Instance))[parent] =
+            new FirstContent(_changes.Count, span, head, between, tail, [xaml]);
 
-        return newLine + indent + StepFor(parent) + xaml + newLine + indent;
+        return Replace(span, head + xaml + tail);
+    }
+
+    /// <summary>Puts another child after the ones this editor already gave an element without children.</summary>
+    private XamlDocumentEditor JoinFirstContent(FirstContent first, string xaml)
+    {
+        first.Children.Add(xaml);
+        _changes[first.Change] = new TextChange(
+            first.Span,
+            first.Head + string.Join(first.Between, first.Children) + first.Tail);
+
+        return this;
     }
 
     /// <summary>
@@ -253,7 +300,35 @@ public sealed partial class XamlDocumentEditor
     /// same document.
     /// </para>
     /// </remarks>
-    private XamlDocumentEditor OpenAndInsert(XamlElement parent, string xaml)
+    private XamlDocumentEditor OpenAndInsert(XamlElement parent, string xaml) =>
+        Replace(OpeningOf(parent), $">{xaml}</{parent.Name}>");
+
+    /// <summary>
+    /// Opens a self-closing element for its first child, as <see cref="OpenAndInsert"/> does, so that a
+    /// later child put by this editor joins the same opening.
+    /// </summary>
+    /// <remarks>
+    /// An element that begins a line takes its children on lines of their own, one step in from it, and
+    /// its end tag back on a line at its own indentation.
+    /// </remarks>
+    private XamlDocumentEditor OpenForChildren(XamlElement parent, string xaml)
+    {
+        string close = $"</{parent.Name}>";
+
+        if (!LaysOutOnLines(parent))
+        {
+            return FirstChild(parent, OpeningOf(parent), ">", string.Empty, close, xaml);
+        }
+
+        string newLine = NewLineFor(parent);
+        string indent = IndentOf(parent);
+        string inner = newLine + indent + StepFor(parent);
+
+        return FirstChild(parent, OpeningOf(parent), ">" + inner, inner, newLine + indent + close, xaml);
+    }
+
+    /// <summary>The slash that closes a self-closing element, with the whitespace before it.</summary>
+    private TextSpan OpeningOf(XamlElement parent)
     {
         int end = parent.StartTagSpan.End;
         int start = end - 2;
@@ -263,10 +338,20 @@ public sealed partial class XamlDocumentEditor
             start--;
         }
 
-        return Replace(
-            TextSpan.FromBounds(start, end),
-            $">{xaml}</{parent.Name}>");
+        return TextSpan.FromBounds(start, end);
     }
+
+    /// <summary>
+    /// The change that gave an element without children its first: where it stands among the recorded
+    /// changes, what it replaces, and the text around and between the children it holds.
+    /// </summary>
+    private sealed record FirstContent(
+        int Change,
+        TextSpan Span,
+        string Head,
+        string Between,
+        string Tail,
+        List<string> Children);
 
     /// <summary>Inserts a copy of an element as a child of another.</summary>
     /// <param name="parent">The element to insert into.</param>

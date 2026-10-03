@@ -118,6 +118,37 @@ public sealed class FragmentTests
             editor.Apply().GetText());
     }
 
+    /// <summary>
+    /// Two fragments pasted into an empty panel by one editor arrive one under the other, each indented to
+    /// where it lands.
+    /// </summary>
+    [Fact]
+    public void TwoFragmentsPastedIntoAnEmptyPanelArriveInOrder()
+    {
+        var target = XamlDocument.Parse(
+            "<Window xmlns=\"https://github.com/avaloniaui\">\n" +
+            "  <StackPanel />\n" +
+            "</Window>\n");
+
+        XamlDocumentEditor editor = target.Edit();
+        XamlElement panel = Element(target, "StackPanel");
+
+        editor.InsertFragment(panel, 0, XamlFragment.Parse($"<TextBlock xmlns=\"{Avalonia}\" Text=\"first\" />"));
+        editor.InsertFragment(panel, 0, XamlFragment.Parse($"<Border xmlns=\"{Avalonia}\">\n  <Button />\n</Border>"));
+
+        Assert.Empty(editor.Diagnostics);
+        Assert.Equal(
+            "<Window xmlns=\"https://github.com/avaloniaui\">\n" +
+            "  <StackPanel>\n" +
+            "    <TextBlock Text=\"first\" />\n" +
+            "    <Border>\n" +
+            "      <Button />\n" +
+            "    </Border>\n" +
+            "  </StackPanel>\n" +
+            "</Window>\n",
+            editor.Apply().GetText());
+    }
+
     [Fact]
     public void APrefixMeaningSomethingElseHereIsRenamedWhereverTheSyntaxNamesIt()
     {

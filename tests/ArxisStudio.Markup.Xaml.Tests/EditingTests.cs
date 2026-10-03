@@ -800,6 +800,90 @@ public sealed class EditingTests
             result);
     }
 
+    /// <summary>
+    /// Several children put by one editor into a self-closing element arrive in the order they were put,
+    /// each on a line of its own.
+    /// </summary>
+    /// <remarks>
+    /// What pasting two controls into an empty panel does. Each insertion opened the element on its own,
+    /// over the same slash, and the two openings overlapped: the editor refused the whole edit.
+    /// </remarks>
+    [Fact]
+    public void ChildrenPutByOneEditorIntoASelfClosingElementArriveInOrder()
+    {
+        XamlDocument document = XamlDocument.Parse(
+            "<StackPanel>\n" +
+            "  <Grid Width=\"200\" />\n" +
+            "</StackPanel>");
+
+        XamlElement grid = Element(document, "Grid");
+
+        string result = document.Edit()
+            .InsertElement(grid, 0, "<TextBlock />")
+            .InsertElement(grid, 1, "<Button />")
+            .Apply()
+            .GetText();
+
+        Assert.Equal(
+            "<StackPanel>\n" +
+            "  <Grid Width=\"200\">\n" +
+            "    <TextBlock />\n" +
+            "    <Button />\n" +
+            "  </Grid>\n" +
+            "</StackPanel>",
+            result);
+    }
+
+    /// <summary>
+    /// Several children put by one editor into an element that holds nothing come one under another, with
+    /// no blank line between them.
+    /// </summary>
+    /// <remarks>
+    /// Each insertion brought the line break that closes the element along with it, so the second arrived
+    /// after an empty line the first had left.
+    /// </remarks>
+    [Fact]
+    public void ChildrenPutByOneEditorIntoAnEmptyElementComeOneUnderAnother()
+    {
+        XamlDocument document = XamlDocument.Parse(
+            "<StackPanel>\n" +
+            "  <Grid></Grid>\n" +
+            "</StackPanel>");
+
+        XamlElement grid = Element(document, "Grid");
+
+        string result = document.Edit()
+            .InsertElement(grid, 0, "<TextBlock />")
+            .InsertElement(grid, 0, "<Button />")
+            .Apply()
+            .GetText();
+
+        Assert.Equal(
+            "<StackPanel>\n" +
+            "  <Grid>\n" +
+            "    <TextBlock />\n" +
+            "    <Button />\n" +
+            "  </Grid>\n" +
+            "</StackPanel>",
+            result);
+    }
+
+    [Fact]
+    public void ChildrenPutByOneEditorIntoAnInlineSelfClosingElementStayOnItsLine()
+    {
+        XamlDocument document = XamlDocument.Parse("<StackPanel><Grid /></StackPanel>");
+
+        XamlElement grid = Element(document, "Grid");
+
+        string result = document.Edit()
+            .InsertElement(grid, 0, "<TextBlock />")
+            .InsertElement(grid, 1, "<Button />")
+            .Apply()
+            .GetText();
+
+        Assert.Equal("<StackPanel><Grid><TextBlock /><Button /></Grid></StackPanel>", result);
+    }
+
     [Fact]
     public void TheFirstChildIsWrittenWithTheDocumentsLineBreaks()
     {

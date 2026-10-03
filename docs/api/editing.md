@@ -108,6 +108,11 @@ back on a line at its own indentation. An element written inline inside another,
 a document written on one line, takes its first child inline as before; so does an element that holds
 text, which is content of another kind.
 
+Several children one editor puts into an element that had none arrive in the order they were put,
+one under another — pasting two controls into an empty panel is one edit. The index has nothing to
+count there and is not read; the second child joins the change that opened the element rather than
+opening it again.
+
 `RemoveElement` takes the whole line when the element had that line to itself, so removal does not
 leave its indentation behind as a blank.
 
