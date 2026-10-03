@@ -1964,7 +1964,8 @@ structural — at the root, a new session.
 Exit criteria:
 
 - a structural change to the root's content of a document whose class resolved applies in place,
-  constructs the class no second time, and leaves no second window open;
+  constructs the class no second time, and leaves no second window open — and a handler in the
+  rebuilt content runs on the root, a window's included;
 - a structural change inside a panel holding a handler the class declares applies in place, and the
   rebuilt control's handler runs on the session's root;
 - a form whose class declares a private handler loads, and the handler runs before and after a

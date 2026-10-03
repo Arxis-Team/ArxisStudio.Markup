@@ -109,9 +109,12 @@ the document — see `docs/adr/0005-resource-includes.md` for why. That leaves f
   a rebuilt fragment have no recorded position to read — and reading them as positions in the
   document attributed them to whatever element sat at that line. What is known instead is that
   the fragment was built from a particular element, so its children are that element's children
-  in order, and that is what the pairing uses. Where the two sides stop having the same shape —
-  a property element contributing a dictionary or a template rather than a logical child — the
-  pairing stops descending, and what is below keeps whatever the map can work out for itself.
+  in order — the controls its content member holds, which is where the elements written as content
+  went — and that is what the pairing uses. Not the logical children: a window parents a host of its
+  own beside its content. Where the two sides stop having the same shape — text or an item that is
+  not a control among the content, a count that differs — the pairing stops descending, and what is
+  below keeps whatever the map can work out for itself; a property element pairs only the entries of
+  a dictionary, by key.
 
 ## Editing and history
 
