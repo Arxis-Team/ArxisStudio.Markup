@@ -11,6 +11,18 @@ the source of truth, an unchanged document round-trips byte for byte, and unknow
 
 ## Unreleased
 
+### Siblings wrapped together
+
+`XamlDocumentEditor.WrapElements` and `XamlDocument.WrapElements` put several siblings into one
+wrapper, written where the first of them stood — what a designer calls grouping. They arrive in
+document order, whatever order they were named in, each one level deeper and written exactly as it
+was; the others leave their places as `RemoveElement` leaves one, so a sibling that was not named
+stays where it is. Siblings that stood next to each other on lines of their own come back character
+for character when the wrapper is unwrapped. Elements with different parents and property elements
+are refused; one element is wrapped as `WrapElement` wraps it.
+
+Added to the public surface: `XamlDocumentEditor.WrapElements`, `XamlDocument.WrapElements`.
+
 ### A root built as written, on request
 
 `XamlLoadOptions.ClassUse` says what a session does with the class `x:Class` names:

@@ -545,6 +545,137 @@ public sealed class EditingTests
         Assert.Equal("<Grid>\n  <Button />\n</Grid>", result);
     }
 
+    /// <summary>
+    /// Siblings wrapped together arrive in the order the document has them, inside a wrapper written
+    /// where the first of them stood.
+    /// </summary>
+    /// <remarks>
+    /// What a designer calls grouping. The order a selection was made in is not an order the markup
+    /// has, and a sibling that was not named stays where it was — after the wrapper, here.
+    /// </remarks>
+    [Fact]
+    public void WrappingSiblingsGathersThemInDocumentOrderWhereTheFirstStood()
+    {
+        XamlDocument document = XamlDocument.Parse(
+            "<StackPanel>\n" +
+            "  <TextBlock />\n" +
+            "  <Button />\n" +
+            "  <CheckBox />\n" +
+            "</StackPanel>");
+
+        string result = document
+            .WrapElements([Element(document, "CheckBox"), Element(document, "TextBlock")], "<Grid Margin=\"4\"></Grid>")
+            .GetText();
+
+        Assert.Equal(
+            "<StackPanel>\n" +
+            "  <Grid Margin=\"4\">\n" +
+            "    <TextBlock />\n" +
+            "    <CheckBox />\n" +
+            "  </Grid>\n" +
+            "  <Button />\n" +
+            "</StackPanel>",
+            result);
+    }
+
+    [Fact]
+    public void WrappingSiblingsIndentsEveryLineOfEachOneLevel()
+    {
+        XamlDocument document = XamlDocument.Parse(
+            "<StackPanel>\n" +
+            "  <Border>\n" +
+            "    <TextBlock />\n" +
+            "  </Border>\n" +
+            "  <Button />\n" +
+            "</StackPanel>");
+
+        string result = document
+            .WrapElements([Element(document, "Border"), Element(document, "Button")], "<Grid></Grid>")
+            .GetText();
+
+        Assert.Equal(
+            "<StackPanel>\n" +
+            "  <Grid>\n" +
+            "    <Border>\n" +
+            "      <TextBlock />\n" +
+            "    </Border>\n" +
+            "    <Button />\n" +
+            "  </Grid>\n" +
+            "</StackPanel>",
+            result);
+    }
+
+    [Fact]
+    public void WrappingAdjacentSiblingsAndUnwrappingThemIsARoundTrip()
+    {
+        const string text =
+            "<StackPanel>\r\n" +
+            "  <TextBlock Text=\"Name\" />\r\n" +
+            "  <TextBox x:Name=\"NameBox\" />\r\n" +
+            "</StackPanel>\r\n";
+
+        XamlDocument document = XamlDocument.Parse(text);
+        XamlDocument wrapped = document.WrapElements(
+            [Element(document, "TextBlock"), Element(document, "TextBox")],
+            "<DockPanel></DockPanel>");
+
+        XamlDocument unwrapped = wrapped.UnwrapElement(Element(wrapped, "DockPanel"));
+
+        Assert.Equal(text, unwrapped.GetText());
+    }
+
+    [Fact]
+    public void WrappingOneSiblingIsWrappingTheElement()
+    {
+        XamlDocument document = Parse();
+
+        Assert.Equal(
+            document.WrapElement(Element(document, "TextBlock"), "<Border></Border>").GetText(),
+            document.WrapElements([Element(document, "TextBlock")], "<Border></Border>").GetText());
+    }
+
+    [Fact]
+    public void ElementsWithDifferentParentsAreNotWrappedTogether()
+    {
+        XamlDocument document = XamlDocument.Parse(
+            "<StackPanel>\n" +
+            "  <Border>\n" +
+            "    <TextBlock />\n" +
+            "  </Border>\n" +
+            "  <Button />\n" +
+            "</StackPanel>");
+
+        // One wrapper stands in one place: gathering the text block out of its border would be a move
+        // nobody asked for.
+        Assert.Throws<InvalidOperationException>(
+            () => document.WrapElements([Element(document, "TextBlock"), Element(document, "Button")], "<Grid></Grid>"));
+    }
+
+    [Fact]
+    public void APropertyElementIsNotGatheredWithItsSiblings()
+    {
+        XamlDocument document = XamlDocument.Parse(
+            "<Grid>\n" +
+            "  <Grid.RowDefinitions>\n" +
+            "    <RowDefinition />\n" +
+            "  </Grid.RowDefinitions>\n" +
+            "  <Button />\n" +
+            "</Grid>");
+
+        XamlElement rows = document.DescendantElements().First(static element => element.IsPropertyElementSyntax);
+
+        Assert.Throws<InvalidOperationException>(
+            () => document.WrapElements([rows, Element(document, "Button")], "<StackPanel></StackPanel>"));
+    }
+
+    [Fact]
+    public void WrappingNoSiblingsIsRejected()
+    {
+        XamlDocument document = Parse();
+
+        Assert.Throws<ArgumentException>(() => document.WrapElements([], "<Grid></Grid>"));
+    }
+
     [Fact]
     public void AnIndexCountsContentChildrenAndNotMembers()
     {

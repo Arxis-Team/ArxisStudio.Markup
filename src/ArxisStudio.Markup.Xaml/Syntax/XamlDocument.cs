@@ -176,6 +176,13 @@ public sealed class XamlDocument : XamlSyntaxNode
     public XamlDocument WrapElement(XamlElement element, string wrapperXaml) =>
         Edit().WrapElement(element, wrapperXaml).Apply();
 
+    /// <summary>Puts several siblings inside one new element, written where the first of them stood.</summary>
+    /// <param name="elements">The siblings to wrap, in any order.</param>
+    /// <param name="wrapperXaml">The wrapper, as markup with somewhere to put content.</param>
+    /// <returns>A new document with the change applied.</returns>
+    public XamlDocument WrapElements(IEnumerable<XamlElement> elements, string wrapperXaml) =>
+        Edit().WrapElements(elements, wrapperXaml).Apply();
+
     /// <summary>Replaces an element with what it contains.</summary>
     /// <param name="element">The element to unwrap.</param>
     /// <returns>A new document with the change applied.</returns>

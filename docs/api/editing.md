@@ -67,6 +67,7 @@ editor.RemoveElement(element);
 editor.ReplaceElement(element, "<ToggleButton Content=\"Save\" />");
 editor.MoveElement(element, newParent, index);
 editor.WrapElement(element, "<Border Padding=\"8\"></Border>");
+editor.WrapElements([label, box, button], "<StackPanel></StackPanel>");
 editor.UnwrapElement(border);
 ```
 
@@ -123,6 +124,14 @@ element moves in one level deeper, and the step is measured from the document ra
 the difference between this element's indentation and its parent's is what the file already uses,
 whether that is two spaces, four, or a tab. `UnwrapElement` is the inverse, and wrapping then
 unwrapping returns the document character for character.
+
+`WrapElements` is grouping: several siblings go into one wrapper, written where the first of them
+stood. The order is the document's, not the order they were named in — a selection's order is not one
+the markup has — and a sibling that was not named stays where it was, so one that stood between them
+ends up after the wrapper. The others leave their places as `RemoveElement` leaves one. Siblings that
+stood next to each other on lines of their own come back character for character when the wrapper is
+unwrapped. Elements with different parents are not wrapped together, and neither is a property
+element; one element is wrapped exactly as `WrapElement` wraps it.
 
 Property elements — `<Grid.ColumnDefinitions>`, `<Border.Resources>` — are members of their parent
 rather than things beside their siblings. They are not unwrapped out into the open, and they take

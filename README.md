@@ -689,6 +689,7 @@ document.RemoveElement(element);
 document.MoveElement(element, newParent, index);
 document.ReplaceElement(element, xaml);
 document.WrapElement(element, wrapperXaml);
+document.WrapElements(siblings, wrapperXaml);
 document.UnwrapElement(element);
 document.DuplicateElement(element, XamlDuplicateNames.Remove);
 

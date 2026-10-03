@@ -492,6 +492,110 @@ public sealed partial class XamlDocumentEditor
         ArgumentNullException.ThrowIfNull(wrapperXaml);
         Validate(element);
 
+        return Wrap([element], WrapperTags(wrapperXaml));
+    }
+
+    /// <summary>
+    /// Puts several siblings inside one new element, written where the first of them stood.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// What a designer calls grouping: three controls selected and put into a panel together. The
+    /// wrapper takes the place of the first of them in document order — whatever order they were
+    /// named in, because the order a selection was made in is not an order the markup has — and they
+    /// move in one after another in that order, one level deeper, each written exactly as it was. The
+    /// others leave their places as <see cref="RemoveElement"/> leaves one, so a sibling that was not
+    /// named stays where it is: one that stood between them ends up after the wrapper.
+    /// </para>
+    /// <para>
+    /// One element is wrapped as <see cref="WrapElement"/> wraps it. Siblings that stand next to each
+    /// other on lines of their own come back character for character when the wrapper is unwrapped.
+    /// </para>
+    /// <para>
+    /// The siblings must share a parent — one wrapper stands in one place, and gathering an element
+    /// out of another would be a move nobody asked for — and none of them may be a property element,
+    /// which is a member of its parent rather than a thing beside its siblings.
+    /// </para>
+    /// </remarks>
+    /// <param name="elements">The siblings to wrap, in any order; one named twice is wrapped once.</param>
+    /// <param name="wrapperXaml">The wrapper, as markup with somewhere to put content.</param>
+    /// <returns>This editor, for chaining.</returns>
+    /// <exception cref="ArgumentNullException">
+    /// <paramref name="elements"/>, an element in it or <paramref name="wrapperXaml"/> is <see langword="null"/>.
+    /// </exception>
+    /// <exception cref="ArgumentException"><paramref name="elements"/> names no element.</exception>
+    /// <exception cref="InvalidOperationException">
+    /// An element belongs to a different document, the elements do not share a parent, one of them is a
+    /// property element, or the wrapper is not a single element with a start and an end tag.
+    /// </exception>
+    public XamlDocumentEditor WrapElements(IEnumerable<XamlElement> elements, string wrapperXaml)
+    {
+        ArgumentNullException.ThrowIfNull(elements);
+        ArgumentNullException.ThrowIfNull(wrapperXaml);
+
+        XamlElement[] given = [.. elements];
+
+        if (given.Length == 0)
+        {
+            throw new ArgumentException("There is nothing to wrap: no element was named.", nameof(elements));
+        }
+
+        foreach (XamlElement element in given)
+        {
+            ArgumentNullException.ThrowIfNull(element, nameof(elements));
+            Validate(element);
+        }
+
+        XamlElement[] ordered = [.. given.Distinct().OrderBy(static element => element.Span.Start)];
+        XamlElement first = ordered[0];
+
+        if (ordered.FirstOrDefault(element => !ReferenceEquals(element.Parent, first.Parent)) is { } stray)
+        {
+            throw new InvalidOperationException(
+                $"Element '{stray.Name}' does not share a parent with '{first.Name}'. Siblings are wrapped " +
+                "together; one wrapper stands in one place.");
+        }
+
+        if (ordered.FirstOrDefault(static element => element.IsPropertyElementSyntax) is { } member)
+        {
+            throw new InvalidOperationException(
+                $"Element '{member.Name}' is a property element, a member of its parent rather than a " +
+                "thing beside its siblings, and is not wrapped with them.");
+        }
+
+        return Wrap(ordered, WrapperTags(wrapperXaml));
+    }
+
+    /// <summary>
+    /// Writes siblings, already in document order, inside a wrapper in place of the first of them, and
+    /// takes the others out of their places.
+    /// </summary>
+    private XamlDocumentEditor Wrap(XamlElement[] ordered, (string Opening, string Closing) wrapper)
+    {
+        XamlElement first = ordered[0];
+
+        string indent = IndentOf(first);
+        string step = StepFor(first);
+        string line = NewLineFor(first);
+        string inner = line + indent + step;
+
+        Replace(
+            first.Span,
+            wrapper.Opening + inner + string.Join(inner, ordered.Select(element => Reindent(element, step))) +
+            line + indent + wrapper.Closing);
+
+        foreach (XamlElement other in ordered.Skip(1))
+        {
+            RemoveElement(other);
+        }
+
+        return this;
+    }
+
+    /// <summary>Reads a wrapper's start tag and end tag, as it writes them.</summary>
+    /// <exception cref="InvalidOperationException">The wrapper is not a single element with a start and an end tag.</exception>
+    private static (string Opening, string Closing) WrapperTags(string wrapperXaml)
+    {
         var wrapper = XamlDocument.Parse(wrapperXaml);
 
         if (wrapper.Root is not { } root || root.IsEmpty || root.EndTagSpan is not { } endTag)
@@ -501,18 +605,9 @@ public sealed partial class XamlDocumentEditor
                 $"somewhere to put what is being wrapped. '{wrapperXaml}' is not.");
         }
 
-        string opening = wrapper.SourceText.GetText(
-            TextSpan.FromBounds(root.Span.Start, root.StartTagSpan.End));
-        string closing = wrapper.SourceText.GetText(
-            TextSpan.FromBounds(endTag.Start, root.Span.End));
-
-        string indent = IndentOf(element);
-        string step = StepFor(element);
-        string line = NewLineFor(element);
-
-        return Replace(
-            element.Span,
-            opening + line + indent + step + Reindent(element, step) + line + indent + closing);
+        return (
+            wrapper.SourceText.GetText(TextSpan.FromBounds(root.Span.Start, root.StartTagSpan.End)),
+            wrapper.SourceText.GetText(TextSpan.FromBounds(endTag.Start, root.Span.End)));
     }
 
     /// <summary>
