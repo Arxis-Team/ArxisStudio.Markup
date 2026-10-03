@@ -580,6 +580,123 @@ public sealed class EditingTests
         Assert.Contains("</StackPanel.Resources>\n  <Button />", result, StringComparison.Ordinal);
     }
 
+    /// <summary>
+    /// The first child of an element that holds only blank lines goes on a line of its own, one step in,
+    /// and the blank lines stay below it.
+    /// </summary>
+    /// <remarks>
+    /// A designer dropping a control into an emptied user control wrote it straight after the start
+    /// tag, on the start tag's line. The blank lines are the author's, and they are kept, as a blank line
+    /// anywhere else is.
+    /// </remarks>
+    [Fact]
+    public void TheFirstChildOfAnElementHoldingBlankLinesGoesOnALineOfItsOwn()
+    {
+        XamlDocument document = XamlDocument.Parse(
+            "<UserControl xmlns=\"https://github.com/avaloniaui\"\n" +
+            "             Width=\"740\" Height=\"420\">\n" +
+            "\n" +
+            "\n" +
+            "</UserControl>");
+
+        string result = document.InsertElement(document.Root!, 0, "<Button Content=\"Button\" />").GetText();
+
+        Assert.Equal(
+            "<UserControl xmlns=\"https://github.com/avaloniaui\"\n" +
+            "             Width=\"740\" Height=\"420\">\n" +
+            "  <Button Content=\"Button\" />\n" +
+            "\n" +
+            "\n" +
+            "</UserControl>",
+            result);
+    }
+
+    [Fact]
+    public void TheFirstChildOfAnIndentedElementTakesTheStepTheFileIsWrittenWith()
+    {
+        XamlDocument document = XamlDocument.Parse(
+            "<StackPanel>\n" +
+            "    <Border>\n" +
+            "    </Border>\n" +
+            "</StackPanel>");
+
+        string result = document.InsertElement(Element(document, "Border"), 0, "<Button />").GetText();
+
+        Assert.Equal(
+            "<StackPanel>\n" +
+            "    <Border>\n" +
+            "        <Button />\n" +
+            "    </Border>\n" +
+            "</StackPanel>",
+            result);
+    }
+
+    [Fact]
+    public void ASelfClosingElementOnALineOfItsOwnOpensOntoLinesOfItsOwn()
+    {
+        XamlDocument document = XamlDocument.Parse(
+            "<StackPanel>\n" +
+            "  <Grid Width=\"200\" />\n" +
+            "</StackPanel>");
+
+        string result = document.InsertElement(Element(document, "Grid"), 0, "<Button />").GetText();
+
+        Assert.Equal(
+            "<StackPanel>\n" +
+            "  <Grid Width=\"200\">\n" +
+            "    <Button />\n" +
+            "  </Grid>\n" +
+            "</StackPanel>",
+            result);
+    }
+
+    [Fact]
+    public void AnEmptyElementOnALineOfItsOwnOpensOntoLinesOfItsOwn()
+    {
+        XamlDocument document = XamlDocument.Parse(
+            "<StackPanel>\n" +
+            "  <Grid></Grid>\n" +
+            "</StackPanel>");
+
+        string result = document.InsertElement(Element(document, "Grid"), 0, "<Button />").GetText();
+
+        Assert.Equal(
+            "<StackPanel>\n" +
+            "  <Grid>\n" +
+            "    <Button />\n" +
+            "  </Grid>\n" +
+            "</StackPanel>",
+            result);
+    }
+
+    [Fact]
+    public void TheFirstChildIsWrittenWithTheDocumentsLineBreaks()
+    {
+        XamlDocument document = XamlDocument.Parse("<UserControl>\r\n\r\n</UserControl>");
+
+        string result = document.InsertElement(document.Root!, 0, "<Button />").GetText();
+
+        Assert.Equal("<UserControl>\r\n  <Button />\r\n\r\n</UserControl>", result);
+    }
+
+    [Fact]
+    public void TheFirstChildGoesAboveACommentTheElementHolds()
+    {
+        XamlDocument document = XamlDocument.Parse(
+            "<Grid>\n" +
+            "  <!-- the form goes here -->\n" +
+            "</Grid>");
+
+        string result = document.InsertElement(document.Root!, 0, "<Button />").GetText();
+
+        Assert.Equal(
+            "<Grid>\n" +
+            "  <Button />\n" +
+            "  <!-- the form goes here -->\n" +
+            "</Grid>",
+            result);
+    }
+
     [Fact]
     public void DuplicatingPutsAnAnonymousCopyStraightAfterTheOriginal()
     {

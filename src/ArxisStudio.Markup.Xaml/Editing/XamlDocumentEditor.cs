@@ -198,13 +198,36 @@ public sealed partial class XamlDocumentEditor
 
         if (parent.IsEmpty)
         {
-            return OpenAndInsert(parent, xaml);
+            return OpenAndInsert(parent, LaysOutOnLines(parent) ? OnLinesOfItsOwn(parent, xaml) : xaml);
         }
 
         (int position, string prefix, string suffix) = ContentInsertionPointFor(parent, index);
 
         return Insert(position, prefix + xaml + suffix);
     }
+
+    /// <summary>
+    /// The first child of an element that begins a line, written on a line of its own one step in from
+    /// the element, with the end tag back on a line at the element's indentation.
+    /// </summary>
+    private string OnLinesOfItsOwn(XamlElement parent, string xaml)
+    {
+        string newLine = NewLineFor(parent);
+        string indent = IndentOf(parent);
+
+        return newLine + indent + StepFor(parent) + xaml + newLine + indent;
+    }
+
+    /// <summary>
+    /// Reports whether an element's first child goes on a line of its own: the element begins a line, in
+    /// a document written on lines at all.
+    /// </summary>
+    /// <remarks>
+    /// A document written on one line stays on one line. The root of one begins its line too, and
+    /// breaking it open would change the layout of a file in which nothing asked for lines.
+    /// </remarks>
+    private bool LaysOutOnLines(XamlElement element) =>
+        StartsLine(element) && _document.SourceText.Lines.Count > 1;
 
     /// <summary>
     /// Gives a self-closing element a content region, and puts the first child into it.
@@ -681,7 +704,7 @@ public sealed partial class XamlDocumentEditor
             XamlElement? last = parent.MemberElements.LastOrDefault();
 
             return last is null
-                ? (parent.StartTagSpan.End, string.Empty, string.Empty)
+                ? FirstContentPointFor(parent)
                 : (last.Span.End, LeadingWhitespaceOf(last), string.Empty);
         }
 
@@ -696,6 +719,64 @@ public sealed partial class XamlDocumentEditor
 
         return (target.Span.Start, string.Empty, LeadingWhitespaceOf(target));
     }
+
+    /// <summary>
+    /// Finds where the first child goes in an element that holds nothing but whitespace and comments,
+    /// and what whitespace should surround it.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// On a line of its own, one step in from the element, wherever the element is laid out on lines —
+    /// what it holds breaks a line, or its start tag begins one. It used to go straight after the start
+    /// tag, on the start tag's line: a designer dropping a control into an emptied user control wrote
+    /// <c>Height="420"&gt;&lt;Button /&gt;</c>, with the blank lines below it.
+    /// </para>
+    /// <para>
+    /// Nothing already there moves or goes. The child arrives with a line break of its own in front of
+    /// it, and the blank lines and comments the element held stay below it, as they would anywhere else;
+    /// an element that held nothing gets its end tag back on a line at its own indentation. An element
+    /// written inside another on one line stays on that line, and text the element holds is content of
+    /// another kind, which leaves the child where it always went.
+    /// </para>
+    /// </remarks>
+    private (int Position, string Prefix, string Suffix) FirstContentPointFor(XamlElement parent)
+    {
+        int start = parent.StartTagSpan.End;
+
+        if (parent.EndTagSpan is not { } endTag || !HoldsOnlyBlanks(parent))
+        {
+            return (start, string.Empty, string.Empty);
+        }
+
+        bool broken = _document.SourceText.GetText(TextSpan.FromBounds(start, endTag.Start)).Contains('\n');
+
+        if (!broken && !LaysOutOnLines(parent))
+        {
+            return (start, string.Empty, string.Empty);
+        }
+
+        string newLine = NewLineFor(parent);
+        string indent = IndentOf(parent);
+        string inner = indent + StepFor(parent);
+
+        return broken
+            ? (start, newLine + inner, string.Empty)
+            : (endTag.Start, newLine + inner, newLine + indent);
+    }
+
+    /// <summary>Reports whether an element holds nothing but whitespace, line breaks and comments.</summary>
+    /// <remarks>
+    /// The whitespace between tags is trivia, not text; character data counts as blank only when it is
+    /// whitespace through and through.
+    /// </remarks>
+    private bool HoldsOnlyBlanks(XamlElement element) =>
+        element.Content.All(node => node switch
+        {
+            XamlTrivia { Kind: XamlTriviaKind.Whitespace or XamlTriviaKind.NewLine } => true,
+            XamlComment => true,
+            XamlText text => _document.SourceText.GetText(text.Span).All(char.IsWhiteSpace),
+            _ => false,
+        });
 
     /// <summary>
     /// Gets the whitespace immediately before a node, which is the indentation a sibling

@@ -11,6 +11,21 @@ the source of truth, an unchanged document round-trips byte for byte, and unknow
 
 ## Unreleased
 
+### The first child of an empty element on a line of its own
+
+`InsertElement` and `InsertFragment` put the first child of an element with no children straight after
+its start tag, on the start tag's line: a designer dropping a button into an emptied user control wrote
+`Height="420"><Button Content="Button" />`, with the blank lines below it. The first child now goes on
+a line of its own, one step in — the step the file is written with, two spaces where it does not say,
+and the document's own line break — whenever the element is laid out on lines: what it holds already
+breaks a line, or its start tag begins a line in a document written on lines. Nothing already there
+moves; the blank lines and comments the element held stay below the child, and an element that held
+nothing, self-closing or not, gets its end tag back on a line at its own indentation. An element
+written inline inside another, every element of a document written on one line, and an element that
+holds text take the first child inline as before.
+
+No public API changed.
+
 ### A live document
 
 `XamlLiveDocument` is one document with its own history, the text last saved, and the session that

@@ -80,6 +80,33 @@ the element's one lossless expansion rather than a choice among several, and an 
 written self-closing by every convention there is — so a tool that inserts into one would otherwise
 be doing the same tag surgery by hand, against spans, which is what this editor exists to avoid.
 
+The first child of an element with no children goes on a line of its own, one step in, whenever the
+element is laid out on lines — what it holds already breaks a line, or its start tag begins a line in
+a document written on lines. An emptied user control
+
+```xml
+<UserControl Width="740" Height="420">
+
+</UserControl>
+```
+
+takes a button as
+
+```xml
+<UserControl Width="740" Height="420">
+  <Button Content="Button" />
+
+</UserControl>
+```
+
+The step is the one the file is written with — the difference between the element's indentation and
+its parent's — and two spaces where the file does not say; the line break is the document's own.
+Nothing already there moves: the blank lines and comments the element held stay below the child, and
+an element that held nothing — `<Grid />` or `<Grid></Grid>` on a line of its own — gets its end tag
+back on a line at its own indentation. An element written inline inside another, and every element of
+a document written on one line, takes its first child inline as before; so does an element that holds
+text, which is content of another kind.
+
 `RemoveElement` takes the whole line when the element had that line to itself, so removal does not
 leave its indentation behind as a blank.
 
