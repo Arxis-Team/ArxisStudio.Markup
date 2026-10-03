@@ -169,6 +169,46 @@ public sealed class ClassKeepingUpdateTests
     }
 
     [AvaloniaFact]
+    public async Task AButtonsHandlerRunsOnTheWindowAfterTheWindowsContentIsRebuilt()
+    {
+        const string Content =
+            "  <StackPanel>\n" +
+            "    <Button x:Name=\"Ok\" Content=\"Ok\" Click=\"OkClicked\" />\n" +
+            "  </StackPanel>\n";
+
+        XamlLoadSession session = await LoadAsync(Window(Content));
+        var root = session.GetRoot<CountedWindow>();
+
+        try
+        {
+            // Resources the window did not have are a change to what the window holds, and the window's
+            // content is rebuilt from a copy of it — the button with it, by a load that hooks up nothing.
+            XamlUpdateResult result = await UpdateAsync(
+                session,
+                Window(
+                    "  <tc:TrackedWindow.Resources>\n" +
+                    "    <SolidColorBrush x:Key=\"Accent\" Color=\"Red\" />\n" +
+                    "  </tc:TrackedWindow.Resources>\n" +
+                    Content));
+
+            Assert.True(result.Applied, Describe(result));
+            Assert.Same(root, session.RootObject);
+
+            Button button = Assert.IsType<StackPanel>(root.Content).Children.OfType<Button>().Single();
+            int clicks = root.OkClickCount;
+
+            button.RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
+
+            Assert.Equal(clicks + 1, root.OkClickCount);
+        }
+        finally
+        {
+            await session.DisposeAsync();
+            root.Close();
+        }
+    }
+
+    [AvaloniaFact]
     public async Task AStructuralChangeInsideAPanelHoldingAHandlerAppliesInPlace()
     {
         await using XamlLoadSession session = await LoadAsync(View(

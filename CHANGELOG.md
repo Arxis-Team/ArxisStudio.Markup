@@ -105,6 +105,11 @@ update path less well than one whose class was missing.
 - Every write of an update, the map rebuilt over it, the design values applied again and the handlers
   hooked up now happen in one dispatcher turn. A cancellation can no longer arrive between the writes
   and the document they belong to.
+- A window whose content was rebuilt — resources added at the root, say — lost the handlers in that
+  content: a click on its rebuilt button ran nothing. The update paired the rebuilt elements with the
+  root's logical children, and a window in Avalonia 12 has a host of its own among them beside its
+  content, so the pairing stopped at the root and the map placed the new objects by positions recorded
+  against the copy's text. The pairing now reads what the element's content member holds.
 
 `docs/adr/0019`, `0020`, `0024`.
 

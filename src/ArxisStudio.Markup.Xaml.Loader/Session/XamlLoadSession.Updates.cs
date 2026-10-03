@@ -1,4 +1,5 @@
 using System;
+using System.Collections;
 using System.Collections.Generic;
 using System.Collections.Immutable;
 using System.Linq;
@@ -1396,6 +1397,14 @@ public sealed partial class XamlLoadSession
     /// The entries of a dictionary the element holds are paired with the elements that declare
     /// them, by the key each is written under — see <see cref="PairResources"/>.
     /// </para>
+    /// <para>
+    /// The objects on the other side are what the element's content went into (<see cref="ContentOf"/>),
+    /// not the object's logical children. Those are whatever the control parents, and a window in
+    /// Avalonia 12 parents a host of its own beside its content — so the walk stopped at every
+    /// window, a window's rebuilt content was left for the map to place by the positions Avalonia
+    /// recorded against the copy's text rather than the document's, and the handlers in it had no
+    /// object to be hooked up to.
+    /// </para>
     /// </remarks>
     private void Pair(XamlElement element, object target, Dictionary<XamlElement, object> into)
     {
@@ -1404,7 +1413,7 @@ public sealed partial class XamlLoadSession
         PairResources(element, target, into);
 
         XamlElement[] children = [.. element.ContentElements];
-        object[] objects = target is ILogical logical ? [.. logical.LogicalChildren] : [];
+        object[] objects = ContentOf(target);
 
         if (children.Length != objects.Length)
         {
@@ -1415,6 +1424,27 @@ public sealed partial class XamlLoadSession
         {
             Pair(children[index], objects[index], into);
         }
+    }
+
+    /// <summary>What an object holds where the elements written as its content went, in order.</summary>
+    /// <remarks>
+    /// The member the type calls its content: the one control a content control or a decorator
+    /// holds, the controls of a panel's children or an items control's items. Only controls,
+    /// which is all the logical children ever offered — what else a list holds was never paired
+    /// by position, and a count that differs stops the walk rather than guess.
+    /// </remarks>
+    private object[] ContentOf(object target)
+    {
+        object? held = Environment.MemberResolver.FindContent(target.GetType()) is { CanRead: true } content
+            ? XamlObjectReplacement.Held(target, content.Name, Environment.MemberResolver)
+            : null;
+
+        return held switch
+        {
+            ILogical one => [one],
+            IEnumerable many and not string => [.. many.OfType<ILogical>()],
+            _ => [],
+        };
     }
 
     /// <summary>
