@@ -148,6 +148,7 @@ if (session is null)
 | `LocalAssembly` | The assembly unqualified `clr-namespace:` references resolve against, and whose non-public members — a private handler — the document may name; by default the resolved `x:Class`'s |
 | `UseCompiledBindingsByDefault` | What `{Binding}` means when the document does not say |
 | `RootAccess` | A host that borrows parts of the root, lending them back for every write — see [updates](updates.md#a-host-that-borrows-the-root) |
+| `ClassUse` | `Construct` the class `x:Class` names (the default), or build the root `AsWritten` — see [a class left out on request](#a-class-left-out-on-request) |
 
 A session is disposable, holds the objects it built, and refuses to work after disposal.
 
@@ -192,6 +193,36 @@ What the load left out of the text Avalonia was given, every later projection of
 out too, so the session stays updatable: a child added to the root rebuilds its content, and a panel
 holding a button with a handler is rebuilt without the handler. A class that resolves later — after a
 build — is a new environment and a new session; a changed `x:Class` is one anyway.
+
+### A class left out on request
+
+The same road is open to a host that does not want the class constructed at all. A designer showing a
+program's forms wants what the program's `App.axaml` declares — its theme and its resources — and not
+the program's `App`, whose constructor is the program starting up (ADR 0027):
+
+```csharp
+var options = new XamlLoadOptions { Mode = XamlLoadMode.Design, ClassUse = XamlClassUse.AsWritten };
+
+await using XamlLoadSession session = await XamlLoadSession.CreateAsync(appDocument, environment, options);
+
+var application = session.GetRoot<Application>();   // an Application, never the program's App
+```
+
+Nothing is reported about the class — nothing is wrong with it — and a handler the document names is
+reported and left out, with nothing to be hooked up to. The styles and the dictionary have one owner
+each, so a host lending them to a form takes them over rather than sharing them, and loads the document
+once per form:
+
+```csharp
+IStyle[] styles = [.. application.Styles];
+IResourceDictionary resources = application.Resources;
+
+application.Styles.Clear();
+application.Resources = new ResourceDictionary();
+
+form.Styles.AddRange(styles);
+form.Resources.MergedDictionaries.Add(resources);
+```
 
 ## Objects and elements
 

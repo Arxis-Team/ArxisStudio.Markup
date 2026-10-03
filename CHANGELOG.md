@@ -11,6 +11,19 @@ the source of truth, an unchanged document round-trips byte for byte, and unknow
 
 ## Unreleased
 
+### A root built as written, on request
+
+`XamlLoadOptions.ClassUse` says what a session does with the class `x:Class` names:
+`XamlClassUse.Construct`, the default and what a session always did, or `XamlClassUse.AsWritten`, which
+builds the root as the element it is written as and never constructs the class — the road a class the
+load cannot use already took (ADR 0017), on the host's request and without a diagnostic about the class.
+An application's `App.axaml` loaded this way is a plain `Application` holding the document's styles and
+resources, and the program's `App` constructor does not run inside the host. A handler the document names
+is reported and left out, with a message saying the root was built as written. Every projection of the
+session leaves the class out, so it updates and rebuilds as before (ADR 0027).
+
+Added to the public surface: `XamlClassUse`, `XamlLoadOptions.ClassUse`.
+
 ### The first child of an empty element on a line of its own
 
 `InsertElement` and `InsertFragment` put the first child of an element with no children straight after

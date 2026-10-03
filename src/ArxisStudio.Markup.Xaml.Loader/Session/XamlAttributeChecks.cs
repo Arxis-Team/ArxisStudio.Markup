@@ -53,6 +53,10 @@ internal static class XamlAttributeChecks
     /// <see langword="null"/> when there is none to use, in which case the document's
     /// <c>x:Class</c>, if it has one, is withheld as well.
     /// </param>
+    /// <param name="classUse">
+    /// Whether the host asked for the class at all, which is what a handler with nothing to be hooked
+    /// up to is told it lacks.
+    /// </param>
     /// <param name="environment">The environment the document's names are resolved through.</param>
     /// <param name="diagnostics">Collects everything noticed on the way.</param>
     /// <param name="cancellationToken">A token to observe while resolving.</param>
@@ -63,6 +67,7 @@ internal static class XamlAttributeChecks
     internal static async ValueTask<XamlAttributeFindings> RunAsync(
         XamlDocument document,
         Type? rootType,
+        XamlClassUse classUse,
         XamlLoadEnvironment environment,
         List<MarkupDiagnostic> diagnostics,
         CancellationToken cancellationToken)
@@ -124,8 +129,8 @@ internal static class XamlAttributeChecks
                 }
 
                 await CheckAsync(
-                        document, element, attribute, type, rootType, environment, diagnostics, removals, handlers,
-                        cancellationToken)
+                        document, element, attribute, type, rootType, classUse, environment, diagnostics, removals,
+                        handlers, cancellationToken)
                     .ConfigureAwait(false);
             }
         }
@@ -139,6 +144,7 @@ internal static class XamlAttributeChecks
         XamlAttribute attribute,
         Type? type,
         Type? rootType,
+        XamlClassUse classUse,
         XamlLoadEnvironment environment,
         List<MarkupDiagnostic> diagnostics,
         ImmutableArray<TextSpan>.Builder removals,
@@ -176,9 +182,12 @@ internal static class XamlAttributeChecks
 
         diagnostics.Add(MarkupDiagnostic.Load(
             XamlLoaderDiagnosticCodes.MissingEventHandler,
-            rootType is null
-                ? $"'{attribute.Name}' names the handler '{handler}', but the document has no x:Class to find it on."
-                : $"'{attribute.Name}' names the handler '{handler}', which {rootType.Name} does not declare.",
+            rootType is not null
+                ? $"'{attribute.Name}' names the handler '{handler}', which {rootType.Name} does not declare."
+                : classUse == XamlClassUse.AsWritten
+                    ? $"'{attribute.Name}' names the handler '{handler}', and the root is built as written, " +
+                      "without the class that would answer it."
+                    : $"'{attribute.Name}' names the handler '{handler}', but the document has no x:Class to find it on.",
             MarkupDiagnosticSeverity.Warning,
             document.Uri,
             attribute.Span));

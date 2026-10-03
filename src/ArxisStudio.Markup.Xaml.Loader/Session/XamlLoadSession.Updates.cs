@@ -562,7 +562,7 @@ public sealed partial class XamlLoadSession
         XamlDocument document,
         List<MarkupDiagnostic> diagnostics,
         CancellationToken cancellationToken) =>
-        XamlAttributeChecks.RunAsync(document, _rootClass, Environment, diagnostics, cancellationToken);
+        XamlAttributeChecks.RunAsync(document, _rootClass, Options.ClassUse, Environment, diagnostics, cancellationToken);
 
     /// <summary>
     /// Works out what the projection of a part that is about to be rebuilt leaves out.

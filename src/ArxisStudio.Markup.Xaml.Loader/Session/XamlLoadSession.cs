@@ -238,9 +238,14 @@ public sealed partial class XamlLoadSession : IAsyncDisposable
         // needs neither the thread nor the scope — and asking for the thread would be worse than
         // unnecessary: a host whose resolver marshals to the owning thread would be waiting for a
         // thread this call is sitting on.
-        Type? rootType = await XamlRootClass
-            .ResolveAsync(document, environment, diagnostics, cancellationToken)
-            .ConfigureAwait(false);
+        //
+        // A host that asked for the root as written has no use for the class, and is not told
+        // anything about it either: nothing is wrong with a class nobody wanted constructed.
+        Type? rootType = options.ClassUse == XamlClassUse.AsWritten
+            ? null
+            : await XamlRootClass
+                .ResolveAsync(document, environment, diagnostics, cancellationToken)
+                .ConfigureAwait(false);
 
         // Against the class the document names rather than against an instance of it, because
         // there is no instance yet: the text the instance is populated from has to exist before
@@ -248,7 +253,7 @@ public sealed partial class XamlLoadSession : IAsyncDisposable
         // With no class to use, the directive naming one is withheld too, and the root is built as
         // the element it is written as.
         ImmutableArray<TextSpan> unloadable = (await XamlAttributeChecks
-            .RunAsync(document, rootType, environment, diagnostics, cancellationToken)
+            .RunAsync(document, rootType, options.ClassUse, environment, diagnostics, cancellationToken)
             .ConfigureAwait(false)).Withheld;
 
         // Includes are resolved before anything is created, because Avalonia resolves them

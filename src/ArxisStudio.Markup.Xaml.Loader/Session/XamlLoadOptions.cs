@@ -32,6 +32,23 @@ public sealed class XamlLoadOptions
     /// <summary>Gets a value indicating whether bindings are compiled unless a document says otherwise.</summary>
     public bool UseCompiledBindingsByDefault { get; init; }
 
+    /// <summary>Gets what is done with the class the document's <c>x:Class</c> names.</summary>
+    /// <remarks>
+    /// <para>
+    /// <see cref="XamlClassUse.Construct"/> by default: the class is constructed and populated from
+    /// the document, as the program would build it.
+    /// </para>
+    /// <para>
+    /// <see cref="XamlClassUse.AsWritten"/> leaves the class out the way a class the load cannot use
+    /// is left out (ADR 0017): the directive is kept out of the text Avalonia is given, by every
+    /// projection the session makes, and the root is built as the element it is written as. It is
+    /// for a host that wants what a document declares and not what its class does — an application's
+    /// <c>App.axaml</c>, whose class constructed inside a designer would be the program starting up
+    /// there (ADR 0027).
+    /// </para>
+    /// </remarks>
+    public XamlClassUse ClassUse { get; init; } = XamlClassUse.Construct;
+
     /// <summary>
     /// Gets what gives the session the whole of its root back, when a host has borrowed parts of it.
     /// </summary>
