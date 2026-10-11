@@ -11,6 +11,17 @@ the source of truth, an unchanged document round-trips byte for byte, and unknow
 
 ## Unreleased
 
+### A document writes what the XAML compiler sets
+
+A simply named Avalonia property is writable to a document only through a public CLR setter, because
+that is how Avalonia's XAML compiler — at run time and in the project's build — sets it (ADR 0029). A
+styled property whose wrapper only reads, as `ActualThemeVariant`'s does, or that has no wrapper on the
+type, is now `CanWrite` false and `IsReadOnly` true, and an edit through the session is refused with
+`ReadOnlyMember`. A property inspector built on the descriptor had written both into a form, whose
+next build then failed.
+
+No public API changed.
+
 ### A class whose constructor throws is left out
 
 A document whose `x:Class` resolved but whose constructor threw produced no object: the reflection

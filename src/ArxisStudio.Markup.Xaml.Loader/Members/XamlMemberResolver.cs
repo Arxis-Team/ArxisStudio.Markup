@@ -344,14 +344,30 @@ public sealed partial class XamlMemberResolver
                 _ => XamlMemberKind.StyledProperty,
             };
 
+        bool writable = !property.IsReadOnly && (property.IsAttached || HasPublicSetter(targetType, property.Name));
+
         return new XamlMemberDescriptor(
             name, kind, property.OwnerType, targetType, property.PropertyType,
-            canRead: true, canWrite: !property.IsReadOnly,
-            isAttached: property.IsAttached, isReadOnly: property.IsReadOnly)
+            canRead: true, canWrite: writable,
+            isAttached: property.IsAttached, isReadOnly: !writable)
         {
             AvaloniaProperty = property,
         };
     }
+
+    /// <summary>
+    /// Whether a document can write a property by its simple name: through a public CLR setter, the
+    /// way Avalonia's XAML compiler — at run time as in the project's build — sets it.
+    /// </summary>
+    /// <remarks>
+    /// The object takes any property that is not read-only, and a document does not. A styled property
+    /// whose wrapper only reads — <c>ActualThemeVariant</c> — has no setter the compiler can find, and one
+    /// registered with no wrapper at all is a name the compiler does not resolve. Written into a
+    /// document, either fails that document's next load and the project's build, so to a document both
+    /// are read-only. An attached property is written by its owner's name and is not asked this.
+    /// </remarks>
+    private static bool HasPublicSetter(Type targetType, string name) =>
+        FindProperty(targetType, name)?.SetMethod is { IsPublic: true };
 
     /// <summary>Determines whether a name is the type's content property.</summary>
     private static bool IsContentProperty(Type targetType, string name) =>

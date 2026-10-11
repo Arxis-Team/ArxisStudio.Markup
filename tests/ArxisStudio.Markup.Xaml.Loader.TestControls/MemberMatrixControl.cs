@@ -30,6 +30,19 @@ public class MemberMatrixControl : ContentControl
         AvaloniaProperty.RegisterDirect<MemberMatrixControl, string>(
             nameof(Computed), o => o.Computed);
 
+    /// <summary>
+    /// A styled property whose CLR wrapper only reads, as <c>ActualThemeVariant</c>'s does: settable on
+    /// the object, and not by a document — Avalonia's XAML compiler finds no setter for it.
+    /// </summary>
+    public static readonly StyledProperty<double> ShadeProperty =
+        AvaloniaProperty.Register<MemberMatrixControl, double>(nameof(Shade));
+
+    /// <summary>
+    /// A styled property with no CLR wrapper at all: Avalonia's XAML compiler does not resolve the name.
+    /// </summary>
+    public static readonly StyledProperty<bool> UnwrappedProperty =
+        AvaloniaProperty.Register<MemberMatrixControl, bool>("Unwrapped");
+
     /// <summary>An attached property, registered against any styled element.</summary>
     public static readonly AttachedProperty<int> SlotProperty =
         AvaloniaProperty.RegisterAttached<MemberMatrixControl, StyledElement, int>("Slot");
@@ -51,6 +64,9 @@ public class MemberMatrixControl : ContentControl
         get => _counter;
         set => SetAndRaise(CounterProperty, ref _counter, value);
     }
+
+    /// <summary>Gets the shade, which the object is given and a document cannot write.</summary>
+    public double Shade => GetValue(ShadeProperty);
 
     /// <summary>Gets a value that is derived rather than stored.</summary>
     public string Computed => $"label={Label}, counter={Counter}";

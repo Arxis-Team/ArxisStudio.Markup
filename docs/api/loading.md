@@ -283,6 +283,13 @@ member.AttachedAccessors
 
 Attached members work by their written name: `session.GetMember(control, "Grid.Row")`.
 
+`CanWrite` is what a *document* can write, which is less than what the object takes. Avalonia's XAML
+compiler — the runtime one and the project's build alike — sets a simply named member through its
+public CLR setter, so a styled property whose wrapper only reads (`ActualThemeVariant`) or that has no
+wrapper on the type is read-only here, and an edit through the session is refused with `ReadOnlyMember`
+before either side is touched (ADR 0029). Written into a document, either would fail its next load and
+the project's build.
+
 To offer a property list, ask what the object has:
 
 ```csharp

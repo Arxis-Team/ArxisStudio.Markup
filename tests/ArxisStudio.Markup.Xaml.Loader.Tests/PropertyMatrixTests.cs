@@ -42,6 +42,8 @@ public sealed class PropertyMatrixTests
     [InlineData(nameof(MemberMatrixControl.Computed), XamlMemberKind.DirectProperty, false)]
     [InlineData(nameof(MemberMatrixControl.Note), XamlMemberKind.ClrProperty, true)]
     [InlineData(nameof(MemberMatrixControl.Items), XamlMemberKind.Collection, false)]
+    [InlineData(nameof(MemberMatrixControl.Shade), XamlMemberKind.StyledProperty, false)]
+    [InlineData("Unwrapped", XamlMemberKind.StyledProperty, false)]
     public async Task EveryKindOfMemberIsClassifiedAndItsWritabilityReported(
         string name, XamlMemberKind kind, bool canWrite)
     {
@@ -153,6 +155,50 @@ public sealed class PropertyMatrixTests
         Assert.Contains(
             result.Diagnostics,
             static d => d.Code == XamlLoaderDiagnosticCodes.ReadOnlyMember);
+    }
+
+    [AvaloniaTheory]
+    [InlineData(nameof(MemberMatrixControl.Shade))]
+    [InlineData("Unwrapped")]
+    [InlineData("ActualThemeVariant")]
+    public async Task AStyledPropertyADocumentCannotSetIsRefusedAndTheDocumentLeftAlone(string name)
+    {
+        // Avalonia's XAML compiler sets a simply named member through its CLR setter, and finds none
+        // here: written into the document, it would fail that document's next load and its build.
+        await using XamlLoadSession session = await LoadMatrix();
+        var control = session.GetRoot<MemberMatrixControl>();
+        AvaloniaProperty property = AvaloniaPropertyRegistry.Instance.FindRegistered(control.GetType(), name)!;
+        string before = session.Document.GetText();
+        object value = name switch
+        {
+            "Unwrapped" => true,
+            "ActualThemeVariant" => Avalonia.Styling.ThemeVariant.Light,
+            _ => 0.5,
+        };
+
+        XamlEditResult result = session.SetValue(control, property, value);
+
+        Assert.False(result.Applied);
+        Assert.Contains(result.Diagnostics, static d => d.Code == XamlLoaderDiagnosticCodes.ReadOnlyMember);
+        Assert.Equal(before, session.Document.GetText());
+    }
+
+    [AvaloniaTheory]
+    [InlineData("Shade=\"0.5\"")]
+    [InlineData("Unwrapped=\"True\"")]
+    public async Task ADocumentWritingWhatTheCompilerCannotSetDoesNotLoad(string attribute)
+    {
+        // What the descriptor refuses to write is what a load refuses to read: the runtime compiler
+        // is Avalonia's own, with the build's rules.
+        (XamlLoadSession? session, XamlLoadResult result) = await XamlLoadSession.TryCreateAsync(
+            XamlDocument.Parse(
+                $"<local:MemberMatrixControl xmlns=\"{AvaloniaNamespace}\" xmlns:local=\"{TestControlsNamespace}\" {attribute} />",
+                new XamlParseOptions { DocumentUri = new Uri("file:///Views/Matrix.axaml") }),
+            Environment(),
+            cancellationToken: TestContext.Current.CancellationToken);
+
+        Assert.Null(session);
+        Assert.Contains(result.Diagnostics, static d => d.IsError);
     }
 
     [AvaloniaFact]
