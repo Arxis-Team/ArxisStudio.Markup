@@ -44,6 +44,8 @@ public sealed class PropertyMatrixTests
     [InlineData(nameof(MemberMatrixControl.Items), XamlMemberKind.Collection, false)]
     [InlineData(nameof(MemberMatrixControl.Shade), XamlMemberKind.StyledProperty, false)]
     [InlineData("Unwrapped", XamlMemberKind.StyledProperty, false)]
+    [InlineData(nameof(MemberMatrixControl.Stamp), XamlMemberKind.ClrProperty, false)]
+    [InlineData(nameof(StyledElement.IsInitialized), XamlMemberKind.ClrProperty, false)]
     public async Task EveryKindOfMemberIsClassifiedAndItsWritabilityReported(
         string name, XamlMemberKind kind, bool canWrite)
     {

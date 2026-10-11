@@ -74,6 +74,12 @@ public class MemberMatrixControl : ContentControl
     /// <summary>Gets or sets an ordinary CLR property, with no Avalonia property behind it.</summary>
     public string? Note { get; set; }
 
+    /// <summary>
+    /// Gets a CLR property the control sets itself, as <c>StyledElement.IsInitialized</c> is: its setter is
+    /// private, and the XAML compiler finds none.
+    /// </summary>
+    public string? Stamp { get; private set; }
+
     /// <summary>Gets a collection members are added to rather than assigned.</summary>
     public IList<string> Items => _items;
 

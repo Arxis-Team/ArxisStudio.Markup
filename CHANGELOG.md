@@ -11,6 +11,16 @@ the source of truth, an unchanged document round-trips byte for byte, and unknow
 
 ## Unreleased
 
+### A CLR property behind a private setter is read-only to a document
+
+`StyledElement.IsInitialized` has a private setter, and `PropertyInfo.CanWrite` answers yes for it, so the
+resolver called it writable and a property inspector wrote `IsInitialized="True"` into a form — which the
+XAML compiler refuses. A CLR property is now writable to a document only through a public setter, as an
+Avalonia property already was (ADR 0029, amended); a collection behind a private setter is a
+`Collection`.
+
+No public API changed.
+
 ### The root of a class document is its own
 
 The object map paired the root of an `x:Class` document after its walk, and learnt the name of its text

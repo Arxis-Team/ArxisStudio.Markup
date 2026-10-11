@@ -34,6 +34,12 @@ through the session, and read-only under its simple name. One the type does wrap
 `TextBlock.FontSize`, `KeyboardNavigation.IsTabStop` on a control — stays the type's own member, written
 simply. This part was added the same day, after a designer's test showed the first decision had left it.
 
+**A CLR property is writable through a public setter too.** `PropertyInfo.CanWrite` answers yes for a
+private one — `StyledElement.IsInitialized` has it — and the compiler finds no setter there; a designer's
+inspector wrote `IsInitialized="True"` into a form the same evening. A CLR property's descriptor now says
+`CanWrite` only for a public setter, and a collection behind a private setter is a collection, filled
+rather than assigned.
+
 ## Consequences
 
 - A tool offering the members a document can write offers what the document can load and the project

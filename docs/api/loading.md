@@ -294,7 +294,8 @@ wrapper on the type is read-only here, and an edit through the session is refuse
 before either side is touched (ADR 0029). Written into a document, either would fail its next load and
 the project's build. An attached property a type answers for and does not wrap is listed and written
 by its owner's name — `InputElement.IsHoldWithMouseEnabled` on a `TextBlock` — and is read-only under
-its simple name, which the compiler resolves to nothing.
+its simple name, which the compiler resolves to nothing. A CLR property is the same: writable through a public setter only, so
+`IsInitialized`, whose setter is private, is read-only.
 
 To offer a property list, ask what the object has:
 

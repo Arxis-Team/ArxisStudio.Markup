@@ -392,7 +392,11 @@ public sealed partial class XamlMemberResolver
         // are distinguished from an ordinary property.
         bool isContent = property.GetCustomAttribute<ContentAttribute>(inherit: true) is not null;
 
-        bool isCollection = !property.CanWrite
+        // Written through a public setter or not at all: PropertyInfo.CanWrite answers yes for a private one, as
+        // StyledElement.IsInitialized has, and the XAML compiler finds no setter there (ADR 0029).
+        bool canWrite = property.SetMethod is { IsPublic: true };
+
+        bool isCollection = !canWrite
             && property.PropertyType != typeof(string)
             && typeof(System.Collections.IEnumerable).IsAssignableFrom(property.PropertyType);
 
@@ -402,8 +406,8 @@ public sealed partial class XamlMemberResolver
 
         return new XamlMemberDescriptor(
             name, kind, property.DeclaringType ?? targetType, targetType, property.PropertyType,
-            canRead: property.CanRead, canWrite: property.CanWrite,
-            isAttached: false, isReadOnly: !property.CanWrite)
+            canRead: property.CanRead, canWrite: canWrite,
+            isAttached: false, isReadOnly: !canWrite)
         {
             ClrProperty = property,
         };
