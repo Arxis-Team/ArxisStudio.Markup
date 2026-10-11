@@ -478,6 +478,28 @@ public sealed class PropertyMatrixTests
         Assert.Equal(members, members.OrderBy(static member => member.Name, StringComparer.Ordinal));
         Assert.Equal(members.Length, members.Select(static member => member.Name).Distinct().Count());
     }
+
+    [AvaloniaFact]
+    public async Task AnAttachedPropertyTheTypeDoesNotWrapIsListedAndWrittenByItsOwnersName()
+    {
+        // InputElement registers IsHoldWithMouseEnabled as an attached property of its own and wraps it in
+        // nothing: the XAML compiler resolves TextBlock's simple name to nothing and the owner's name to it.
+        await using XamlLoadSession session = await Load(
+            $"<TextBlock xmlns=\"{AvaloniaNamespace}\" Text=\"hold\" />");
+
+        var block = session.GetRoot<TextBlock>();
+
+        Assert.False(session.GetMember(block, "IsHoldWithMouseEnabled").CanWrite);
+
+        ImmutableArray<XamlMemberDescriptor> members = session.GetMembers(block);
+
+        Assert.DoesNotContain(members, static member => member.Name == "IsHoldWithMouseEnabled");
+        Assert.Contains(members, static member => member.Name == "InputElement.IsHoldWithMouseEnabled" && member.CanWrite && member.IsAttached);
+
+        // Set through the session, it is written the way the compiler reads it.
+        Assert.True(session.SetValue(block, InputElement.IsHoldWithMouseEnabledProperty, true).Applied);
+        Assert.Contains("InputElement.IsHoldWithMouseEnabled=\"True\"", session.Document.GetText(), StringComparison.Ordinal);
+    }
     [AvaloniaFact]
     public async Task AValueWrittenAsTextReachesTheSameValueTheDocumentLoadedWith()
     {

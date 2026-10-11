@@ -75,7 +75,9 @@ public sealed partial class XamlMemberResolver
     /// A property registered both ways — <c>KeyboardNavigation.IsTabStop</c> is also an ordinary
     /// property of every control — is listed once, under its simple name. Both spellings are
     /// valid XAML, but they are one property, and offering it twice invites a panel to show two
-    /// rows that write to the same value.
+    /// rows that write to the same value. Once, but under the name a document can write: an attached
+    /// property the type answers for and does not wrap — <c>InputElement.IsHoldWithMouseEnabled</c> —
+    /// is listed by its owner's name, because the XAML compiler resolves the simple one to nothing.
     /// </para>
     /// <para>
     /// Which of them are worth showing is still the tool's decision — a hundred inherited
@@ -242,6 +244,14 @@ public sealed partial class XamlMemberResolver
         ArgumentNullException.ThrowIfNull(targetType);
         ArgumentNullException.ThrowIfNull(property);
 
+        // An attached property the type does not wrap is a member a document writes by its owner's name —
+        // InputElement.IsHoldWithMouseEnabled on a TextBlock — and the XAML compiler resolves the simple
+        // name to nothing (ADR 0029).
+        if (property.IsAttached && !HasPublicSetter(targetType, property.Name))
+        {
+            return Resolve(targetType, $"{property.OwnerType.Name}.{property.Name}", property.OwnerType);
+        }
+
         // Routed through the cache like every other lookup, so a property asked about
         // repeatedly costs one reflection pass rather than one per call.
         return _cache.GetOrAdd(
@@ -344,7 +354,8 @@ public sealed partial class XamlMemberResolver
                 _ => XamlMemberKind.StyledProperty,
             };
 
-        bool writable = !property.IsReadOnly && (property.IsAttached || HasPublicSetter(targetType, property.Name));
+        bool writable = !property.IsReadOnly
+            && (name.Contains('.', StringComparison.Ordinal) || HasPublicSetter(targetType, property.Name));
 
         return new XamlMemberDescriptor(
             name, kind, property.OwnerType, targetType, property.PropertyType,
@@ -364,9 +375,10 @@ public sealed partial class XamlMemberResolver
     /// whose wrapper only reads — <c>ActualThemeVariant</c> — has no setter the compiler can find, and one
     /// registered with no wrapper at all is a name the compiler does not resolve. Written into a
     /// document, either fails that document's next load and the project's build, so to a document both
-    /// are read-only. An attached property is written by its owner's name and is not asked this.
+    /// are read-only. An attached property written by its owner's name is not asked this; one the registry
+    /// answers under its simple name is, because a simple name is what the document would write.
     /// </remarks>
-    private static bool HasPublicSetter(Type targetType, string name) =>
+    internal static bool HasPublicSetter(Type targetType, string name) =>
         FindProperty(targetType, name)?.SetMethod is { IsPublic: true };
 
     /// <summary>Determines whether a name is the type's content property.</summary>

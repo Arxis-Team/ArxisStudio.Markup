@@ -88,10 +88,13 @@ internal static class XamlPropertyNames
     /// <remarks>
     /// Asked of the registry rather than of the property: an attached property a type has taken on
     /// with <c>AddOwner</c> — <c>TextBlock.FontSize</c> is <c>TextElement</c>'s — is that type's own
-    /// as far as a document is concerned, and is written <c>FontSize</c>.
+    /// as far as a document is concerned, and is written <c>FontSize</c>. An attached property the type
+    /// answers for and does not wrap — <c>InputElement.IsHoldWithMouseEnabled</c> — is not: the XAML
+    /// compiler resolves the simple name to nothing, and it is written with its owner (ADR 0029).
     /// </remarks>
     private static bool IsOwnMember(AvaloniaProperty property, Type targetType) =>
-        ReferenceEquals(AvaloniaPropertyRegistry.Instance.FindRegistered(targetType, property.Name), property);
+        ReferenceEquals(AvaloniaPropertyRegistry.Instance.FindRegistered(targetType, property.Name), property)
+        && (!property.IsAttached || XamlMemberResolver.HasPublicSetter(targetType, property.Name));
 
     private static bool Names(XamlElement element, XamlQualifiedName name, AvaloniaProperty property, Type targetType)
     {

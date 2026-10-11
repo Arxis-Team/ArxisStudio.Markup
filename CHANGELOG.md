@@ -11,6 +11,17 @@ the source of truth, an unchanged document round-trips byte for byte, and unknow
 
 ## Unreleased
 
+### An attached property a type does not wrap is written by its owner's name
+
+`InputElement` registers `IsHoldWithMouseEnabled` as an attached property of its own and wraps it in
+nothing; the registry answered it under a `TextBlock`'s simple names, so it was listed as
+`IsHoldWithMouseEnabled`, writable, and an edit through the session wrote it so — a name the XAML
+compiler resolves to nothing. Such a property is now listed and written as `Owner.Member`, and is
+read-only under its simple name (ADR 0029, amended). One the type wraps with a public setter stays the
+type's own member.
+
+No public API changed.
+
 ### A document writes what the XAML compiler sets
 
 A simply named Avalonia property is writable to a document only through a public CLR setter, because
