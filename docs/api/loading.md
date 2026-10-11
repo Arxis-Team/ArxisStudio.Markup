@@ -261,6 +261,10 @@ output being passed off as a control's own declaration:
 An object declared in an included file is attributed to that file rather than to whichever line of
 this one sits at the same number — `GetSourceUri` is how you find out which.
 
+The root object is the root element's, whatever positions say: the root of an `x:Class` document
+records none, and a position recorded against another text — a theme's, or a canvas's window chrome
+compiled in Debug — is never taken for one in this document (ADR 0030).
+
 ## Members
 
 What a name means on a type — the question the syntax layer deliberately cannot answer:

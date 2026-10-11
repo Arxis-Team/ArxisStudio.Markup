@@ -173,9 +173,9 @@ public sealed class XamlObjectMap
         {
             // Avalonia names a runtime-loaded document with a synthetic URI of its own rather
             // than the base URI it was handed, so what the document "is" can only be learnt
-            // from the root object. Anything reporting a different URI came from elsewhere --
+            // from what it built. Anything reporting a different URI came from elsewhere --
             // a template or an included resource -- and must not be mapped into this document.
-            _documentSourceUri = XamlSourceInfo.GetXamlSourceInfo(root)?.SourceUri,
+            _documentSourceUri = SourceUriOf(root),
         };
 
         foreach ((XamlElement element, object target) in
@@ -188,15 +188,67 @@ public sealed class XamlObjectMap
 
         map._root = root;
 
+        // Before the walk, so that everything below the root is held to the root's element: a
+        // position recorded on somebody else's object cannot take the root, and cannot land
+        // outside it.
+        map.PairTheRoot(document, root);
         map.Walk(
             document, root, XamlObjectOrigin.Document, new HashSet<object>(ReferenceEqualityComparer.Instance), within: null);
-        map.PairTheRoot(document, root);
 
         return map;
     }
 
+    /// <summary>The name Avalonia gave the text the document's objects were built from.</summary>
+    /// <remarks>
+    /// The root's own, when it has one. The root of an <c>x:Class</c> document has none: the instance
+    /// is constructed before the markup is loaded into it. What it holds was loaded from the document,
+    /// so the nearest of its logical descendants that records a position says what the text was
+    /// called — nearest, because what is declared deeper may be another control's own markup, and
+    /// never one a template produced. Without it every recorded position was read as one in this
+    /// document, and a window chrome's template, compiled with positions in its own file, took a
+    /// form's root element (ADR 0030). A root holding nothing that recorded one leaves the name
+    /// unknown, and the pairing of the root is what keeps it its own.
+    /// </remarks>
+    private static Uri? SourceUriOf(object root)
+    {
+        if (XamlSourceInfo.GetXamlSourceInfo(root)?.SourceUri is { } own)
+        {
+            return own;
+        }
+
+        if (root is not ILogical logical)
+        {
+            return null;
+        }
+
+        var pending = new Queue<ILogical>(logical.LogicalChildren);
+        var seen = new HashSet<ILogical>(ReferenceEqualityComparer.Instance);
+
+        while (pending.Count > 0)
+        {
+            ILogical next = pending.Dequeue();
+
+            if (!seen.Add(next) || next is StyledElement { TemplatedParent: not null })
+            {
+                continue;
+            }
+
+            if (XamlSourceInfo.GetXamlSourceInfo(next)?.SourceUri is { } declared)
+            {
+                return declared;
+            }
+
+            foreach (ILogical child in next.LogicalChildren)
+            {
+                pending.Enqueue(child);
+            }
+        }
+
+        return null;
+    }
+
     /// <summary>
-    /// Pairs the document's root element with the object it produced, when nothing else did.
+    /// Pairs the document's root element with the object it produced, unless an update already did.
     /// </summary>
     /// <remarks>
     /// <para>
@@ -214,9 +266,12 @@ public sealed class XamlObjectMap
     /// on a form's background found nothing and the form's own properties were unreachable.
     /// </para>
     /// <para>
-    /// Only when the walk left both sides free. A root that already paired keeps what it deduced,
-    /// and an element already claimed by another object is not taken from it — either would be this
-    /// method overruling evidence with an assumption, which is the opposite of its purpose.
+    /// Before the walk rather than after it. Afterwards it would yield to whatever the walk had
+    /// paired first, and the walk is not evidence about the root: a recorded position is all it has,
+    /// and a position recorded against somebody else's text — a window chrome's template, compiled
+    /// with positions in its own file — took a form's root element, so that a designer described the
+    /// form as that template (ADR 0030). Only what an update carried across is left alone: it is the
+    /// update's own account of the same root.
     /// </para>
     /// </remarks>
     private void PairTheRoot(XamlDocument document, object root)

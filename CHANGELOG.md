@@ -11,6 +11,17 @@ the source of truth, an unchanged document round-trips byte for byte, and unknow
 
 ## Unreleased
 
+### The root of a class document is its own
+
+The object map paired the root of an `x:Class` document after its walk, and learnt the name of its text
+from the root — which records no position, being constructed before its markup is loaded. With no name
+every recorded position counted as one in the document, and a window chrome's template, compiled with
+positions in its own file, took a form's root element: a designer described the form as that template.
+The root is now paired before the walk, and the text's name is learnt from the nearest declared
+descendant when the root has none (ADR 0030).
+
+No public API changed.
+
 ### An attached property a type does not wrap is written by its owner's name
 
 `InputElement` registers `IsHoldWithMouseEnabled` as an attached property of its own and wraps it in
