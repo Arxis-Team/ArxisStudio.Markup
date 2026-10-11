@@ -189,6 +189,13 @@ that one is the document contradicting itself. Names still resolve — `x:Name` 
 not a class — and handlers are reported and left out, because a handler names a method of the
 class and there is no class to find it on. The document keeps every one of them.
 
+A class whose constructor throws goes the same way (ADR 0028). The constructor is the project's code:
+a generated `InitializeComponent` in an assembly whose markup was never compiled throws "No precompiled
+XAML found", and a constructor can reach for a service a designer does not have. The root is built as
+written, and `RootInstanceCreationFailure` (AXM3022) is a warning carrying the constructor's own message
+— not the reflection wrapper's. Where the document itself failed inside the constructor, built without
+the class it would fail the same way: there is no root, and AXM3022 is an error.
+
 What the load left out of the text Avalonia was given, every later projection of the session leaves
 out too, so the session stays updatable: a child added to the root rebuilds its content, and a panel
 holding a button with a handler is rebuilt without the handler. A class that resolves later — after a

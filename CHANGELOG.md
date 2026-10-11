@@ -11,6 +11,20 @@ the source of truth, an unchanged document round-trips byte for byte, and unknow
 
 ## Unreleased
 
+### A class whose constructor throws is left out
+
+A document whose `x:Class` resolved but whose constructor threw produced no object: the reflection
+wrapper's "Exception has been thrown by the target of an invocation" was reported, and Avalonia's
+loader, handed the directive, constructed the class again and failed the document. The constructor is
+the project's code — a generated `InitializeComponent` in an assembly whose markup was never compiled
+throws "No precompiled XAML found" — and it now takes the road of a class nobody has built (ADR 0028):
+the directive and its handlers are withheld from every projection of the session, the root is built
+as written, and `RootInstanceCreationFailure` (AXM3022) is a warning carrying the constructor's own
+message. Where the document itself failed inside the constructor there is still no root, and AXM3022
+is an error.
+
+No public API changed.
+
 ### Several children into an empty element in one edit
 
 Two children one editor put into an element with none collided. Into a self-closing element each

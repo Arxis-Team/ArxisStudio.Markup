@@ -88,6 +88,16 @@ public sealed partial class XamlLoadSession : IAsyncDisposable
     private readonly Type? _rootClass;
 
     /// <summary>
+    /// How the load used the class: as the host asked, or <see cref="XamlClassUse.AsWritten"/> when the
+    /// class's constructor threw and the root was built without it (ADR 0028).
+    /// </summary>
+    /// <remarks>
+    /// What a later projection tells a handler it withholds: that the root is built as written, rather
+    /// than that the document has no class.
+    /// </remarks>
+    private readonly XamlClassUse _classUse;
+
+    /// <summary>
     /// Gets the assembly the document belongs to: the one the caller named, or the class's.
     /// </summary>
     /// <remarks>
@@ -104,12 +114,14 @@ public sealed partial class XamlLoadSession : IAsyncDisposable
         TextProjection projection,
         object rootObject,
         Type? rootClass,
+        XamlClassUse classUse,
         ImmutableArray<MarkupDiagnostic> diagnostics)
     {
         Document = document;
         Environment = environment;
         Projection = projection;
         _rootClass = rootClass;
+        _classUse = classUse;
         Objects = XamlObjectMap.Build(
             document,
             rootObject,
@@ -270,7 +282,7 @@ public sealed partial class XamlLoadSession : IAsyncDisposable
         // InitializeComponent does exactly that, and that load is where the document goes. The
         // factory is the caller's and may be asynchronous, which is why this goes through RunAsync
         // rather than waiting for a task on the one thread that task may need.
-        object? root = await environment.Dispatcher
+        XamlRootBuild built = await environment.Dispatcher
             .RunAsync(
                 async () =>
                 {
@@ -283,6 +295,40 @@ public sealed partial class XamlLoadSession : IAsyncDisposable
                 },
                 cancellationToken)
             .ConfigureAwait(false);
+
+        XamlClassUse classUse = options.ClassUse;
+
+        // The class resolved and its constructor threw: the project's code, not the document — a
+        // generated InitializeComponent in an assembly whose markup was never compiled does exactly
+        // this. The class goes the way of one nobody has built (ADR 0028): withheld from this and
+        // every later projection, its handlers with it, and the root built as written. Projected
+        // again here, off the owning thread, for the reason the class was resolved off it.
+        if (built.ClassFailure is { } failure && rootType is not null)
+        {
+            diagnostics.Add(XamlRootClass.CreationFailure(rootType, document, failure, builtAsWritten: true));
+
+            projection = await WithoutClassAsync(document, environment, diagnostics, cancellationToken)
+                .ConfigureAwait(false);
+
+            rootType = null;
+            classUse = XamlClassUse.AsWritten;
+
+            built = await environment.Dispatcher
+                .RunAsync(
+                    async () =>
+                    {
+                        using (environment.CompilationScope?.Enter())
+                        {
+                            return await BuildAsync(
+                                    null, document, projection, environment, options, diagnostics, cancellationToken)
+                                .ConfigureAwait(true);
+                        }
+                    },
+                    cancellationToken)
+                .ConfigureAwait(false);
+        }
+
+        object? root = built.Root;
 
         if (root is null)
         {
@@ -307,7 +353,7 @@ public sealed partial class XamlLoadSession : IAsyncDisposable
         // suspended, which for a factory that answers immediately is never.
         XamlLoadSession session = await environment.Dispatcher
             .InvokeAsync(
-                () => new XamlLoadSession(document, environment, options, projection, root, rootType, []),
+                () => new XamlLoadSession(document, environment, options, projection, root, rootType, classUse, []),
                 cancellationToken)
             .ConfigureAwait(false);
 
@@ -424,7 +470,7 @@ public sealed partial class XamlLoadSession : IAsyncDisposable
     /// all of this is on the owning thread, inside a scope that thread entered and will leave.
     /// </para>
     /// </remarks>
-    private static async Task<object?> BuildAsync(
+    private static async Task<XamlRootBuild> BuildAsync(
         Type? rootType,
         XamlDocument document,
         TextProjection projection,
@@ -435,21 +481,21 @@ public sealed partial class XamlLoadSession : IAsyncDisposable
     {
         if (rootType is null)
         {
-            return Load(document, projection, options, options.LocalAssembly, null, diagnostics);
+            return new XamlRootBuild(Load(document, projection, options, options.LocalAssembly, null, diagnostics), null);
         }
 
         // The class's assembly is the one the document belongs to, unless the caller said otherwise —
         // and the one a runtime load needs named before it may call the class's private handlers.
         Assembly localAssembly = options.LocalAssembly ?? rootType.Assembly;
 
-        object? rootInstance;
+        XamlRootCreation creation;
 
         XamlRootPopulation population = XamlRootPopulation.Lend(
             rootType, instance => Load(document, projection, options, localAssembly, instance, diagnostics));
 
         using (population)
         {
-            rootInstance = await XamlRootClass
+            creation = await XamlRootClass
                 .CreateAsync(rootType, document, environment, options, diagnostics, cancellationToken)
                 .ConfigureAwait(true);
         }
@@ -459,21 +505,70 @@ public sealed partial class XamlLoadSession : IAsyncDisposable
             // The constructor ran the document. When the instance it ran it over is the one that
             // came back, that was the load — including when it failed, which the diagnostics
             // already say and a second attempt would only say again.
-            if (ReferenceEquals(populated, rootInstance))
+            if (ReferenceEquals(populated, creation.Instance))
             {
-                return population.Root;
+                return new XamlRootBuild(population.Root, null);
             }
 
-            // And when nothing came back, the constructor threw after loading, or the factory
-            // threw the instance away. Either way there is no root, and asking Avalonia to
-            // construct the class a second time is asking for the same failure.
-            if (rootInstance is null)
+            // The document itself failed inside the constructor, and the constructor threw over it:
+            // built without the class it would fail the same way. Or the factory threw the instance
+            // away, and asking Avalonia to construct the class a second time is asking for the same
+            // thing. Either way there is no root, and that is an error.
+            if (creation.Instance is null && (population.Root is null || creation.Failure is null))
             {
-                return null;
+                if (creation.Failure is { } failure)
+                {
+                    diagnostics.Add(XamlRootClass.CreationFailure(rootType, document, failure, builtAsWritten: false));
+                }
+
+                return default;
             }
         }
 
-        return Load(document, projection, options, localAssembly, rootInstance, diagnostics);
+        // The constructor threw before the document was loaded into it — or after, over a document
+        // that loaded. The class is the code's, not the document's, and the document is built
+        // without it (ADR 0028): said by the caller, which projects the text again off this thread.
+        if (creation.Failure is { } thrown)
+        {
+            return new XamlRootBuild(null, thrown);
+        }
+
+        return new XamlRootBuild(Load(document, projection, options, localAssembly, creation.Instance, diagnostics), null);
+    }
+
+    /// <summary>
+    /// Projects the document again as a document whose class the load cannot use: the directive and
+    /// every handler withheld (ADR 0028).
+    /// </summary>
+    /// <remarks>
+    /// Everything the first checks and the first projection said stands, and is not said twice — what
+    /// is new is only a handler the class would have answered, which now has nothing to be hooked up
+    /// to and is reported as for a root built as written.
+    /// </remarks>
+    private static async ValueTask<TextProjection> WithoutClassAsync(
+        XamlDocument document,
+        XamlLoadEnvironment environment,
+        List<MarkupDiagnostic> diagnostics,
+        CancellationToken cancellationToken)
+    {
+        var again = new List<MarkupDiagnostic>();
+
+        ImmutableArray<TextSpan> withheld = (await XamlAttributeChecks
+            .RunAsync(document, null, XamlClassUse.AsWritten, environment, again, cancellationToken)
+            .ConfigureAwait(false)).Withheld;
+
+        foreach (MarkupDiagnostic handler in again)
+        {
+            if (handler.Code == XamlLoaderDiagnosticCodes.MissingEventHandler
+                && !diagnostics.Exists(said => said.Code == handler.Code && said.Span == handler.Span))
+            {
+                diagnostics.Add(handler);
+            }
+        }
+
+        return await XamlDocumentProjector
+            .ProjectAsync(document, null, environment, [], withheld, cancellationToken)
+            .ConfigureAwait(false);
     }
 
     /// <summary>Hands the projected text to Avalonia's runtime loader.</summary>

@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Reflection;
 using System.Threading;
 using System.Threading.Tasks;
 
@@ -95,14 +96,22 @@ internal static class XamlRootClass
     /// Creates the instance the document will populate.
     /// </summary>
     /// <remarks>
+    /// <para>
     /// Runs the caller's factory, and through it the class's constructor, so the caller is on the
     /// thread that owns Avalonia objects and inside the environment's compilation scope.
+    /// </para>
+    /// <para>
+    /// A constructor that throws is handed back rather than reported, because how it is reported
+    /// depends on what the load makes of it: the root is built without the class where it can be
+    /// (ADR 0028), and not at all where the document itself failed inside the constructor. See
+    /// <see cref="CreationFailure"/>.
+    /// </para>
     /// </remarks>
     /// <returns>
-    /// The instance, or <see langword="null"/> when there is no usable one — in which case the
-    /// load carries on without it and the diagnostics say why.
+    /// The instance, or none — with the constructor's own exception when it threw, and with a
+    /// diagnostic already said when the factory handed back something else.
     /// </returns>
-    public static async ValueTask<object?> CreateAsync(
+    public static async ValueTask<XamlRootCreation> CreateAsync(
         Type rootType,
         XamlDocument document,
         XamlLoadEnvironment environment,
@@ -130,23 +139,51 @@ internal static class XamlRootClass
                     MarkupDiagnosticSeverity.Error,
                     document.Uri));
 
-                return null;
+                return default;
             }
 
-            return instance;
+            return new XamlRootCreation(instance, null);
         }
         catch (Exception error) when (error is not OperationCanceledException)
         {
             // Creating the instance runs the caller's constructor, which can fail for reasons
             // that have nothing to do with the document.
-            diagnostics.Add(MarkupDiagnostic.Load(
-                XamlLoaderDiagnosticCodes.RootInstanceCreationFailure,
-                $"Creating an instance of '{rootType.FullName}' failed: {error.Message}",
-                MarkupDiagnosticSeverity.Error,
-                document.Uri));
-
-            return null;
+            return new XamlRootCreation(null, Unwrap(error));
         }
+    }
+
+    /// <summary>Says that the class could not be constructed, and what became of the root.</summary>
+    /// <param name="rootType">The class.</param>
+    /// <param name="document">The document naming it.</param>
+    /// <param name="failure">What its constructor threw, unwrapped.</param>
+    /// <param name="builtAsWritten">
+    /// Whether the load went on without the class — a warning, as for a class nobody has built — or
+    /// produced no root at all, because the document failed inside the constructor: an error.
+    /// </param>
+    public static MarkupDiagnostic CreationFailure(Type rootType, XamlDocument document, Exception failure, bool builtAsWritten) =>
+        MarkupDiagnostic.Load(
+            XamlLoaderDiagnosticCodes.RootInstanceCreationFailure,
+            builtAsWritten && document.Root is { } root
+                ? $"Creating an instance of '{rootType.FullName}' failed: {failure.Message} " +
+                  $"The document is loaded without it, and its root is built as the '{root.Name}' it is written as."
+                : $"Creating an instance of '{rootType.FullName}' failed: {failure.Message}",
+            builtAsWritten ? MarkupDiagnosticSeverity.Warning : MarkupDiagnosticSeverity.Error,
+            document.Uri,
+            document.Root?.GetDirectiveAttribute(XamlDirectives.Class)?.ValueSpan);
+
+    /// <summary>
+    /// The exception the constructor threw, not the one reflection wrapped it in: a constructor
+    /// called by reflection fails with "Exception has been thrown by the target of an invocation",
+    /// which names nothing.
+    /// </summary>
+    private static Exception Unwrap(Exception error)
+    {
+        while (error is TargetInvocationException { InnerException: { } inner })
+        {
+            error = inner;
+        }
+
+        return error;
     }
 
     /// <summary>Resolves a fully qualified class name through the environment's type resolver.</summary>
@@ -201,3 +238,16 @@ internal static class XamlRootClass
         return !declared.Success || declared.Type.IsAssignableFrom(rootType);
     }
 }
+
+/// <summary>What creating an <c>x:Class</c> root came to.</summary>
+/// <param name="Instance">The instance, or <see langword="null"/> when there is none to populate.</param>
+/// <param name="Failure">What the constructor threw, unwrapped; <see langword="null"/> when it did not throw.</param>
+internal readonly record struct XamlRootCreation(object? Instance, Exception? Failure);
+
+/// <summary>What building a session's root came to.</summary>
+/// <param name="Root">The root, or <see langword="null"/> when there is none.</param>
+/// <param name="ClassFailure">
+/// What the class's constructor threw when the document can be built without it; the root is then
+/// <see langword="null"/>, and the caller builds it as written (ADR 0028).
+/// </param>
+internal readonly record struct XamlRootBuild(object? Root, Exception? ClassFailure);

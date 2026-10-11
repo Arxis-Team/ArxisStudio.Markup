@@ -41,3 +41,22 @@ public class UnconstructableView : UserControl
     public UnconstructableView() =>
         throw new InvalidOperationException("This view cannot be constructed, by design.");
 }
+
+/// <summary>
+/// A class whose constructor throws and which answers a handler, to prove the handler goes with the
+/// class when the root is built without it.
+/// </summary>
+public class UnconstructableHandlingView : UserControl
+{
+    /// <summary>Always throws.</summary>
+    /// <exception cref="InvalidOperationException">Always.</exception>
+    public UnconstructableHandlingView() =>
+        throw new InvalidOperationException("This view cannot be constructed either.");
+
+    /// <summary>Would handle a click, named by a document's <c>Click</c> attribute.</summary>
+    /// <param name="sender">The control that was clicked.</param>
+    /// <param name="e">The event's arguments.</param>
+    public void SaveClicked(object? sender, RoutedEventArgs e)
+    {
+    }
+}

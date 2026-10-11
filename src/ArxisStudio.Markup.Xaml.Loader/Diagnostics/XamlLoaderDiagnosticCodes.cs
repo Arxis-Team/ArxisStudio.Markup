@@ -106,7 +106,11 @@ public static class XamlLoaderDiagnosticCodes
     /// </summary>
     public const string IncompatibleRootType = "AXM3021";
 
-    /// <summary>Creating the root instance threw.</summary>
+    /// <summary>
+    /// Creating the root instance threw, and the message is the constructor's own. A warning when the
+    /// document was loaded without the class and its root built as written; an error when the document
+    /// itself failed inside the constructor and there is no root (ADR 0028).
+    /// </summary>
     public const string RootInstanceCreationFailure = "AXM3022";
 
     /// <summary>A root-instance factory returned something the document cannot populate.</summary>
