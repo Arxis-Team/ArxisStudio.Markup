@@ -49,6 +49,15 @@ namespace ArxisStudio.Markup.Xaml.Loader;
 /// window's icon (ADR 0031). A session leaves them out of its projections and sets them itself once
 /// the objects exist, from what the environment's resolvers find.
 /// </para>
+/// <para>
+/// One element goes as well, with everything in it: an element of the document's own class, below the
+/// root — a data context made of the form, a copy of the control in its own content. Constructing the
+/// class populates it, and populating it constructs the class again, for as long as there is stack:
+/// Avalonia's compiler builds such a project, and the application stops with a stack overflow. A load
+/// would do the same, over the live text and over the compiled markup it falls back to, and take the
+/// process with it (ADR 0032). Where the element is all its property element holds, the property element
+/// goes with it, so that what is left still says a member and a value or neither.
+/// </para>
 /// </remarks>
 internal static class XamlAttributeChecks
 {
@@ -95,9 +104,21 @@ internal static class XamlAttributeChecks
         var unreached = new HashSet<XamlElement>(ReferenceEqualityComparer.Instance);
         var templates = new Dictionary<Type, bool>();
 
+        // The class the document constructs, by the name it declares as well as by the type: a host that asked
+        // for the root as written, or a class that does not resolve, still has its class constructed by Avalonia
+        // wherever the document places it.
+        string? declared = document.Root?.GetDirective(XamlDirectives.Class);
+        var withheld = new List<TextSpan>();
+
         foreach (XamlElement element in document.DescendantElements())
         {
             cancellationToken.ThrowIfCancellationRequested();
+
+            // Inside an element the load leaves out, nothing is loaded, so nothing is checked either.
+            if (withheld.Exists(span => span.Contains(element.Span)))
+            {
+                continue;
+            }
 
             bool reached = element.Parent is not XamlElement parent || !unreached.Contains(parent);
 
@@ -139,6 +160,28 @@ internal static class XamlAttributeChecks
                     .ResolveAsync(new XamlTypeName(namespaceUri, element.Name.LocalName), element.NamespaceContext, cancellationToken)
                     .ConfigureAwait(false))
                 .Type;
+
+            if (!ReferenceEquals(element, document.Root) && IsOwnClass(type, rootType, declared))
+            {
+                XamlElement leftOut = element.Parent is XamlElement { IsPropertyElementSyntax: true } member
+                                      && member.Elements.Count() == 1
+                    ? member
+                    : element;
+
+                withheld.Add(leftOut.Span);
+                removals.Add(leftOut.Span);
+
+                diagnostics.Add(MarkupDiagnostic.Load(
+                    XamlLoaderDiagnosticCodes.SelfPlacement,
+                    $"'{element.Name}' places the document's own class, {type!.FullName}, inside itself: constructing it " +
+                    "constructs it again, for as long as there is stack, and the application stops with a stack " +
+                    "overflow. The element is left out of the load.",
+                    MarkupDiagnosticSeverity.Error,
+                    document.Uri,
+                    element.NameSpan));
+
+                continue;
+            }
 
             // A template's own attributes are the session's; what it holds is built when it is used.
             if (type is not null && IsTemplate(type, templates))
@@ -297,6 +340,16 @@ internal static class XamlAttributeChecks
             document.Uri,
             attribute.ValueSpan ?? attribute.Span));
     }
+
+    /// <summary>Reports whether an element's type is the class the document constructs.</summary>
+    /// <param name="type">The element's type, if it resolved.</param>
+    /// <param name="rootType">The class the document populates, if there is one to use.</param>
+    /// <param name="declared">The class the document's <c>x:Class</c> names, if it names one.</param>
+    private static bool IsOwnClass(Type? type, Type? rootType, string? declared) =>
+        type is not null
+        && (rootType is not null
+            ? type == rootType
+            : declared is { Length: > 0 } && string.Equals(type.FullName, declared, StringComparison.Ordinal));
 
     /// <summary>Reports whether a type is a template: one whose content is built when it is used, not at a load.</summary>
     /// <remarks>

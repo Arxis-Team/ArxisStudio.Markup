@@ -502,7 +502,13 @@ public sealed partial class XamlLoadSession : IAsyncDisposable
         XamlRootCreation creation;
 
         XamlRootPopulation population = XamlRootPopulation.Lend(
-            rootType, instance => Load(document, projection, options, localAssembly, instance, diagnostics));
+            rootType,
+            instance => Load(document, projection, options, localAssembly, instance, diagnostics),
+            placesItself => diagnostics.Add(MarkupDiagnostic.Load(
+                XamlLoaderDiagnosticCodes.LivePopulationCycle,
+                placesItself,
+                MarkupDiagnosticSeverity.Warning,
+                document.Uri)));
 
         using (population)
         {

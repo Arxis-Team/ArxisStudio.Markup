@@ -7,9 +7,9 @@ namespace ArxisStudio.Markup.Xaml.Loader.TestControls;
 /// A second compiled control, so the tests can place one inside the other's live document.
 /// </summary>
 /// <remarks>
-/// Its compiled markup deliberately places nothing, so that a cycle between the two can only be
-/// created by live documents — which is the one way a cycle can arise, since a project with a
-/// compiled cycle would never have built.
+/// Its compiled markup deliberately places nothing, so that a cycle between the two is one of live
+/// documents only. A project whose compiled markup states a cycle builds as well, and constructs
+/// without end at run time — <see cref="SelfPlacingView"/> is that case.
 /// </remarks>
 public partial class LiveHostControl : UserControl
 {

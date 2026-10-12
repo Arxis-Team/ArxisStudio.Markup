@@ -40,21 +40,32 @@ namespace ArxisStudio.Markup.Xaml.Loader;
 /// every instance that is not the root: a copy of the control the document places inside itself,
 /// or one another thread happens to construct.
 /// </para>
+/// <para>
+/// A copy the document places inside the root, while the root is being populated, is a document that
+/// constructs itself. With a registration to answer for it, the registration says so; with none, the
+/// copy is left without content and said here — never handed to the compiled markup, which would
+/// construct the type again with the hook cleared, without end (ADR 0032).
+/// </para>
 /// </remarks>
 internal sealed class XamlRootPopulation : IDisposable
 {
+    private readonly Type _type;
     private readonly XamlPopulateHook? _hook;
     private readonly Func<object, object?> _populate;
+    private readonly Action<string> _placesItself;
     private readonly Action<object>? _previous;
     private readonly Action<object>? _installed;
     private readonly int _thread;
 
     private bool _returned;
 
-    private XamlRootPopulation(XamlPopulateHook? hook, Func<object, object?> populate)
+    private XamlRootPopulation(
+        Type type, XamlPopulateHook? hook, Func<object, object?> populate, Action<string> placesItself)
     {
+        _type = type;
         _hook = hook;
         _populate = populate;
+        _placesItself = placesItself;
         _thread = System.Environment.CurrentManagedThreadId;
 
         if (hook is not null)
@@ -88,9 +99,13 @@ internal sealed class XamlRootPopulation : IDisposable
     /// <see langword="null"/> when it could not. It reports rather than throws — it runs inside
     /// somebody else's constructor.
     /// </param>
+    /// <param name="placesItself">
+    /// Told, in words, that a copy of the root constructed inside the root's own population was left
+    /// without content — with no registration answering for the type, nothing else will say it.
+    /// </param>
     /// <returns>The loan, to be disposed once the instance has been constructed.</returns>
-    public static XamlRootPopulation Lend(Type rootType, Func<object, object?> populate) =>
-        new(XamlPopulateHook.Find(rootType), populate);
+    public static XamlRootPopulation Lend(Type rootType, Func<object, object?> populate, Action<string> placesItself) =>
+        new(rootType, XamlPopulateHook.Find(rootType), populate, placesItself);
 
     /// <summary>Puts back what the type was populated by before.</summary>
     /// <remarks>
@@ -124,7 +139,22 @@ internal sealed class XamlRootPopulation : IDisposable
         }
 
         Instance = instance;
-        Root = _populate(instance);
+
+        // The root's population is a population of its type like any other: a copy of the type the
+        // document constructs inside it is the document placing itself, whoever answers for the copy.
+        bool entered = XamlPopulateHook.TryEnter(_type);
+
+        try
+        {
+            Root = _populate(instance);
+        }
+        finally
+        {
+            if (entered)
+            {
+                XamlPopulateHook.Leave(_type);
+            }
+        }
     }
 
     /// <summary>Populates an instance that is not the root, the way it would have been anyway.</summary>
@@ -136,6 +166,21 @@ internal sealed class XamlRootPopulation : IDisposable
 
             return;
         }
+
+        // A copy of the root constructed while the root is being populated on this thread: the
+        // document places its own class. It stays empty — the compiled markup was compiled from a
+        // document that places it too, as far as anything here can tell, and run with the hook
+        // cleared it would construct the type again without end (ADR 0032).
+        if (!XamlPopulateHook.TryEnter(_type))
+        {
+            _placesItself(
+                $"'{_type.FullName}' places itself: a copy of it is constructed inside its own population. " +
+                "The copy is left without content.");
+
+            return;
+        }
+
+        XamlPopulateHook.Leave(_type);
 
         try
         {

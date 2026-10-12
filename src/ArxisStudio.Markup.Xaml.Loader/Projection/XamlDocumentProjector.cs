@@ -220,6 +220,10 @@ internal static class XamlDocumentProjector
     /// Removed from the projection only. The document keeps every one of them, which is what
     /// makes them survive a save and lets design mode apply them afterwards.
     /// </para>
+    /// <para>
+    /// An element the load has been told it cannot be given goes whole, with everything inside it —
+    /// one that places the document's own class inside itself (ADR 0032).
+    /// </para>
     /// </remarks>
     private static void Strip(
         XamlDocument document,
@@ -228,12 +232,25 @@ internal static class XamlDocumentProjector
         XamlElement? fragment,
         IReadOnlyCollection<TextSpan> unloadable)
     {
+        var removed = new List<TextSpan>();
+
         foreach (XamlElement element in document.DescendantElements())
         {
             // Inside an include that has already been replaced there is no text left to edit,
-            // and outside the fragment there will be no text at all.
-            if (spliced.Exists(span => span.Contains(element.Span)) || !Covers(fragment, element.Span))
+            // and outside the fragment there will be no text at all. Inside an element already taken
+            // out there is nothing left either.
+            if (spliced.Exists(span => span.Contains(element.Span))
+                || removed.Exists(span => span.Contains(element.Span))
+                || !Covers(fragment, element.Span))
             {
+                continue;
+            }
+
+            if (unloadable.Contains(element.Span) && !ReferenceEquals(element, fragment))
+            {
+                builder.Replace(element.Span, string.Empty);
+                removed.Add(element.Span);
+
                 continue;
             }
 

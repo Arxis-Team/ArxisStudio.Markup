@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Reflection;
 using System.Runtime.ExceptionServices;
 
@@ -23,9 +24,29 @@ namespace ArxisStudio.Markup.Xaml.Loader;
 /// is not the seam this rides on — installing into it would fail at invocation time, far from
 /// the mistake.
 /// </para>
+/// <para>
+/// It also keeps the one thing the two of them have to agree on: which types the current thread is
+/// populating. A type constructed again while it is being populated places itself — directly, or
+/// through a cycle of documents — and neither the root's loan nor a registration may then hand the
+/// inner instance to the compiled markup: Avalonia's compiler builds a project whose markup places
+/// itself, and that markup constructs the type again with the hook cleared, without end (ADR 0032).
+/// </para>
 /// </remarks>
 internal sealed class XamlPopulateHook
 {
+    /// <summary>The types the current thread is populating.</summary>
+    /// <remarks>
+    /// Thread-static because population is re-entrant by design — a live document that places another
+    /// registered control populates it in the middle of its own population — and the only re-entrancy
+    /// that must be stopped is the same type appearing inside itself.
+    /// </remarks>
+    [ThreadStatic]
+    private static HashSet<Type>? t_populating;
+
+    /// <summary>The types among them found constructed again inside their own population.</summary>
+    [ThreadStatic]
+    private static HashSet<Type>? t_placingItself;
+
     /// <summary>The field Avalonia's XAML compiler emits for exactly this purpose.</summary>
     private const string OverrideFieldName = "!XamlIlPopulateOverride";
 
@@ -75,6 +96,43 @@ internal sealed class XamlPopulateHook
 
         return new XamlPopulateHook(field, trampoline);
     }
+
+    /// <summary>Marks a type as being populated on the current thread.</summary>
+    /// <param name="type">The type about to be populated.</param>
+    /// <returns>
+    /// <see langword="false"/> when the type is already being populated further up this thread's
+    /// stack — the instance asking is one the type places inside itself, and the type is marked as
+    /// such for the population that owns it.
+    /// </returns>
+    internal static bool TryEnter(Type type)
+    {
+        if ((t_populating ??= []).Add(type))
+        {
+            return true;
+        }
+
+        (t_placingItself ??= []).Add(type);
+
+        return false;
+    }
+
+    /// <summary>Ends a population <see cref="TryEnter"/> began.</summary>
+    /// <param name="type">The type whose population has ended.</param>
+    internal static void Leave(Type type)
+    {
+        t_populating?.Remove(type);
+        t_placingItself?.Remove(type);
+    }
+
+    /// <summary>
+    /// Reports whether a type's population on this thread has met an instance of the type inside it.
+    /// </summary>
+    /// <remarks>
+    /// The compiled markup of such a type is not a fallback: it was compiled from a document that places
+    /// the type too, as far as anything here can tell, and would construct it again without end.
+    /// </remarks>
+    /// <param name="type">The type being populated.</param>
+    internal static bool PlacesItself(Type type) => t_placingItself?.Contains(type) == true;
 
     /// <summary>
     /// Runs the compiled populate over an instance, through the generated trampoline.

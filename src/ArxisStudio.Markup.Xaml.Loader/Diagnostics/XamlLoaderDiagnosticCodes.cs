@@ -169,13 +169,15 @@ public static class XamlLoaderDiagnosticCodes
 
     /// <summary>
     /// Populating an instance from its live document failed, and the instance was populated from
-    /// the compiled markup instead.
+    /// the compiled markup instead — or, for a type found placing itself, kept what the document
+    /// built before it failed.
     /// </summary>
     public const string LivePopulationFailed = "AXM3051";
 
     /// <summary>
-    /// Live documents form a cycle of controls each placing the other, and the inner instance was
-    /// populated from the compiled markup to break it.
+    /// A control is constructed inside its own population — documents placing each other, or a
+    /// document placing its own class — and the inner instance was left without content to break
+    /// the cycle.
     /// </summary>
     public const string LivePopulationCycle = "AXM3052";
 
@@ -183,4 +185,11 @@ public static class XamlLoaderDiagnosticCodes
     /// The document's <c>x:Class</c> names a different type than the one it was registered for.
     /// </summary>
     public const string LivePopulationClassMismatch = "AXM3053";
+
+    /// <summary>
+    /// The document places its own class inside itself — a data context made of the form, a copy of
+    /// the control in its own content — which constructs the class again for as long as there is
+    /// stack, and the element is left out of the load.
+    /// </summary>
+    public const string SelfPlacement = "AXM3054";
 }

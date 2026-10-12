@@ -35,8 +35,15 @@ namespace ArxisStudio.Markup.Xaml.Loader;
 /// Population must not be able to break a form that places the control. An instance whose live
 /// document fails to compile — mid-edit documents routinely do not — is populated from the
 /// compiled markup instead, and the failure is reported through <see cref="PopulationFailed"/>:
-/// stale content over no content. The same fallback breaks cycles, where two live documents each
-/// place the other's control and construction would otherwise never bottom out.
+/// stale content over no content.
+/// </para>
+/// <para>
+/// A cycle — two live documents each placing the other's control, or one placing its own — is
+/// broken by leaving the inner instance without content, and said through the same event. Not by
+/// the compiled markup: Avalonia's compiler builds a project whose markup places itself, and that
+/// markup would construct the type again with the hook cleared, without end — the process's stack,
+/// not the form, would be what gave out (ADR 0032). For the same reason a type found placing itself
+/// is not handed to its compiled markup when its live document then fails.
 /// </para>
 /// <para>
 /// The projected text is prepared when a document is registered, not when an instance is
@@ -54,17 +61,6 @@ namespace ArxisStudio.Markup.Xaml.Loader;
 /// </remarks>
 public sealed class XamlLivePopulation : IDisposable
 {
-    /// <summary>
-    /// The types the current thread is populating, for breaking cycles.
-    /// </summary>
-    /// <remarks>
-    /// Thread-static because population is re-entrant by design — a live document that places
-    /// another registered control populates it in the middle of its own population — and the only
-    /// re-entrancy that must be stopped is the same type appearing inside itself.
-    /// </remarks>
-    [ThreadStatic]
-    private static HashSet<Type>? t_populating;
-
     private readonly XamlLoadEnvironment _environment;
     private readonly Dictionary<Type, Registration> _registrations = [];
     private readonly Lock _gate = new();
@@ -86,8 +82,9 @@ public sealed class XamlLivePopulation : IDisposable
     }
 
     /// <summary>
-    /// Raised when an instance was populated from its compiled markup because the live document
-    /// could not do it — a compile failure, or a cycle of controls placing each other.
+    /// Raised when the live document could not populate an instance: it failed, and the instance
+    /// shows the compiled markup — or the instance is one a cycle of controls places inside itself,
+    /// and it is left without content.
     /// </summary>
     /// <remarks>
     /// Raised on whatever thread was constructing the instance. A subscriber that throws is
@@ -276,20 +273,17 @@ public sealed class XamlLivePopulation : IDisposable
 
         PreparedDocument prepared = Volatile.Read(ref registration.Prepared);
 
-        HashSet<Type> populating = t_populating ??= [];
-
-        if (!populating.Add(registration.Type))
+        if (!XamlPopulateHook.TryEnter(registration.Type))
         {
             // This type is already being populated further up this same stack, so its live
             // document — directly or through others — places the control inside itself.
-            // Construction has to bottom out somewhere, and the compiled markup is the one
-            // version of this control known not to contain it.
-            registration.PopulateFromCompiledMarkup(instance);
-
+            // Construction has to bottom out somewhere, and here, where the instance is still empty:
+            // the compiled markup was compiled from a document that may well place it too, and run
+            // with the hook cleared it would construct the type again without end (ADR 0032).
             Report(registration, prepared, MarkupDiagnostic.Load(
                 XamlLoaderDiagnosticCodes.LivePopulationCycle,
                 $"'{registration.Type.FullName}' places itself, through its own live document or " +
-                "a cycle of documents placing each other. The inner instance shows the compiled markup.",
+                "a cycle of documents placing each other. The inner instance is left without content.",
                 MarkupDiagnosticSeverity.Warning,
                 prepared.Document.Uri));
 
@@ -338,19 +332,31 @@ public sealed class XamlLivePopulation : IDisposable
                 // surfaces inside a constructor somebody else is running. The compiled markup is
                 // what the instance would have shown had nothing been registered, so it is what
                 // the instance shows now — stale beats blank, and the event says which it was.
-                registration.PopulateFromCompiledMarkup(instance);
+                // Unless the type has just been found placing itself: then its compiled markup
+                // is the one thing that cannot be run (ADR 0032), and the instance keeps what the
+                // document built before it failed.
+                bool placesItself = XamlPopulateHook.PlacesItself(registration.Type);
+
+                if (!placesItself)
+                {
+                    registration.PopulateFromCompiledMarkup(instance);
+                }
 
                 Report(registration, prepared, MarkupDiagnostic.Load(
                     XamlLoaderDiagnosticCodes.LivePopulationFailed,
                     $"Populating '{registration.Type.FullName}' from its live document failed: " +
-                    $"{error.Message} The instance shows the compiled markup.",
+                    $"{error.Message} " +
+                    (placesItself
+                        ? "The instance keeps what the document built before it failed: the type places " +
+                          "itself, and its compiled markup would construct it again without end."
+                        : "The instance shows the compiled markup."),
                     MarkupDiagnosticSeverity.Error,
                     prepared.Document.Uri));
             }
         }
         finally
         {
-            populating.Remove(registration.Type);
+            XamlPopulateHook.Leave(registration.Type);
         }
     }
 

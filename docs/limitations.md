@@ -346,6 +346,9 @@ the document — see `docs/adr/0005-resource-includes.md` for why. That leaves f
 - **No sandbox.** Loading a document runs constructors, setters, type converters, markup
   extensions and any custom control code the document reaches. A caller loading XAML it did not
   write is running code it did not write, and this library makes no attempt to prevent that.
+  Markup that constructs its own class is the one recursion stopped here (ADR 0032); a constructor
+  whose code constructs its class, and compiled markup that still places its class after the live
+  document stopped doing so, run as they would in the application.
 - **No project system.** Assemblies, resources and source arrive through the environment's
   resolver interfaces and nowhere else. Nothing here reads a `.sln`, a `.csproj`,
   `project.assets.json` or a package cache, and nothing here will.

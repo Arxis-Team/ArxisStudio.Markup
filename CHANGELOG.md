@@ -11,6 +11,22 @@ the source of truth, an unchanged document round-trips byte for byte, and unknow
 
 ## Unreleased
 
+### A document that places its own class does not take the process down
+
+A form that makes a data context of itself — `<UserControl.DataContext><views:MainView/></UserControl.DataContext>`
+inside `MainView.axaml` — constructs itself without end, and Avalonia's compiler builds it. A host that
+registers its documents for live population found the cycle and handed the inner copy to the compiled
+markup, which ran with the hook cleared and constructed the class again until the stack gave out: the
+host's process, not the form. The attribute checks now leave an element of the document's own class out
+of every projection, with the new `AXM3054 SelfPlacement` error at its name; a cycle — documents placing
+each other, or a copy of the root reaching its loan — leaves the inner instance empty (`AXM3052`) instead of
+running the compiled markup; and a type found placing itself is not handed to its compiled markup when its
+live document then fails (ADR 0032, amending 0014 and 0015).
+
+Added: `XamlLoaderDiagnosticCodes.SelfPlacement`. Changed: the inner instance of a cycle is empty, where it
+showed the compiled markup, and a copy of a form inside itself is left out of the load, where it was drawn
+from a live registration.
+
 ### An image is read through the environment
 
 `<Image Source="/Assets/logo.png"/>` went to Avalonia's runtime loader, whose asset loader knows only the

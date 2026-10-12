@@ -166,7 +166,7 @@ public sealed class SelfLoadingRootTests
     }
 
     [AvaloniaFact]
-    public async Task ACopyOfTheRootPlacedInsideItselfIsNotTheRoot()
+    public async Task ACopyOfTheRootPlacedInsideItselfIsLeftOut()
     {
         XamlLoadEnvironment environment = Environment();
 
@@ -175,10 +175,10 @@ public sealed class SelfLoadingRootTests
         await population.SetDocumentAsync(
             typeof(SelfLoadingView), View("Registered"), TestContext.Current.CancellationToken);
 
-        // A form that places its own control is a cycle only a live document can state. The
-        // session's population is for the instance it is building; the copy inside it is an
-        // embedded control like any other and is drawn from what is registered for the type.
-        await using XamlLoadSession session = await XamlLoadSession.CreateAsync(
+        // A form that places its own control constructs itself inside its own population, and the
+        // compiler builds it: the application stops with a stack overflow. The copy is left out of
+        // the load, whatever is registered for the type, and said as an error about it (ADR 0032).
+        (XamlLoadSession? session, XamlLoadResult result) = await XamlLoadSession.TryCreateAsync(
             XamlDocument.Parse(
                 $"<UserControl xmlns=\"{AvaloniaNamespace}\"\n" +
                 $"             xmlns:x=\"{XamlNamespaces.Xaml}\"\n" +
@@ -193,11 +193,16 @@ public sealed class SelfLoadingRootTests
             environment,
             cancellationToken: TestContext.Current.CancellationToken);
 
-        var view = session.GetRoot<SelfLoadingView>();
-        var inner = Assert.IsType<SelfLoadingView>(((StackPanel)view.Content!).Children[1]);
+        Assert.True(session is not null, string.Join(" | ", result.Diagnostics));
 
-        Assert.Equal("Outer", Shown(view));
-        Assert.Equal("Registered", Shown(inner));
+        await using (session)
+        {
+            var view = session.GetRoot<SelfLoadingView>();
+
+            Assert.Equal("Outer", Shown(view));
+            Assert.Single(((StackPanel)view.Content!).Children);
+            Assert.Contains(result.Diagnostics, static d => d.Code == XamlLoaderDiagnosticCodes.SelfPlacement);
+        }
     }
 
     [AvaloniaFact]

@@ -243,7 +243,7 @@ public sealed class LivePopulationTests
     }
 
     [AvaloniaFact]
-    public async Task TwoDocumentsPlacingEachOther_TerminateAtTheCompiledMarkup()
+    public async Task TwoDocumentsPlacingEachOther_LeaveTheInnermostEmpty()
     {
         using var population = new XamlLivePopulation(Environment());
 
@@ -261,16 +261,16 @@ public sealed class LivePopulationTests
             HostDocument("<tc:LiveControl />"),
             TestContext.Current.CancellationToken);
 
-        // Host places control places host: only live documents can state this cycle, because a
-        // project whose compiled markup contained it would never have built. Construction has to
-        // bottom out rather than overflow, and where it bottoms out is the compiled markup.
+        // Host places control places host. Construction has to bottom out rather than overflow, and it
+        // bottoms out where the cycle is found, in an empty instance — not in the compiled markup, which a
+        // project whose markup states the same cycle builds, and which would state it again (ADR 0032).
         var host = new LiveHostControl();
 
         var inner = Assert.IsType<LiveControl>(host.Content);
         var innermost = Assert.IsType<LiveHostControl>(inner.Content);
 
-        // The innermost host is the compiled one — a Border, not another LiveControl.
-        Assert.IsType<Border>(innermost.Content);
+        // The innermost host is empty — neither another LiveControl nor the compiled Border.
+        Assert.Null(innermost.Content);
 
         Assert.Contains(
             failures,

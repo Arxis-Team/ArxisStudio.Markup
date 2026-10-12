@@ -62,3 +62,12 @@ The generated members are found and shape-checked in one place, `XamlPopulateHoo
 - A future Avalonia without the hook degrades to the old behaviour — populate after construction —
   and nothing else changes. No public API was added; `IXamlRootInstanceFactory` remains for a caller
   that wants to construct its roots some other way.
+
+## Amendment — a copy of the root inside itself
+
+Date: 2026-10-12
+
+"A copy of the control the document places inside itself" is no longer answered by what was installed
+before. The document is placing its own class, which constructs it without end once compiled, and the
+copy is left out of the text with `AXM3054`; reached through another document, it is constructed inside
+the root's own population, counts as a cycle, and is left empty (ADR 0032).

@@ -70,3 +70,14 @@ The contract has four load-bearing clauses:
   rebuild land on fresh content.
 - A second registry overriding the same type takes the field last-wins, which is the field's own
   semantics. One registry per generation of assemblies is the intended shape.
+
+## Amendment — a compiled cycle builds
+
+Date: 2026-10-12
+
+The clause on the fallback said cycles are something only live documents can state, because "a project
+whose compiled markup contained one would never have built". It builds. Avalonia's compiler builds a form
+that places its own class — a data context made of the form is the ordinary case — and the application
+stops with a stack overflow at run time. Handing the inner instance of a cycle to the compiled markup ran
+exactly that markup, with the override field cleared, and took the process down. A cycle now bottoms out in
+an empty instance, and a document that places its own class leaves the placement out (ADR 0032).

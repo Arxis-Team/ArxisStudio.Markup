@@ -49,7 +49,14 @@ Three rules worth knowing before relying on it:
 - **The fallback is the compiled markup, reported through `PopulationFailed`.** A mid-edit
   document routinely does not compile, and the failure surfaces inside a constructor somebody
   else is running — so the instance falls back to what it would have shown anyway, and the event
-  says so. The same fallback bottoms out cycles of live documents placing each other.
+  says so.
+- **A cycle bottoms out in an empty instance, never in the compiled markup.** Documents placing
+  each other, or one placing its own class, construct a type inside its own population. The inner
+  instance is left without content (`AXM3052`): Avalonia's compiler builds a project whose markup
+  states the same cycle, and that markup, run as a fallback, would construct the type again without
+  end. A document that places its own class leaves the element out of the text altogether
+  (`AXM3054`), and a type found placing itself is not handed to its compiled markup when its
+  document then fails (ADR 0032).
 - **Dispose before the assemblies go.** The override field on a type roots the delegate, the
   delegate roots the registry, the registry roots the documents. On types in a collectible load
   context, an undisposed registry is a context that never collects. One registry per generation
