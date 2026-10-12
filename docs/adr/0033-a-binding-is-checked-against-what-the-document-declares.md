@@ -27,9 +27,10 @@ compiles them and refuses a path its data type does not have.
 - `#name` and `ElementName` name an element of the document's name scope — a template's own inside a template.
   A name nothing has is a broken binding: the build refuses it where it compiles, and it shows nothing where
   it does not.
-- `$self` and `RelativeSource Self` are the element; `$parent[T;n]` and `RelativeSource FindAncestor` are the
-  `n`-th ancestor of type `T` in the document, and where the document has none — the window a form will stand
-  in — the type `T` itself, which is what a build reads.
+- `$self` and `RelativeSource Self` are the element; `$parent[T;n]` and `RelativeSource FindAncestor` are an
+  ancestor of type `T` in the document — the level counted as Avalonia counts it, from nought in `$parent[T;n]`
+  (`$parent[Border;1]` is the second border above) and from one in `AncestorLevel` — and where the document has
+  none, the window a form will stand in, the type `T` itself, which is what a build reads.
 - A `Source`, a templated parent or a mode it does not know is `Other`, and its path is `NotUnderstood`.
 - The data context is read as a build reads it. A compiled binding reads the nearest `x:DataType`, which a
   data template does not inherit; with none in scope the build refuses it. A binding the build does not

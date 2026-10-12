@@ -404,9 +404,11 @@ public sealed partial class XamlLoadSession
 
                     type = parts[0].Trim() is { Length: > 0 } named ? named : null;
 
+                    // $parent[T;n] counts from nought, as Avalonia does — $parent[Border;1] is the second border above —
+                    // where RelativeSource's AncestorLevel counts from one.
                     if (parts.Length > 1 && int.TryParse(parts[1].Trim(), NumberStyles.Integer, CultureInfo.InvariantCulture, out int written))
                     {
-                        level = written;
+                        level = written + 1;
                     }
 
                     at = close + 1;

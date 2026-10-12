@@ -194,7 +194,9 @@ public sealed class BindingCheckTests
             "<TextBlock x:Name=\"Found\" Text=\"{Binding Name, RelativeSource={RelativeSource FindAncestor, AncestorType={x:Type UserControl}}}\" />" +
             "<TextBlock x:Name=\"Window\" Text=\"{Binding $parent[Window].Title}\" />" +
             "<TextBlock x:Name=\"Templated\" Text=\"{Binding Name, RelativeSource={RelativeSource TemplatedParent}}\" />" +
-            "<TextBlock x:Name=\"Second\" Text=\"{Binding $parent[Panel;2].ColumnDefinitions}\" />" +
+            "<TextBlock x:Name=\"Second\" Text=\"{Binding $parent[Panel;1].ColumnDefinitions}\" />" +
+            "<TextBlock x:Name=\"Nearest\" Text=\"{Binding $parent[Panel;0].Orientation}\" />" +
+            "<TextBlock x:Name=\"Leveled\" Text=\"{Binding ColumnDefinitions, RelativeSource={RelativeSource AncestorType=Panel, AncestorLevel=2}}\" />" +
             "</StackPanel></Grid></UserControl>");
 
         XamlBindingCheck self = await CheckAsync(session, "Self", "Text", compilesByDefault: true);
@@ -222,11 +224,14 @@ public sealed class BindingCheckTests
         Assert.Equal(XamlBindingSource.Other, templated.Source);
         Assert.Equal(XamlBindingPathStatus.NotUnderstood, templated.Status);
 
-        // The level counts ancestors of the type: the second panel above is the grid.
+        // The level counts ancestors of the type — from nought in $parent[T;n], from one in AncestorLevel, as Avalonia
+        // counts them: the second panel above is the grid either way.
         XamlBindingCheck second = await CheckAsync(session, "Second", "Text", compilesByDefault: true);
 
         Assert.Equal(typeof(Grid), second.SourceType);
         Assert.Equal(typeof(ColumnDefinitions), second.ResultType);
+        Assert.Equal(typeof(StackPanel), (await CheckAsync(session, "Nearest", "Text", compilesByDefault: true)).SourceType);
+        Assert.Equal(typeof(Grid), (await CheckAsync(session, "Leveled", "Text", compilesByDefault: true)).SourceType);
     }
 
     [AvaloniaFact]
