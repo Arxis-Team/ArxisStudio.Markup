@@ -193,6 +193,30 @@ switch (attribute.GetValue())
 which is what makes read-modify-write lossless. Use `XamlLiteralValue.FromPlainText` when you hold
 text that must stay literal whatever it looks like.
 
+One argument of an extension is set where it stands, and the rest keep the text the document gave
+them — spacing, quotes, a nested extension, an argument nothing here understands:
+
+```csharp
+var binding = (XamlMarkupExtensionValue)XamlValue.Parse("{Binding Name, Converter={StaticResource Upper}}");
+
+binding = binding
+    .WithArgument(null, new XamlLiteralValue("Customer.Name"))          // the first positional argument
+    .WithArgument("Mode", new XamlLiteralValue("TwoWay"))               // a new named one goes last
+    .WithArgument("StringFormat", new XamlLiteralValue("{0}, {1}"));    // quoted, and escaped: it starts with a brace
+
+editor.SetAttribute(element, XamlQualifiedName.Unprefixed("Text"), binding);
+// {Binding Customer.Name, Converter={StaticResource Upper}, Mode=TwoWay, StringFormat='{}{0}, {1}'}
+
+binding.WithArgument("Mode", null);                                     // removed with its separator
+```
+
+A literal a bare argument would misread — a comma, a brace, an equals sign, a quote, white space at an
+end, nothing at all — is quoted, in double quotes when it holds an apostrophe; one holding both kinds
+of quote cannot be written and is refused. Quotes do not stop a leading brace from opening an
+extension — Avalonia reads `'{0:N2}'` as one — so such a literal takes the `{}` escape inside them, and
+reading a quoted argument drops it, as reading an attribute does. The result is parsed from its new
+text, so edits chain. ADR 0034 records the rules.
+
 ## Namespaces
 
 ```csharp

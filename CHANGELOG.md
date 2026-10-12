@@ -11,6 +11,20 @@ the source of truth, an unchanged document round-trips byte for byte, and unknow
 
 ## Unreleased
 
+### An argument is written where it stands
+
+Changing one argument of an extension meant writing the whole expression again: one built from `Arguments`
+rendered every argument anew, lost the document's spacing, and wrote a quoted literal without its quotes —
+`StringFormat='{}{0:N2}'` came back as text the next parse read as a nested extension.
+`XamlMarkupExtensionValue.WithArgument` sets, adds or removes one argument and splices the written text, so
+every other argument keeps exactly what the document said; the result is parsed again and edits chain. A
+literal a bare argument would misread is quoted — in double quotes when it holds an apostrophe — and one holding
+both kinds of quote is refused. One starting with a brace takes the `{}` escape inside the quotes, because
+Avalonia reads `'{0:N2}'` as an extension; reading a quoted argument drops that escape, so its literal is the
+format itself. `XamlMarkupExtensionArgument.ToString` quotes the same way. ADR 0034.
+
+Added: `XamlMarkupExtensionValue.WithArgument`.
+
 ### A binding is checked against what the document declares
 
 `ResolveBindingPath` read a path against a type, and finding the type was the caller's: the data type or the

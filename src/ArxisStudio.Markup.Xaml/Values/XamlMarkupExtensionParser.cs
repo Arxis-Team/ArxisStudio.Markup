@@ -95,7 +95,8 @@ internal static class XamlMarkupExtensionParser
                 new TextSpan(nameStart, 0)));
         }
 
-        ImmutableArray<XamlMarkupExtensionArgument> arguments = ParseArguments(text, ref position, diagnostics);
+        ImmutableArray<XamlMarkupExtensionArgument> arguments =
+            ParseArguments(text, ref position, diagnostics, start, out ImmutableArray<TextSpan> spans);
 
         if (position < text.Length && text[position] == '}')
         {
@@ -112,16 +113,24 @@ internal static class XamlMarkupExtensionParser
         return new XamlMarkupExtensionValue(XamlQualifiedName.Parse(name), arguments)
         {
             RawText = text[start..Math.Min(position, text.Length)],
+            ArgumentSpans = spans,
         };
     }
 
+    /// <summary>
+    /// Parses the arguments and notes where each one stands, counted from <paramref name="origin"/> — the
+    /// extension's opening brace — so an edit can replace one argument and leave the others' text alone.
+    /// </summary>
     private static ImmutableArray<XamlMarkupExtensionArgument> ParseArguments(
         string text,
         ref int position,
-        List<MarkupDiagnostic> diagnostics)
+        List<MarkupDiagnostic> diagnostics,
+        int origin,
+        out ImmutableArray<TextSpan> spans)
     {
         ImmutableArray<XamlMarkupExtensionArgument>.Builder arguments =
             ImmutableArray.CreateBuilder<XamlMarkupExtensionArgument>();
+        ImmutableArray<TextSpan>.Builder found = ImmutableArray.CreateBuilder<TextSpan>();
 
         while (true)
         {
@@ -129,10 +138,24 @@ internal static class XamlMarkupExtensionParser
 
             if (position >= text.Length || text[position] == '}')
             {
+                spans = found.ToImmutable();
+
                 return arguments.ToImmutable();
             }
 
+            int argumentStart = position;
+
             arguments.Add(ParseArgument(text, ref position, diagnostics));
+
+            // A bare value runs up to the separator and is trimmed; its span ends where its text does.
+            int argumentEnd = Math.Min(position, text.Length);
+
+            while (argumentEnd > argumentStart && char.IsWhiteSpace(text[argumentEnd - 1]))
+            {
+                argumentEnd--;
+            }
+
+            found.Add(TextSpan.FromBounds(argumentStart - origin, argumentEnd - origin));
 
             SkipWhitespace(text, ref position);
 
@@ -142,6 +165,8 @@ internal static class XamlMarkupExtensionParser
 
                 continue;
             }
+
+            spans = found.ToImmutable();
 
             return arguments.ToImmutable();
         }
@@ -254,7 +279,15 @@ internal static class XamlMarkupExtensionParser
             position++;
         }
 
+        // Quotes do not keep a leading brace from opening an extension — Avalonia reads '{0:N2}' as one — so a
+        // quoted literal that starts with a brace carries the same {} escape a whole attribute does, and the escape
+        // is how it was written, not part of it.
         string content = text[contentStart..position];
+
+        if (content.StartsWith("{}", StringComparison.Ordinal))
+        {
+            content = content[2..];
+        }
 
         if (position < text.Length)
         {
