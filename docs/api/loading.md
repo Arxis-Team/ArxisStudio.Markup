@@ -493,6 +493,31 @@ The member list is names. The `Type` answers — `DataType`, `DesignDataContextT
 belong to whatever generation of code the session was built in: read what is needed from them and let
 them go. ADR 0026 records the rule.
 
+Whether a binding written on an element works — its source found in the document, its path read against
+it, and whether a build that compiles it takes it:
+
+```csharp
+var binding = (XamlMarkupExtensionValue)element.GetAttribute("Text")!.GetValue()!;
+XamlBindingCheck check = await session.CheckBindingAsync(element, "Text", binding, compilesByDefault: true, token);
+
+check.Source        // DataContext, Element (#name, ElementName), Self ($self), Ancestor ($parent[T]), Other
+check.Path          // the path read against the source: "Text" of "#title.Text"
+check.Status        // Resolved, Broken, NotUnderstood — as ResolveBindingPath reads it
+check.Compiles      // {CompiledBinding}, {ReflectionBinding}, or the nearest x:CompileBindings, or the default
+check.BreaksBuild   // compiles, and what it reads is missing
+check.SourceType    // the type the path was read against; ResultType — where it ends
+```
+
+The source is found in the document, not in the tree the objects stand in: a designer shows the root inside
+its own controls, and an ancestor, a name or a data context found there would be the host's. A name nothing
+has is `Broken`; an ancestor the document does not have — the window a form will stand in — is read as the
+type the binding names, which is what a build reads. The data context is read as a build reads it: a
+compiled binding against the nearest `x:DataType`, which a data template does not inherit, and with none in
+scope it is `Broken` with no step; one that does not compile against the data type in scope, or the data the
+document gives the objects — never what the root inherits from its host. A binding on `DataContext` reads
+its parent's data. `compilesByDefault` is the project's default — a session that loads forgivingly does not
+share it. ADR 0033 records the rules.
+
 ## Values
 
 Before writing a property, ask where its current value came from:

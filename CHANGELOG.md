@@ -11,6 +11,19 @@ the source of truth, an unchanged document round-trips byte for byte, and unknow
 
 ## Unreleased
 
+### A binding is checked against what the document declares
+
+`ResolveBindingPath` read a path against a type, and finding the type was the caller's: the data type or the
+design data, and nothing for a binding that reads an element, itself or an ancestor. A host that asked the
+live tree for them asked its own controls — in a designer the root stands inside the host's, and the nearest
+window, an ancestor's data context and a name scope found there are the host's. `XamlLoadSession.CheckBindingAsync`
+reads the source from the binding's markup and finds it in the document — `#name` and `ElementName` in the
+document's name scope, `$self`, `$parent[T;n]` and `FindAncestor` among its elements, or as `T` itself where the
+ancestor is outside it — reads the data context as a build reads it, and says whether a build that compiles the
+binding would take it. ADR 0033.
+
+Added: `XamlLoadSession.CheckBindingAsync`, `XamlBindingCheck`, `XamlBindingSource`.
+
 ### The type catalog tells a model from a converter and a view locator
 
 `XamlTypeKinds.Data` was every type that is not an Avalonia object, so a data panel offering a document's
