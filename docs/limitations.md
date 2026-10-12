@@ -115,6 +115,16 @@ the document — see `docs/adr/0005-resource-includes.md` for why. That leaves f
   not a control among the content, a count that differs — the pairing stops descending, and what is
   below keeps whatever the map can work out for itself; a property element pairs only the entries of
   a dictionary, by key.
+- **An image is read again when its attribute is, not when its file changes.** What an image's or an
+  icon's text names is read through the environment at a load, when an update writes the attribute and
+  when it rebuilds the part holding it (ADR 0031). `ApplySourceUpdateAsync` for the image file itself
+  compares the projections, which do not hold images, and changes nothing; reload the document or touch
+  the attribute to show the new file.
+- **Only an image or an icon written as an attribute is read through the environment.** The same text
+  written as an element's content — `<Image.Source>/Assets/logo.png</Image.Source>` — goes to Avalonia as
+  before; a design value (`d:Source`) is converted as text and refused, as it was; and a control populated
+  from its live document inside its constructor reads its images through Avalonia's asset loader: a
+  constructor has no turn to read a resource in.
 
 ## Editing and history
 

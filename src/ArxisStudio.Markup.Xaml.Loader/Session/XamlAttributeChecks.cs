@@ -43,6 +43,11 @@ namespace ArxisStudio.Markup.Xaml.Loader;
 /// them up to the instance it populates; a part an update rebuilds has no instance to be hooked up
 /// to, so the update leaves them out of that part's text and hooks them up itself.
 /// </para>
+/// <para>
+/// And the attributes whose value is read from the resource their text names — an image's source, a
+/// window's icon (ADR 0031). A session leaves them out of its projections and sets them itself once
+/// the objects exist, from what the environment's resolvers find.
+/// </para>
 /// </remarks>
 internal static class XamlAttributeChecks
 {
@@ -74,6 +79,7 @@ internal static class XamlAttributeChecks
     {
         ImmutableArray<TextSpan>.Builder removals = ImmutableArray.CreateBuilder<TextSpan>();
         ImmutableArray<XamlHandlerAttribute>.Builder handlers = ImmutableArray.CreateBuilder<XamlHandlerAttribute>();
+        ImmutableArray<XamlResourceAttribute>.Builder resources = ImmutableArray.CreateBuilder<XamlResourceAttribute>();
 
         // Reported where it was resolved — unresolved, or not what the root says it is. Here it is
         // only kept out of the text, so that Avalonia does not go looking for it a second time.
@@ -130,12 +136,12 @@ internal static class XamlAttributeChecks
 
                 await CheckAsync(
                         document, element, attribute, type, rootType, classUse, environment, diagnostics, removals,
-                        handlers, cancellationToken)
+                        handlers, resources, cancellationToken)
                     .ConfigureAwait(false);
             }
         }
 
-        return new XamlAttributeFindings(removals.ToImmutable(), handlers.ToImmutable());
+        return new XamlAttributeFindings(removals.ToImmutable(), handlers.ToImmutable(), resources.ToImmutable());
     }
 
     private static async ValueTask CheckAsync(
@@ -149,6 +155,7 @@ internal static class XamlAttributeChecks
         List<MarkupDiagnostic> diagnostics,
         ImmutableArray<TextSpan>.Builder removals,
         ImmutableArray<XamlHandlerAttribute>.Builder handlers,
+        ImmutableArray<XamlResourceAttribute>.Builder resources,
         CancellationToken cancellationToken)
     {
         if (attribute.GetValue() is XamlMarkupExtensionValue extension)
@@ -166,7 +173,20 @@ internal static class XamlAttributeChecks
             return;
         }
 
-        if (environment.MemberResolver.Resolve(type, attribute.Name.LocalName).Kind != XamlMemberKind.Event)
+        XamlMemberDescriptor member = environment.MemberResolver.Resolve(type, attribute.Name.LocalName);
+
+        // An image or an icon written as text is read by the session, through the environment, rather
+        // than by Avalonia's asset loader — which knows only what was last built and fails the whole
+        // document over a file it cannot find (ADR 0031). A session leaves it out of the text and sets
+        // the value once the object exists.
+        if (member is { IsResolved: true, CanWrite: true, IsReadOnly: false } && XamlResourceValues.Reads(member.ValueType))
+        {
+            resources.Add(new XamlResourceAttribute(element, attribute, member));
+
+            return;
+        }
+
+        if (member.Kind != XamlMemberKind.Event)
         {
             return;
         }

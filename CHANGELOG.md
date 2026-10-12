@@ -11,6 +11,21 @@ the source of truth, an unchanged document round-trips byte for byte, and unknow
 
 ## Unreleased
 
+### An image is read through the environment
+
+`<Image Source="/Assets/logo.png"/>` went to Avalonia's runtime loader, whose asset loader knows only the
+resources of the assemblies the process has loaded: the environment's resolvers were never asked, an image
+added since the last build could not be shown, and one the asset loader could not find failed the whole
+document. A member holding an image or an icon — `IImage`, `IImageBrushSource`, `Bitmap`, `WindowIcon` — now
+reads its text as a URI against the document: the session leaves the attribute out of the text Avalonia is
+given, reads what it names through the environment's resolvers, decodes it and sets it — at a load, in place
+on an update, and for a part an update rebuilds. A name that finds nothing is `AXM2005` about that attribute,
+a warning at a load and a refusal at an update; a resource that cannot be read or decoded is the new `AXM2014`.
+What is read is kept per environment, by where it was found and what its bytes are (ADR 0031).
+
+Added: `XamlMemberDescriptor.ReadsResource` and `XamlLoaderDiagnosticCodes.UnreadableResourceValue`.
+`ConvertFromText` refuses text such a member reads as the name of a resource, and says why.
+
 ### A CLR property behind a private setter is read-only to a document
 
 `StyledElement.IsInitialized` has a private setter, and `PropertyInfo.CanWrite` answers yes for it, so the

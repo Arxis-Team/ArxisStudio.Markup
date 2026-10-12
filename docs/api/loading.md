@@ -231,6 +231,34 @@ form.Styles.AddRange(styles);
 form.Resources.MergedDictionaries.Add(resources);
 ```
 
+### Images and icons
+
+```xml
+<Image Source="/Assets/logo.png" />
+<Window Icon="Assets/app.ico" />
+```
+
+A member that holds an image or an icon — `IImage`, `IImageBrushSource`, `Bitmap`, `WindowIcon` — reads its
+text as the URI of a resource, against the document's base. The session reads it, not Avalonia's asset
+loader: the attribute is left out of the text Avalonia is given, the environment's `ResourceResolver` finds
+what it names, the bytes are decoded on the owning thread, and the value is set on the object once it
+exists (ADR 0031). An image the last build lacks shows if the environment can find it — a project's own
+resolver answers from the files on disk — and one nobody finds is a warning about that attribute rather
+than the end of the document:
+
+```csharp
+// <Image Source="/Assets/missing.png" />
+// AXM2005 (warning): '/Assets/missing.png' names nothing the environment can find, so Source was not set.
+```
+
+A resource that is found and cannot be read, or does not decode as an image, is `UnreadableResourceValue`
+(AXM2014). Only literal text is read this way: `{StaticResource Logo}` and `{Binding Avatar}` stay
+Avalonia's. What is read is kept by the environment, by where it was found and what its bytes are, so a
+document loaded again does not decode the same file twice, and a file that changed is decoded afresh.
+
+A control populated from its live document inside its constructor ([live population](live-population.md))
+is the exception: a constructor has no turn to read a resource in, so its text goes to Avalonia as written.
+
 ## Objects and elements
 
 The map is the point of the whole exercise: given an object, which markup declared it, and given
@@ -279,6 +307,7 @@ member.ValueType       // what it holds
 member.CanWrite        // and whether you may
 member.IsReadOnly
 member.IsAttached
+member.ReadsResource   // an image or an icon, read from the resource its text names
 member.AvaloniaProperty
 member.ClrProperty
 member.Event
@@ -374,6 +403,11 @@ watching the update roll it back. The member's `TypeConverter` first, then the p
 
 Markup extensions are not values of this kind: `{Binding Customer.Name}` is resolved by a load, so
 check for one with `XamlValue.Parse` before asking.
+
+Nor is the name of a resource. A member that `ReadsResource` — an image's source, a window's icon —
+refuses text here, because what the text names is read by a load or an update, through the environment
+and against the document, and neither is here ([images and icons](#images-and-icons)). Ask
+`ReadsResource` first and leave the check to the update, which refuses a name that finds nothing.
 
 ## What a document can name
 

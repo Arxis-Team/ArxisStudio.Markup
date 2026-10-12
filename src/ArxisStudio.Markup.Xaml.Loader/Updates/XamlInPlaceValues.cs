@@ -54,6 +54,18 @@ internal abstract class XamlInPlaceWrite
         }
     }
 
+    /// <summary>
+    /// A value that could not be worked out — an image the environment does not find (ADR 0031) — which
+    /// refuses the update before anything is written.
+    /// </summary>
+    internal sealed class Refusal(MarkupDiagnostic diagnostic) : XamlInPlaceWrite
+    {
+        internal MarkupDiagnostic Diagnostic { get; } = diagnostic;
+
+        internal override void Apply(object target, XamlMemberDescriptor member) =>
+            throw new InvalidOperationException("A refused value is never written; the update stops before the turn writes.");
+    }
+
     /// <summary>A binding — to a source, or to a resource that may change.</summary>
     internal sealed class Binding(BindingBase binding) : XamlInPlaceWrite
     {

@@ -80,6 +80,18 @@ public sealed class XamlMemberDescriptor
     public bool IsResolved => Kind != XamlMemberKind.Unknown;
 
     /// <summary>
+    /// Gets a value indicating whether the member reads its text as the URI of a resource — an image's
+    /// source, a brush's image, a window's icon.
+    /// </summary>
+    /// <remarks>
+    /// Such text is a name rather than a value: <c>/Assets/logo.png</c>, against the document's base. A
+    /// session reads what it names through its environment's resolvers when it loads the document and when
+    /// an update writes it (ADR 0031), and a name that finds nothing is a diagnostic about that attribute.
+    /// <see cref="ConvertFromText"/> has neither the document nor the environment, and refuses it.
+    /// </remarks>
+    public bool ReadsResource => IsResolved && XamlResourceValues.Reads(ValueType);
+
+    /// <summary>
     /// Reads attribute text as a value of this member, without writing anything.
     /// </summary>
     /// <remarks>
@@ -95,6 +107,10 @@ public sealed class XamlMemberDescriptor
     /// are read by instead of declaring a converter. A markup extension — <c>{Binding Name}</c> — is not text of this
     /// kind and is not evaluated here: that is a question for the load, not for a value.
     /// </para>
+    /// <para>
+    /// Nor is the name of a resource, for a member that <see cref="ReadsResource"/>: what it names is read
+    /// through the environment, against the document, by a load or an update — neither of which is here.
+    /// </para>
     /// </remarks>
     /// <param name="text">The text as a document would write it, between the quotes.</param>
     /// <returns>The value, or what is wrong with the text.</returns>
@@ -103,9 +119,16 @@ public sealed class XamlMemberDescriptor
     {
         ArgumentNullException.ThrowIfNull(text);
 
-        return IsResolved
-            ? XamlValueConversion.Convert(ValueType, text)
-            : XamlValueConversionResult.FromError($"'{Name}' is not a member of {TargetType.Name}.");
+        if (!IsResolved)
+        {
+            return XamlValueConversionResult.FromError($"'{Name}' is not a member of {TargetType.Name}.");
+        }
+
+        return ReadsResource
+            ? XamlValueConversionResult.FromError(
+                $"{Name} reads '{text}' as the name of a resource, which a load or an update reads through its " +
+                "environment against the document; there is no value to give before that.")
+            : XamlValueConversion.Convert(ValueType, text);
     }
 
     /// <summary>Returns the member's kind, name and value type.</summary>

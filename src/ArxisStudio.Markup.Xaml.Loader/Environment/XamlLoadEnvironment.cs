@@ -74,6 +74,16 @@ public sealed class XamlLoadEnvironment
     public XamlMemberResolver MemberResolver { get; init; } = new();
 
     /// <summary>
+    /// Gets the values this environment has read from resources — the images and icons a document names by
+    /// URI (ADR 0031) — so that a part rebuilt or a document loaded again does not decode the same file twice.
+    /// </summary>
+    /// <remarks>
+    /// One per environment, for the reason <see cref="MemberResolver"/> is: what it keeps was read through
+    /// this environment's resolvers.
+    /// </remarks>
+    internal XamlResourceValueCache ResourceValues { get; } = new();
+
+    /// <summary>
     /// Builds an environment over the assemblies the caller supplies plus those already loaded.
     /// </summary>
     /// <remarks>

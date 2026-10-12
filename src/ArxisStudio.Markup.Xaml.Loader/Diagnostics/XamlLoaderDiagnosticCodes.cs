@@ -57,6 +57,13 @@ public static class XamlLoaderDiagnosticCodes
     /// </summary>
     public const string UnreadableTypes = "AXM2013";
 
+    /// <summary>
+    /// A value a document names by URI — an image's source, a window's icon — was found and is not one:
+    /// the resource could not be read, or what it holds does not decode as the member's type (ADR 0031).
+    /// One the environment cannot find at all is <see cref="UnresolvedResource"/>.
+    /// </summary>
+    public const string UnreadableResourceValue = "AXM2014";
+
     /// <summary>Avalonia reported a problem while loading the document.</summary>
     public const string RuntimeLoadFailure = "AXM3001";
 

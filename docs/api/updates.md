@@ -182,7 +182,10 @@ exactly as it is.
 
 ### Values set where they stand
 
-A literal is converted and set. An attribute taken out of an Avalonia property clears the property's
+A literal is converted and set. An image or an icon written as text is read instead, before anything
+is written, through the environment and against the document — the same read a load makes
+([Loading](loading.md#images-and-icons)) — and set where it stands; a name that finds nothing refuses the
+update cleanly with `AXM2005`, as text a member cannot hold does. An attribute taken out of an Avalonia property clears the property's
 local value — a style, a theme or an inherited value shows through again, which is what the document
 now says — and that includes an attached property and the root's own attributes, so removing
 `Background` from a window no longer costs a new session. A CLR property has no local value to clear:
@@ -230,6 +233,9 @@ projection of just that element. What that would lose, the session puts back:
   update stands: a handler the author is still writing is the ordinary state of a file in an editor.
   A handler written, renamed or taken out is not a value to set — its element is built again and
   hooked up this way; on the root, whose handlers its load hooked up, it is a new session.
+- **Images and icons are read for it.** The part is projected without them, as the load was, and what
+  they name is read through the environment before the turn and set on the part's objects in it — a
+  name that finds nothing is a warning, and the part is built without that one value (ADR 0031).
 - **The part carries its scope.** `x:DataType` and `x:CompileBindings` of the nearest element above it
   are written onto the part's root, so a compiled binding inside it compiles as it did in the load.
 - **A static reference reads the dictionaries around it.** A part whose markup reads a key with

@@ -263,17 +263,18 @@ public sealed partial class XamlLoadSession : IAsyncDisposable
         // there is no instance yet: the text the instance is populated from has to exist before
         // its constructor runs. It is the type Avalonia compiles the handlers against either way.
         // With no class to use, the directive naming one is withheld too, and the root is built as
-        // the element it is written as.
-        ImmutableArray<TextSpan> unloadable = (await XamlAttributeChecks
+        // the element it is written as. An image or an icon written as text is left out as well, and
+        // read through the environment once its object exists (ADR 0031).
+        XamlAttributeFindings findings = await XamlAttributeChecks
             .RunAsync(document, rootType, options.ClassUse, environment, diagnostics, cancellationToken)
-            .ConfigureAwait(false)).Withheld;
+            .ConfigureAwait(false);
 
         // Includes are resolved before anything is created, because Avalonia resolves them
         // itself during the load and throws when it cannot. Resolving them here through the
         // environment, and handing over text with their content already in place, is what makes
         // the caller's own providers the ones that answer.
         TextProjection projection = await XamlDocumentProjector
-            .ProjectAsync(document, null, environment, diagnostics, unloadable, cancellationToken)
+            .ProjectAsync(document, null, environment, diagnostics, findings.LeftOut, cancellationToken)
             .ConfigureAwait(false);
 
         // Creating and populating are the owning thread's work, and one piece of it. Creating runs
@@ -354,6 +355,16 @@ public sealed partial class XamlLoadSession : IAsyncDisposable
         XamlLoadSession session = await environment.Dispatcher
             .InvokeAsync(
                 () => new XamlLoadSession(document, environment, options, projection, root, rootType, classUse, []),
+                cancellationToken)
+            .ConfigureAwait(false);
+
+        // What the projection left for the session to read is read now that there are objects to set
+        // it on, and through the map, for the reason design values are. A resource that is not there
+        // is a warning about one attribute: the rest of the document stands, as an image a running
+        // application cannot find shows nothing.
+        await XamlResourceValues
+            .ApplyAsync(
+                findings.Resources, session.Objects, document.BaseUri, environment, document.Uri, diagnostics,
                 cancellationToken)
             .ConfigureAwait(false);
 
@@ -555,7 +566,7 @@ public sealed partial class XamlLoadSession : IAsyncDisposable
 
         ImmutableArray<TextSpan> withheld = (await XamlAttributeChecks
             .RunAsync(document, null, XamlClassUse.AsWritten, environment, again, cancellationToken)
-            .ConfigureAwait(false)).Withheld;
+            .ConfigureAwait(false)).LeftOut;
 
         foreach (MarkupDiagnostic handler in again)
         {

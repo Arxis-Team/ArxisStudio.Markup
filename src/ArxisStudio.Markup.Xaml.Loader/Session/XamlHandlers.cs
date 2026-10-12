@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Collections.Immutable;
+using System.Linq;
 using System.Reflection;
 
 namespace ArxisStudio.Markup.Xaml.Loader;
@@ -14,9 +15,26 @@ internal sealed record XamlHandlerAttribute(XamlElement Element, XamlAttribute A
 /// <summary>What the attribute checks found in one version of a document.</summary>
 /// <param name="Withheld">The attributes a projection has to leave out for the load to survive.</param>
 /// <param name="Handlers">The handlers the class answers, which a load hands to Avalonia.</param>
+/// <param name="Resources">
+/// The attributes whose value is read from the resource their text names, which a session reads through
+/// its environment and sets itself (ADR 0031).
+/// </param>
 internal readonly record struct XamlAttributeFindings(
     ImmutableArray<TextSpan> Withheld,
-    ImmutableArray<XamlHandlerAttribute> Handlers);
+    ImmutableArray<XamlHandlerAttribute> Handlers,
+    ImmutableArray<XamlResourceAttribute> Resources)
+{
+    /// <summary>
+    /// Gets what a session's projection leaves out: what the load could not survive, and the values the
+    /// session reads itself.
+    /// </summary>
+    /// <remarks>
+    /// Not what every projection leaves out: a document populating a compiled control inside its
+    /// constructor has no turn to read a resource in, and gives Avalonia the text as written.
+    /// </remarks>
+    public ImmutableArray<TextSpan> LeftOut =>
+        Resources.IsEmpty ? Withheld : [.. Withheld, .. Resources.Select(static resource => resource.Attribute.Span)];
+}
 
 /// <summary>
 /// Hooks the handlers of a rebuilt part up to the instance its document populated.

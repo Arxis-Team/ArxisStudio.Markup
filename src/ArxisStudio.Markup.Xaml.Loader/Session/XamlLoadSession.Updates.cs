@@ -196,7 +196,7 @@ public sealed partial class XamlLoadSession
                 fragment: null,
                 Environment,
                 diagnostics,
-                (await FindingsAsync(Document, diagnostics, cancellationToken).ConfigureAwait(false)).Withheld,
+                (await FindingsAsync(Document, diagnostics, cancellationToken).ConfigureAwait(false)).LeftOut,
                 cancellationToken)
             .ConfigureAwait(false);
 
@@ -424,6 +424,18 @@ public sealed partial class XamlLoadSession
                 continue;
             }
 
+            // An image or an icon written as text is read here, through the environment, and set where
+            // it stands (ADR 0031) — Avalonia is never given it, so a rebuild would not read it either.
+            // One that cannot be read refuses the update, as text a member cannot hold does.
+            if (change.Strategy == XamlUpdateStrategy.SetProperty
+                && await ResourceAsync(change, cancellationToken).ConfigureAwait(false) is { } resource)
+            {
+                inPlace[change] = resource;
+                settled.Add(change);
+
+                continue;
+            }
+
             if (change.Strategy is not (XamlUpdateStrategy.ClearProperty or XamlUpdateStrategy.SetExpression))
             {
                 settled.Add(change);
@@ -461,6 +473,40 @@ public sealed partial class XamlLoadSession
         && change.MemberName is { } name
         && Objects.GetObject(element) is { } target
         && Environment.MemberResolver.Resolve(target.GetType(), name).Kind == XamlMemberKind.Event;
+
+    /// <summary>
+    /// Reads the image or icon a change writes as text, or says — by answering nothing — that it writes
+    /// something else.
+    /// </summary>
+    private async ValueTask<XamlInPlaceWrite?> ResourceAsync(XamlDocumentChange change, CancellationToken cancellationToken)
+    {
+        if (change.OldElement is not { } element
+            || change.NewElement is not { } written
+            || change.MemberName is not { } name
+            || Objects.GetObject(element) is not { } target
+            || AttributeOf(written, name) is not { } attribute
+            || attribute.GetValue() is not XamlLiteralValue)
+        {
+            return null;
+        }
+
+        XamlMemberDescriptor member = Environment.MemberResolver.Resolve(target.GetType(), name);
+
+        if (!member.ReadsResource || member.IsReadOnly || !member.CanWrite)
+        {
+            return null;
+        }
+
+        XamlResourceRead read = await XamlResourceValues
+            .ReadAsync(
+                attribute, member, Document.BaseUri, Environment, Document.Uri, MarkupDiagnosticSeverity.Error,
+                cancellationToken)
+            .ConfigureAwait(false);
+
+        return read.Failure is { } failure
+            ? new XamlInPlaceWrite.Refusal(failure)
+            : new XamlInPlaceWrite.Setting(read.Value);
+    }
 
     /// <summary>Works out what a value change writes where it stands, or that it cannot be written there.</summary>
     private async ValueTask<XamlInPlaceWrite?> InPlaceAsync(XamlDocumentChange change, CancellationToken cancellationToken)
@@ -585,7 +631,7 @@ public sealed partial class XamlLoadSession
     /// </remarks>
     private static HashSet<TextSpan> LeftOutOf(XamlElement part, XamlDocument document, XamlAttributeFindings findings)
     {
-        var spans = new HashSet<TextSpan>(findings.Withheld);
+        var spans = new HashSet<TextSpan>(findings.LeftOut);
 
         foreach (XamlHandlerAttribute handler in findings.Handlers)
         {
@@ -631,7 +677,7 @@ public sealed partial class XamlLoadSession
         // Reprojecting before anything is touched means a failure to resolve an include is a
         // refused update rather than a half-updated tree.
         TextProjection projection = await XamlDocumentProjector
-            .ProjectAsync(updated, fragment: null, Environment, diagnostics, findings.Withheld, cancellationToken)
+            .ProjectAsync(updated, fragment: null, Environment, diagnostics, findings.LeftOut, cancellationToken)
             .ConfigureAwait(false);
 
         // Every fragment is projected and parsed before any object is touched, for the same
@@ -660,6 +706,20 @@ public sealed partial class XamlLoadSession
                 await PlacedClassAsync(element, updated, cancellationToken).ConfigureAwait(false)));
         }
 
+        // The images and icons of the parts about to be rebuilt are read now, through the environment,
+        // like every other value worked out before the turn (ADR 0031); the turn sets them on what it
+        // builds. One that cannot be read is a warning, as at a load: the part is built without it.
+        List<(XamlResourceAttribute Attribute, object? Value)> resources = await XamlResourceValues
+            .ReadAllAsync(
+                findings.Resources.Where(resource => fragments.Exists(fragment =>
+                    fragment.Change.NewElement is { } part && part.Span.Contains(resource.Element.Span))),
+                updated.BaseUri,
+                Environment,
+                updated.Uri,
+                diagnostics,
+                cancellationToken)
+            .ConfigureAwait(false);
+
         var rootMustBeRebuilt = false;
 
         // One turn of the dispatcher for everything that touches the objects: the writes, the map
@@ -687,7 +747,7 @@ public sealed partial class XamlLoadSession
                         // caller told to do that has to be given something to do it with.
                         try
                         {
-                            Finish(updated, projection, fragments, findings, kept, diagnostics);
+                            Finish(updated, projection, fragments, findings, kept, resources, diagnostics);
                         }
                         catch (Exception)
                         {
@@ -760,9 +820,14 @@ public sealed partial class XamlLoadSession
         List<(XamlDocumentChange Change, TextProjection Projection, Type? Placed)> fragments,
         XamlAttributeFindings findings,
         List<XamlElement> kept,
+        List<(XamlResourceAttribute Attribute, object? Value)> resources,
         List<MarkupDiagnostic> diagnostics)
     {
         Adopt(updated, projection);
+
+        // What the rebuilt parts were built without, read before the turn: on the objects now that the
+        // map knows them, and not on an element whose object was kept, which still has its own.
+        XamlResourceValues.Set(resources, Objects, kept, updated.Uri, diagnostics);
 
         // Design values are re-applied from the document rather than patched one at a time.
         // Nothing re-evaluates on an update, so the document is the only place that says what they
@@ -1022,6 +1087,15 @@ public sealed partial class XamlLoadSession
 
             if (inPlace.TryGetValue(change, out XamlInPlaceWrite? settled))
             {
+                // A value that was read before the turn and found missing refuses here, with nothing
+                // written yet — the parts built above go back unplaced.
+                if (settled is XamlInPlaceWrite.Refusal refusal)
+                {
+                    diagnostics.Add(refusal.Diagnostic);
+
+                    return XamlMutationOutcome.Refused;
+                }
+
                 // Worked out before the turn began, against the object's own member; all that is
                 // left is that the object is still there to write it on.
                 if (change.OldElement is not { } holder
