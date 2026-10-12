@@ -513,8 +513,9 @@ its own controls, and an ancestor, a name or a data context found there would be
 has is `Broken`; an ancestor the document does not have — the window a form will stand in — is read as the
 type the binding names, which is what a build reads. The data context is read as a build reads it: a
 compiled binding against the nearest `x:DataType`, which a data template does not inherit, and with none in
-scope it is `Broken` with no step; one that does not compile against the data type in scope, or the data the
-document gives the objects — never what the root inherits from its host. A binding on `DataContext` reads
+scope it is `Broken` with no step; one that does not compile against the data the document gives the objects,
+as it reads when the form runs, and against the data type in scope only where there is none — never what the
+root inherits from its host. A binding on `DataContext` reads
 its parent's data. `compilesByDefault` is the project's default — a session that loads forgivingly does not
 share it. ADR 0033 records the rules.
 

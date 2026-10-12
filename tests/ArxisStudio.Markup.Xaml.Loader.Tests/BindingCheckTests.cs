@@ -87,6 +87,43 @@ public sealed class BindingCheckTests
     }
 
     [AvaloniaFact]
+    public async Task ABindingTheBuildDoesNotCompileReadsTheDataTheObjectsHaveBeforeTheDataType()
+    {
+        // The root's x:DataType names its model, and the card hands its content a string: a reflection binding reads
+        // the string when the form runs, while a compiled one is checked against the model and refused.
+        await using XamlLoadSession session = await LoadAsync(
+            Head("UserControl", "x:DataType=\"tc:GreetingModel\"") +
+            "<UserControl.DataContext><tc:GreetingModel /></UserControl.DataContext>" +
+            "<Border DataContext=\"{Binding Name}\">" +
+            "<TextBlock x:Name=\"Inner\" Text=\"{Binding Length}\" />" +
+            "</Border></UserControl>");
+
+        var window = new Window { Content = session.RootObject };
+
+        window.Show();
+
+        try
+        {
+            XamlBindingCheck reflected = await CheckAsync(session, "Inner", "Text", compilesByDefault: false);
+
+            Assert.Equal(XamlBindingPathStatus.Resolved, reflected.Status);
+            Assert.Equal(typeof(string), reflected.SourceType);
+            Assert.Equal(typeof(int), reflected.ResultType);
+
+            XamlBindingCheck compiled = await CheckAsync(session, "Inner", "Text", compilesByDefault: true);
+
+            Assert.Equal(XamlBindingPathStatus.Broken, compiled.Status);
+            Assert.Equal(typeof(GreetingModel), compiled.SourceType);
+            Assert.True(compiled.BreaksBuild);
+        }
+        finally
+        {
+            window.Content = null;
+            window.Close();
+        }
+    }
+
+    [AvaloniaFact]
     public async Task ADataContextBindingReadsTheDataItsParentHas()
     {
         await using XamlLoadSession session = await LoadAsync(

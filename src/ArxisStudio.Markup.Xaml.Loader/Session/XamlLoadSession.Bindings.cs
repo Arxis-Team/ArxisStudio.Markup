@@ -33,10 +33,10 @@ public sealed partial class XamlLoadSession
     /// <para>
     /// The data context is read as a build reads it: a compiled binding against the nearest <c>x:DataType</c>,
     /// which a data template does not inherit, and without one in scope the build refuses it. A binding a build
-    /// does not compile is read against the data type in scope, and without one against the data the document
-    /// gives the objects — written on an element, or set by the class or the design data on the root; data the
-    /// root inherits from the host is not the document's. A binding on <c>DataContext</c> itself reads its
-    /// parent's.
+    /// does not compile is read as it reads when the form runs — against the data the document gives the objects,
+    /// written on an element, or set by the class or the design data on the root — and against the data type in
+    /// scope only where there is no such data; data the root inherits from the host is not the document's. A
+    /// binding on <c>DataContext</c> itself reads its parent's.
     /// </para>
     /// <para>
     /// The path is read by <see cref="XamlMemberResolver.ResolveBindingPath"/>, and what it does not follow —
@@ -171,7 +171,9 @@ public sealed partial class XamlLoadSession
                 : (dataType, null);
         }
 
-        return (dataType ?? await DocumentDataTypeAsync(scope, cancellationToken).ConfigureAwait(false), null);
+        // A binding the build does not compile reads, when the form runs, the data its element has: x:DataType is what
+        // a compiler checks against, and it is a guess here only where the document gives the objects no data.
+        return (await DocumentDataTypeAsync(scope, cancellationToken).ConfigureAwait(false) ?? dataType, null);
     }
 
     /// <summary>The element a binding names: one of the document's name scope, or the binding reads nothing.</summary>

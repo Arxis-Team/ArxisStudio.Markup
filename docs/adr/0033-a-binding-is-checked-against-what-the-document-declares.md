@@ -33,9 +33,12 @@ compiles them and refuses a path its data type does not have.
 - A `Source`, a templated parent or a mode it does not know is `Other`, and its path is `NotUnderstood`.
 - The data context is read as a build reads it. A compiled binding reads the nearest `x:DataType`, which a
   data template does not inherit; with none in scope the build refuses it. A binding the build does not
-  compile reads the data type in scope, and without one the data the document gives the objects — the nearest
-  data context that is not inherited, which is what an element writes or what the class or the design data
-  sets on the root. What the root inherits comes from its host and is not the document's.
+  compile reads what it reads when the form runs: the data the document gives the objects — the nearest data
+  context that is not inherited, which is what an element writes or what the class or the design data sets on
+  the root — and the data type in scope only where there is no such data. `x:DataType` is what a compiler
+  checks against; a reflection binding under an element that hands its content other data reads that data,
+  and reading the data type there would call a working binding broken. What the root inherits comes from its
+  host and is not the document's.
 - A binding on `DataContext` reads what its parent has: the element's own `x:DataType` is about the data it
   gives its content.
 

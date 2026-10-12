@@ -20,7 +20,9 @@ window, an ancestor's data context and a name scope found there are the host's. 
 reads the source from the binding's markup and finds it in the document — `#name` and `ElementName` in the
 document's name scope, `$self`, `$parent[T;n]` and `FindAncestor` among its elements, or as `T` itself where the
 ancestor is outside it — reads the data context as a build reads it, and says whether a build that compiles the
-binding would take it. ADR 0033.
+binding would take it. A binding the build does not compile is read against the data the objects have, as it
+reads when the form runs: under an element that hands its content other data, the data type in scope would have
+called a working binding broken. ADR 0033.
 
 Added: `XamlLoadSession.CheckBindingAsync`, `XamlBindingCheck`, `XamlBindingSource`.
 
