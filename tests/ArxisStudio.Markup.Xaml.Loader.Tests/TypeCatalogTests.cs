@@ -59,6 +59,26 @@ public sealed class TypeCatalogTests
     }
 
     [Fact]
+    public void DataSaysWhetherItNotifiesAndAConverterOrAViewLocatorIsToldApart()
+    {
+        XamlTypeCatalog catalog = Catalog();
+
+        // What a data panel offers: a model that says when it changes.
+        Assert.Equal(
+            XamlTypeKinds.Creatable | XamlTypeKinds.Data | XamlTypeKinds.Notifies,
+            Entry(catalog, typeof(CatalogViewModel)).Kinds);
+
+        // And what it does not: a converter a binding names, and a view locator that builds views for data.
+        Assert.Equal(
+            XamlTypeKinds.Creatable | XamlTypeKinds.Data | XamlTypeKinds.Converter,
+            Entry(catalog, typeof(CatalogConverter)).Kinds);
+
+        Assert.Equal(
+            XamlTypeKinds.Creatable | XamlTypeKinds.Data | XamlTypeKinds.DataTemplate,
+            Entry(catalog, typeof(CatalogLocator)).Kinds);
+    }
+
+    [Fact]
     public void ATypeWhoseAssemblyMapsNoNamespaceIsWrittenWithUsing()
     {
         XamlTypeEntry entry = Entry(Catalog(), typeof(CatalogModel));
@@ -138,3 +158,43 @@ public class CatalogBox<T>;
 
 /// <summary>A delegate, which a document does not write as an element.</summary>
 public delegate void CatalogCallback();
+
+/// <summary>A view model that says when its properties change.</summary>
+public sealed class CatalogViewModel : System.ComponentModel.INotifyPropertyChanged
+{
+    private string _greeting = "Hello";
+
+    /// <inheritdoc/>
+    public event System.ComponentModel.PropertyChangedEventHandler? PropertyChanged;
+
+    /// <summary>Gets or sets the greeting a binding reads.</summary>
+    public string Greeting
+    {
+        get => _greeting;
+        set
+        {
+            _greeting = value;
+            PropertyChanged?.Invoke(this, new System.ComponentModel.PropertyChangedEventArgs(nameof(Greeting)));
+        }
+    }
+}
+
+/// <summary>A converter, which a binding names rather than reads.</summary>
+public sealed class CatalogConverter : Avalonia.Data.Converters.IValueConverter
+{
+    /// <inheritdoc/>
+    public object? Convert(object? value, Type targetType, object? parameter, System.Globalization.CultureInfo culture) => value;
+
+    /// <inheritdoc/>
+    public object? ConvertBack(object? value, Type targetType, object? parameter, System.Globalization.CultureInfo culture) => value;
+}
+
+/// <summary>A view locator: it builds views for data and is not data itself.</summary>
+public sealed class CatalogLocator : Avalonia.Controls.Templates.IDataTemplate
+{
+    /// <inheritdoc/>
+    public Control? Build(object? param) => null;
+
+    /// <inheritdoc/>
+    public bool Match(object? data) => false;
+}

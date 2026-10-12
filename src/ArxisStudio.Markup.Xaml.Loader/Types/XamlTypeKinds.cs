@@ -50,4 +50,22 @@ public enum XamlTypeKinds
 
     /// <summary>Not an Avalonia object: a model or a view model a document binds to.</summary>
     Data = 1024,
+
+    /// <summary>
+    /// Data that says when its properties change — <c>INotifyPropertyChanged</c> — so a binding to it follows
+    /// them. Not said of Avalonia objects, every one of which does.
+    /// </summary>
+    Notifies = 2048,
+
+    /// <summary>
+    /// Data that is a converter a binding names — <c>IValueConverter</c> or <c>IMultiValueConverter</c> —
+    /// rather than data it reads.
+    /// </summary>
+    Converter = 4096,
+
+    /// <summary>
+    /// Data that builds views for data — <c>IDataTemplate</c>, which a view locator is — rather than being
+    /// data itself.
+    /// </summary>
+    DataTemplate = 8192,
 }

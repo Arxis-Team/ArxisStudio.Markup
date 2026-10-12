@@ -11,6 +11,15 @@ the source of truth, an unchanged document round-trips byte for byte, and unknow
 
 ## Unreleased
 
+### The type catalog tells a model from a converter and a view locator
+
+`XamlTypeKinds.Data` was every type that is not an Avalonia object, so a data panel offering a document's
+models offered its converters and its `ViewLocator` beside them. Data now says more: `Notifies` for a type
+that implements `INotifyPropertyChanged`, `Converter` for an `IValueConverter` or `IMultiValueConverter`, and
+`DataTemplate` for an `IDataTemplate`. Asked of data only — every Avalonia object notifies.
+
+Added: `XamlTypeKinds.Notifies`, `XamlTypeKinds.Converter`, `XamlTypeKinds.DataTemplate`.
+
 ### A document that places its own class does not take the process down
 
 A form that makes a data context of itself — `<UserControl.DataContext><views:MainView/></UserControl.DataContext>`

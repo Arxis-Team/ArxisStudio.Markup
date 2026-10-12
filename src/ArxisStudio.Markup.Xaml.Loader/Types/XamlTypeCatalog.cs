@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Collections.Immutable;
+using System.ComponentModel;
 using System.IO;
 using System.Linq;
 using System.Reflection;
@@ -8,6 +9,8 @@ using System.Runtime.CompilerServices;
 using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Controls.Primitives;
+using Avalonia.Controls.Templates;
+using Avalonia.Data.Converters;
 using Avalonia.Metadata;
 
 namespace ArxisStudio.Markup.Xaml.Loader;
@@ -205,7 +208,7 @@ public sealed class XamlTypeCatalog
 
         if (!typeof(AvaloniaObject).IsAssignableFrom(type))
         {
-            return kinds | XamlTypeKinds.Data;
+            return kinds | XamlTypeKinds.Data | DataKindsOf(type);
         }
 
         if (!typeof(Control).IsAssignableFrom(type))
@@ -253,6 +256,36 @@ public sealed class XamlTypeCatalog
         if (XamlPopulateHook.Find(type) is not null)
         {
             kinds |= XamlTypeKinds.CompiledMarkup;
+        }
+
+        return kinds;
+    }
+
+    /// <summary>
+    /// What a data panel needs to tell a model from the rest of what is not an Avalonia object: a converter
+    /// and a view locator are named by documents too, but nothing binds to them.
+    /// </summary>
+    /// <remarks>
+    /// Asked of data only: every Avalonia object says when its properties change, and the flag would say
+    /// nothing about a control.
+    /// </remarks>
+    private static XamlTypeKinds DataKindsOf(Type type)
+    {
+        XamlTypeKinds kinds = XamlTypeKinds.None;
+
+        if (typeof(INotifyPropertyChanged).IsAssignableFrom(type))
+        {
+            kinds |= XamlTypeKinds.Notifies;
+        }
+
+        if (typeof(IValueConverter).IsAssignableFrom(type) || typeof(IMultiValueConverter).IsAssignableFrom(type))
+        {
+            kinds |= XamlTypeKinds.Converter;
+        }
+
+        if (typeof(IDataTemplate).IsAssignableFrom(type))
+        {
+            kinds |= XamlTypeKinds.DataTemplate;
         }
 
         return kinds;

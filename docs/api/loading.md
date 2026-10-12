@@ -438,7 +438,10 @@ and the editor declares the namespace where the document lacks it.
 `Kinds` answers what a tool asks before offering a type: `Creatable` (a document can write it as an
 element), `Control` and its shapes — `Panel`, `ContentControl`, `Decorator`, `ItemsControl`,
 `TemplatedControl`, `UserControl`, `TopLevel` — `CompiledMarkup` for an `x:Class` whose markup was
-compiled into it, and `Data` for a type that is not an Avalonia object at all.
+compiled into it, and `Data` for a type that is not an Avalonia object at all. Of data it says more,
+because a data panel offers models and not everything else a document names: `Notifies` for one that
+implements `INotifyPropertyChanged`, `Converter` for an `IValueConverter` or `IMultiValueConverter`, and
+`DataTemplate` for an `IDataTemplate`, which a view locator is.
 
 **Nothing in a catalog holds a type or an assembly.** A toolbox filled from one generation of a
 project's code stays on screen while the next one loads, and a `Type` in it would keep the previous
