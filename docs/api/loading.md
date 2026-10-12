@@ -258,6 +258,11 @@ document loaded again does not decode the same file twice, and a file that chang
 
 A control populated from its live document inside its constructor ([live population](live-population.md))
 is the exception: a constructor has no turn to read a resource in, so its text goes to Avalonia as written.
+So is an image the session could not set once the objects exist — one inside a property element, such as
+`<Border.Background><ImageBrush Source="…"/></Border.Background>`, or inside a template's content: no object
+the map pairs holds it, and its text goes to Avalonia as written, as before ADR 0031. And an `avares:` image
+no resolver of the environment knows — a package's, built into its assembly — is asked of Avalonia's asset
+loader last, before it is `AXM2005`.
 
 ## Objects and elements
 

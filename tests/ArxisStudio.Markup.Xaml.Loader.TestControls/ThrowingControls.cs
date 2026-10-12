@@ -6,6 +6,21 @@ using Avalonia.Metadata;
 
 namespace ArxisStudio.Markup.Xaml.Loader.TestControls;
 
+/// <summary>A control whose picture is a CLR property that refuses every image it is given.</summary>
+/// <remarks>
+/// Written through reflection, so what the setter throws arrives wrapped — the case a filter naming only
+/// the exceptions a setter raises itself lets through.
+/// </remarks>
+public class PictureRefusingControl : Control
+{
+    /// <summary>Gets or sets a picture this control will not take.</summary>
+    public Avalonia.Media.IImage? Picture
+    {
+        get => null;
+        set => throw new NotSupportedException("This control takes no pictures.");
+    }
+}
+
 /// <summary>
 /// A control whose setters fail in the several ways real ones do.
 /// </summary>

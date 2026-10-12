@@ -125,6 +125,10 @@ the document — see `docs/adr/0005-resource-includes.md` for why. That leaves f
   before; a design value (`d:Source`) is converted as text and refused, as it was; and a control populated
   from its live document inside its constructor reads its images through Avalonia's asset loader: a
   constructor has no turn to read a resource in.
+- **An image inside a property element or a template is Avalonia's.** The object map pairs what the
+  logical tree, the resources and the styles reach, and a brush that is a property's value or a template's
+  content is reached by none of them: such an attribute goes to Avalonia as written, which reads it through
+  its asset loader — what was last built — as before ADR 0031.
 
 ## Editing and history
 

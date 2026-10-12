@@ -60,3 +60,25 @@ cache per environment, for the reason the member resolver is per environment.
 - A design-time value (`d:Source`) is converted as text, and refused for these members as before.
 - A file that changes on disk is read again the next time its attribute is loaded, rewritten or rebuilt; a
   source update for the file alone does not re-read it.
+
+## Amendment — what the session cannot reach, find or set
+
+Date: 2026-10-12
+
+A review of this decision found three ways it lost an image Avalonia's loader had shown before it:
+
+- **Reach.** The session sets a value on the object its element produced, and the object map pairs what the
+  logical tree, the resources and the styles reach. A brush written in a property element and a template's
+  content are reached by none of them, so the value read for them had no object to go to, and the image
+  vanished without a word. Such an attribute now stays in the text, for Avalonia's loader, as before this
+  decision: an element inside a property element, or inside a type that defers its content
+  (`[TemplateContent]` — `ControlTemplate`, `DataTemplate`, `ItemsPanelTemplate` and a library's own), keeps
+  its image as written. A template's own attributes are still the session's.
+- **Find.** The environment's resolvers know what a host gives them — a designer's projects — and an image
+  built into a package's or a library's assembly was `AXM2005`, though Avalonia's asset loader had always
+  found it. When no resolver knows an `avares:` URI, Avalonia's asset loader is asked last, as an include the
+  environment cannot find is left to Avalonia (ADR 0005).
+- **Set.** A setter that refuses an image is a warning about its attribute, but a CLR property is written by
+  reflection, which wraps what the setter threw, and that wrapper escaped the load. A write now stands on the
+  answers an update does (`XamlObjectReplacement`), and says what the setter itself threw — for a design value
+  (`d:`) too, which had the same gap.

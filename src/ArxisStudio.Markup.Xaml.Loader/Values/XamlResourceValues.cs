@@ -7,6 +7,7 @@ using System.Threading.Tasks;
 using Avalonia.Controls;
 using Avalonia.Media;
 using Avalonia.Media.Imaging;
+using Avalonia.Platform;
 
 namespace ArxisStudio.Markup.Xaml.Loader;
 
@@ -95,27 +96,39 @@ internal static class XamlResourceValues
                 $"'{text}' is not a URI, so {member.Name} has nothing to be read from.");
         }
 
-        XamlResource? resource;
+        Uri found;
         byte[] bytes;
 
         try
         {
-            resource = await environment.ResourceResolver
+            XamlResource? resource = await environment.ResourceResolver
                 .ResolveAsync(uri, baseUri, cancellationToken)
                 .ConfigureAwait(false);
 
             if (resource is null)
             {
-                return Failed(
-                    XamlLoaderDiagnosticCodes.UnresolvedResource,
-                    $"'{text}' names nothing the environment can find, so {member.Name} was not set.");
+                // What the environment does not know may still be built into an assembly the process has
+                // loaded — a package's image, say — and before ADR 0031 Avalonia's asset loader was the only
+                // one asked about it. It is asked last, as an include the environment cannot find is left to
+                // Avalonia.
+                if (BuiltIn(uri, baseUri) is not { } asset)
+                {
+                    return Failed(
+                        XamlLoaderDiagnosticCodes.UnresolvedResource,
+                        $"'{text}' names nothing the environment can find, so {member.Name} was not set.");
+                }
+
+                (found, bytes) = asset;
             }
+            else
+            {
+                await using Stream stream = await resource.OpenAsync(cancellationToken).ConfigureAwait(false);
+                using var copy = new MemoryStream();
 
-            await using Stream stream = await resource.OpenAsync(cancellationToken).ConfigureAwait(false);
-            using var copy = new MemoryStream();
-
-            await stream.CopyToAsync(copy, cancellationToken).ConfigureAwait(false);
-            bytes = copy.ToArray();
+                await stream.CopyToAsync(copy, cancellationToken).ConfigureAwait(false);
+                found = resource.Uri;
+                bytes = copy.ToArray();
+            }
         }
         catch (Exception unread) when (unread is IOException or UnauthorizedAccessException or InvalidOperationException)
         {
@@ -126,7 +139,7 @@ internal static class XamlResourceValues
 
         Type kind = KindOf(member.ValueType);
 
-        if (environment.ResourceValues.TryGet(resource.Uri, kind, bytes, out object? known))
+        if (environment.ResourceValues.TryGet(found, kind, bytes, out object? known))
         {
             return new XamlResourceRead(known, null);
         }
@@ -141,10 +154,10 @@ internal static class XamlResourceValues
         {
             return Failed(
                 XamlLoaderDiagnosticCodes.UnreadableResourceValue,
-                $"'{text}' was found at {resource.Uri} but is not {(kind == typeof(WindowIcon) ? "an icon" : "an image")}: {error}");
+                $"'{text}' was found at {found} but is not {(kind == typeof(WindowIcon) ? "an icon" : "an image")}: {error}");
         }
 
-        environment.ResourceValues.Remember(resource.Uri, kind, bytes, value);
+        environment.ResourceValues.Remember(found, kind, bytes, value);
 
         return new XamlResourceRead(value, null);
 
@@ -258,12 +271,12 @@ internal static class XamlResourceValues
             {
                 XamlDesignValues.Write(target, attribute.Member, value);
             }
-            catch (Exception error) when (error is InvalidCastException or ArgumentException or InvalidOperationException)
+            catch (Exception error) when (XamlDesignValues.Refused(error))
             {
                 diagnostics.Add(MarkupDiagnostic.Load(
                     XamlLoaderDiagnosticCodes.IncompatibleValue,
                     $"{target.GetType().Name}.{attribute.Member.Name} would not take what '{attribute.Attribute.GetValueText()}' " +
-                    $"names: {error.Message}",
+                    $"names: {XamlDesignValues.Unwrapped(error).Message}",
                     MarkupDiagnosticSeverity.Warning,
                     documentUri,
                     attribute.Attribute.Span));
@@ -282,6 +295,47 @@ internal static class XamlResourceValues
         }
 
         return false;
+    }
+
+    /// <summary>
+    /// Reads what Avalonia's asset loader finds at a URI: a resource built into an assembly the process has
+    /// loaded.
+    /// </summary>
+    /// <param name="uri">The URI as written.</param>
+    /// <param name="baseUri">What a relative URI is resolved against.</param>
+    /// <returns>Where it was found and what it holds; <see langword="null"/> — nothing there, or nothing to ask.</returns>
+    /// <remarks>
+    /// Only an <c>avares:</c> URI is the asset loader's. Without an application the loader has no platform to
+    /// ask, and that is the same answer as nothing found.
+    /// </remarks>
+    private static (Uri Uri, byte[] Bytes)? BuiltIn(Uri uri, Uri? baseUri)
+    {
+        Uri target = InMemoryResourceResolver.Combine(uri, baseUri);
+
+        if (!XamlUri.IsAvaloniaResource(target))
+        {
+            return null;
+        }
+
+        try
+        {
+            if (!AssetLoader.Exists(target))
+            {
+                return null;
+            }
+
+            using Stream stream = AssetLoader.Open(target);
+            using var copy = new MemoryStream();
+
+            stream.CopyTo(copy);
+
+            return (target, copy.ToArray());
+        }
+        catch (Exception missing) when (missing is IOException or InvalidOperationException or ArgumentException
+                                            or NotSupportedException or UriFormatException)
+        {
+            return null;
+        }
     }
 
     /// <summary>What a member's resource is decoded into: an icon for a window, a bitmap for the rest.</summary>

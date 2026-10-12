@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Globalization;
 using System.Linq;
+using System.Reflection;
 using Avalonia;
 using Avalonia.Controls;
 
@@ -245,16 +246,36 @@ internal static class XamlDesignValues
         {
             Write(target, member, value.Value);
         }
-        catch (Exception error) when (error is InvalidCastException or ArgumentException or InvalidOperationException)
+        catch (Exception error) when (Refused(error))
         {
             diagnostics.Add(MarkupDiagnostic.Load(
                 XamlLoaderDiagnosticCodes.IncompatibleValue,
-                $"'{literal.Text}' could not be assigned to {target.GetType().Name}.{name}: {error.Message}",
+                $"'{literal.Text}' could not be assigned to {target.GetType().Name}.{name}: {Unwrapped(error).Message}",
                 MarkupDiagnosticSeverity.Warning,
                 document.Uri,
                 attribute.Span));
         }
     }
+
+    /// <summary>Reports whether what a write threw is the setter refusing the value — an answer about the document.</summary>
+    /// <remarks>
+    /// The same answers an update stands on (<c>XamlObjectReplacement</c>): a CLR property and an attached accessor
+    /// are written by reflection, which wraps what the setter threw, and a filter naming only what a setter raises
+    /// itself let the wrapped one out of the load. Anything else — a null reference inside a control, an
+    /// out-of-memory — is not an answer about the document and is left to propagate.
+    /// </remarks>
+    /// <param name="error">What the write threw.</param>
+    internal static bool Refused(Exception error) =>
+        error is InvalidCastException
+            or ArgumentException
+            or InvalidOperationException
+            or NotSupportedException
+            or TargetInvocationException;
+
+    /// <summary>What the setter itself threw, out of the wrapper reflection put round it.</summary>
+    /// <param name="error">What the write threw.</param>
+    internal static Exception Unwrapped(Exception error) =>
+        error is TargetInvocationException { InnerException: { } inner } ? inner : error;
 
     /// <summary>Writes a value through whichever accessor the member actually has.</summary>
     internal static void Write(object target, XamlMemberDescriptor member, object? value)

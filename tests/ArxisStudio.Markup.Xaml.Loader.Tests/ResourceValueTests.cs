@@ -4,8 +4,11 @@ using System.IO;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
+using ArxisStudio.Markup.Xaml.Loader.TestControls;
 using Avalonia.Controls;
+using Avalonia.Controls.Templates;
 using Avalonia.Headless.XUnit;
+using Avalonia.Media;
 using Avalonia.Media.Imaging;
 using Xunit;
 
@@ -59,9 +62,9 @@ public sealed class ResourceValueTests
         }
     }
 
-    private static XamlLoadEnvironment Environment(ResourceFiles files)
+    private static XamlLoadEnvironment Environment(ResourceFiles files, params System.Reflection.Assembly[] assemblies)
     {
-        XamlLoadEnvironment defaults = XamlLoadEnvironment.CreateDefault();
+        XamlLoadEnvironment defaults = XamlLoadEnvironment.CreateDefault(assemblies);
 
         return new XamlLoadEnvironment
         {
@@ -335,4 +338,108 @@ public sealed class ResourceValueTests
             Assert.Contains("resource", converted.Error, StringComparison.Ordinal);
         }
     }
+
+    /// <summary>
+    /// An image the session could not set — a brush that is a property's value, an image in a template — is left
+    /// to Avalonia's loader, as it was before ADR 0031, rather than withheld from the text and never set.
+    /// </summary>
+    /// <remarks>
+    /// The object map pairs what the logical tree, the resources and the styles reach. A brush written in a
+    /// property element and a template's content are reached by none of them, so the value read for them had
+    /// no object to go to, and the image vanished without a word.
+    /// </remarks>
+    [AvaloniaFact]
+    public async Task AnImageTheSessionCannotReachIsLeftToAvalonia()
+    {
+        string xaml =
+            $"<StackPanel xmlns=\"{AvaloniaNamespace}\">\n" +
+            "  <Border Width=\"8\" Height=\"8\">\n" +
+            "    <Border.Background>\n" +
+            $"      <ImageBrush Source=\"{BuiltDot}\" />\n" +
+            "    </Border.Background>\n" +
+            "  </Border>\n" +
+            "  <ContentControl Content=\"x\">\n" +
+            "    <ContentControl.ContentTemplate>\n" +
+            "      <DataTemplate>\n" +
+            $"        <Image Source=\"{BuiltDot}\" />\n" +
+            "      </DataTemplate>\n" +
+            "    </ContentControl.ContentTemplate>\n" +
+            "  </ContentControl>\n" +
+            "</StackPanel>";
+
+        var files = new ResourceFiles();
+
+        (XamlLoadSession session, XamlLoadResult result) = await LoadAsync(xaml, Environment(files));
+
+        await using (session)
+        {
+            Assert.Empty(result.Diagnostics);
+            Assert.Empty(files.Asked);
+
+            StackPanel root = session.GetRoot<StackPanel>();
+            var brush = Assert.IsType<ImageBrush>(root.Children.OfType<Border>().Single().Background);
+            var template = Assert.IsAssignableFrom<IDataTemplate>(root.Children.OfType<ContentControl>().Single().ContentTemplate);
+
+            Assert.NotNull(brush.Source);
+            Assert.NotNull(Assert.IsType<Image>(template.Build("x")).Source);
+        }
+    }
+
+    /// <summary>
+    /// An image the environment's resolvers do not know is asked of Avalonia's asset loader, which knows the
+    /// resources built into the assemblies the process has loaded — a package's images among them.
+    /// </summary>
+    /// <remarks>
+    /// Before ADR 0031 that loader was the only one asked, and an image a package carries loaded. A host whose
+    /// resolvers know only its own projects' files then lost every such image to <c>AXM2005</c>.
+    /// </remarks>
+    [AvaloniaFact]
+    public async Task AnImageTheEnvironmentDoesNotKnowIsAskedOfAvaloniasAssetLoader()
+    {
+        (XamlLoadSession session, XamlLoadResult result) = await LoadAsync(Panel(BuiltDot), Environment(new ResourceFiles()));
+
+        await using (session)
+        {
+            Assert.Empty(result.Diagnostics);
+            Assert.IsType<Bitmap>(Shown(session).Source);
+        }
+    }
+
+    /// <summary>
+    /// A setter that throws while an image is set through reflection is a warning about that attribute, not an
+    /// exception out of the load.
+    /// </summary>
+    /// <remarks>
+    /// A CLR property is written by reflection, which wraps what its setter threw, and the filter named only the
+    /// exceptions a setter raises itself: the load threw instead of saying which attribute went wrong.
+    /// </remarks>
+    [AvaloniaFact]
+    public async Task ASetterThatThrowsThroughReflectionIsAWarning()
+    {
+        ResourceFiles files = new ResourceFiles().With("avares://Probe/Assets/dot.png", [1, 2, 3]);
+        string xaml =
+            $"<StackPanel xmlns=\"{AvaloniaNamespace}\" xmlns:c=\"using:ArxisStudio.Markup.Xaml.Loader.TestControls\">\n" +
+            "  <c:PictureRefusingControl Picture=\"/Assets/dot.png\" />\n" +
+            "</StackPanel>";
+
+        (XamlLoadSession? session, XamlLoadResult result) = await XamlLoadSession.TryCreateAsync(
+            Parse(xaml),
+            Environment(files, typeof(PictureRefusingControl).Assembly),
+            new XamlLoadOptions { Mode = XamlLoadMode.Design, LocalAssembly = typeof(PictureRefusingControl).Assembly },
+            TestContext.Current.CancellationToken);
+
+        Assert.True(session is not null, "The document produced no object: " + string.Join(" | ", result.Diagnostics));
+
+        await using (session)
+        {
+            MarkupDiagnostic refused = Assert.Single(
+                result.Diagnostics, diagnostic => diagnostic.Code == XamlLoaderDiagnosticCodes.IncompatibleValue);
+
+            Assert.Equal(MarkupDiagnosticSeverity.Warning, refused.Severity);
+            Assert.Contains("takes no pictures", refused.Message, StringComparison.Ordinal);
+        }
+    }
+
+    /// <summary>An image built into the test controls' assembly — what Avalonia's asset loader finds.</summary>
+    private const string BuiltDot = "avares://ArxisStudio.Markup.Xaml.Loader.TestControls/Assets/dot.png";
 }

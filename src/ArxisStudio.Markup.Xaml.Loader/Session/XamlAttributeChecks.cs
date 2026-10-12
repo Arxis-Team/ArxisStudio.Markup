@@ -5,6 +5,7 @@ using System.Linq;
 using System.Reflection;
 using System.Threading;
 using System.Threading.Tasks;
+using Avalonia.Metadata;
 
 namespace ArxisStudio.Markup.Xaml.Loader;
 
@@ -88,14 +89,29 @@ internal static class XamlAttributeChecks
             removals.Add(named.Span);
         }
 
+        // What the session cannot set an image on once the objects exist: the object map pairs what the logical
+        // tree, the resources and the styles reach, and a property element's value and a template's content are
+        // reached by none of them. Their images stay in the text, for Avalonia's loader, as before ADR 0031.
+        var unreached = new HashSet<XamlElement>(ReferenceEqualityComparer.Instance);
+        var templates = new Dictionary<Type, bool>();
+
         foreach (XamlElement element in document.DescendantElements())
         {
             cancellationToken.ThrowIfCancellationRequested();
 
+            bool reached = element.Parent is not XamlElement parent || !unreached.Contains(parent);
+
             // A property element is a member of its parent, not a type of its own.
             if (element.IsPropertyElementSyntax)
             {
+                unreached.Add(element);
+
                 continue;
+            }
+
+            if (!reached)
+            {
+                unreached.Add(element);
             }
 
             if (element.NamespaceUri is not { } namespaceUri)
@@ -124,6 +140,12 @@ internal static class XamlAttributeChecks
                     .ConfigureAwait(false))
                 .Type;
 
+            // A template's own attributes are the session's; what it holds is built when it is used.
+            if (type is not null && IsTemplate(type, templates))
+            {
+                unreached.Add(element);
+            }
+
             foreach (XamlAttribute attribute in element.Attributes)
             {
                 if (attribute is XamlNamespaceDeclaration
@@ -135,8 +157,8 @@ internal static class XamlAttributeChecks
                 }
 
                 await CheckAsync(
-                        document, element, attribute, type, rootType, classUse, environment, diagnostics, removals,
-                        handlers, resources, cancellationToken)
+                        document, element, attribute, type, reached, rootType, classUse, environment, diagnostics,
+                        removals, handlers, resources, cancellationToken)
                     .ConfigureAwait(false);
             }
         }
@@ -149,6 +171,7 @@ internal static class XamlAttributeChecks
         XamlElement element,
         XamlAttribute attribute,
         Type? type,
+        bool reached,
         Type? rootType,
         XamlClassUse classUse,
         XamlLoadEnvironment environment,
@@ -178,8 +201,11 @@ internal static class XamlAttributeChecks
         // An image or an icon written as text is read by the session, through the environment, rather
         // than by Avalonia's asset loader — which knows only what was last built and fails the whole
         // document over a file it cannot find (ADR 0031). A session leaves it out of the text and sets
-        // the value once the object exists.
-        if (member is { IsResolved: true, CanWrite: true, IsReadOnly: false } && XamlResourceValues.Reads(member.ValueType))
+        // the value once the object exists — where it can: on an element the object map does not reach
+        // the value would go nowhere, and the attribute stays with Avalonia, as it did before.
+        if (reached
+            && member is { IsResolved: true, CanWrite: true, IsReadOnly: false }
+            && XamlResourceValues.Reads(member.ValueType))
         {
             resources.Add(new XamlResourceAttribute(element, attribute, member));
 
@@ -270,6 +296,26 @@ internal static class XamlAttributeChecks
             MarkupDiagnosticSeverity.Warning,
             document.Uri,
             attribute.ValueSpan ?? attribute.Span));
+    }
+
+    /// <summary>Reports whether a type is a template: one whose content is built when it is used, not at a load.</summary>
+    /// <remarks>
+    /// By the attribute Avalonia's compiler defers content on — <c>ControlTemplate</c>, <c>DataTemplate</c>,
+    /// <c>ItemsPanelTemplate</c>, <c>TreeDataTemplate</c> and a library's own all say it — rather than by name.
+    /// </remarks>
+    /// <param name="type">The element's type.</param>
+    /// <param name="known">Answers already worked out during this check.</param>
+    private static bool IsTemplate(Type type, Dictionary<Type, bool> known)
+    {
+        if (!known.TryGetValue(type, out bool template))
+        {
+            template = type
+                .GetProperties(BindingFlags.Instance | BindingFlags.Public)
+                .Any(static property => property.IsDefined(typeof(TemplateContentAttribute), inherit: true));
+            known[type] = template;
+        }
+
+        return template;
     }
 
     /// <summary>

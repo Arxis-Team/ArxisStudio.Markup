@@ -26,6 +26,12 @@ What is read is kept per environment, by where it was found and what its bytes a
 Added: `XamlMemberDescriptor.ReadsResource` and `XamlLoaderDiagnosticCodes.UnreadableResourceValue`.
 `ConvertFromText` refuses text such a member reads as the name of a resource, and says why.
 
+What the session cannot set once the objects exist — an image inside a property element or inside a
+template's content, which no object the map pairs holds — goes to Avalonia as written, as before. An
+`avares:` image no resolver of the environment knows is asked of Avalonia's asset loader last, so a
+package's images still show. A setter that throws while an image or a design value is set through
+reflection is a warning about its attribute rather than an exception out of the load.
+
 ### A CLR property behind a private setter is read-only to a document
 
 `StyledElement.IsInitialized` has a private setter, and `PropertyInfo.CanWrite` answers yes for it, so the

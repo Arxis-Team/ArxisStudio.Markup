@@ -14,4 +14,12 @@
     <PackageReference Include="Avalonia" />
   </ItemGroup>
 
+  <!--
+    An image built into the assembly the way an application's or a package's is: what Avalonia's asset
+    loader finds and an environment's resolvers may not.
+  -->
+  <ItemGroup>
+    <AvaloniaResource Include="Assets/dot.png" />
+  </ItemGroup>
+
 </Project>
