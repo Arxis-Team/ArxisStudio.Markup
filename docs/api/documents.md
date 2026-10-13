@@ -246,6 +246,33 @@ foreach (XamlResourceReference reference in references)
 `XamlResourceGraph` follows those references across files and answers what depends on what — see
 [Updates](updates.md#what-a-changed-file-costs).
 
+## Resource declarations
+
+The keys a document writes, read the same way — from the syntax, with no type resolved:
+
+```csharp
+ImmutableArray<XamlResourceDeclaration> entries = document.GetResourceDeclarations();
+
+foreach (XamlResourceDeclaration entry in entries)
+{
+    // Owner: the element writing Resources, or the root of a dictionary document
+    Console.WriteLine($"{entry.Key} in {entry.Owner.Name} for {entry.ThemeVariant ?? "every theme"}");
+}
+
+// What a StaticResource or DynamicResource on this element can name: its own, then its ancestors'.
+ImmutableArray<XamlResourceDeclaration> reach = XamlResourceDeclarations.InScope(element);
+```
+
+An entry is an element with an `x:Key` inside a dictionary: a `Resources` property element, an element called
+`ResourceDictionary` there or at the root, one merged in (`MergedDictionaries`) or a theme dictionary
+(`ThemeDictionaries`, whose own key is the `ThemeVariant` of its entries). `IsTextKey` tells a key written as
+text from one written as an expression, `{x:Type Button}`; `KeySpan` is where the key is written.
+
+Reach is the element and its ancestors — with the styles each writes — nearest first, whatever the order of the
+text: Avalonia finds an ancestor's key written after the use and not a sibling's. Whether a `StaticResource`
+reads a key a theme dictionary alone holds depends on a theme being known while the element is built; that is
+for the host to decide.
+
 ## Style declarations
 
 Whose style each `<Style>` and `<ControlTheme>` is, read the same way as the includes — from the

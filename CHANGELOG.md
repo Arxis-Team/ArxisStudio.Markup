@@ -11,6 +11,17 @@ the source of truth, an unchanged document round-trips byte for byte, and unknow
 
 ## Unreleased
 
+### A resource is read where the document writes it
+
+The syntax package found the includes a document declares and nothing about its keys. `XamlResourceDeclarations`
+reads every keyed entry from the syntax — in `Resources`, a `ResourceDictionary`, one merged in, a theme
+dictionary — with the element that is its value, the element whose resources it belongs to and the theme it is
+for; `InScope` answers which an element reaches: its own, then each ancestor's with the styles it writes, nearest
+first, whatever the order of the text. That is what Avalonia's compiled markup does, checked against 12.1.1: a
+`StaticResource` finds an ancestor's key written after the use and not a sibling's. ADR 0035.
+
+Added: `XamlResourceDeclaration`, `XamlResourceDeclarations`, `XamlDocument.GetResourceDeclarations`.
+
 ### An argument is written where it stands
 
 Changing one argument of an extension meant writing the whole expression again: one built from `Arguments`

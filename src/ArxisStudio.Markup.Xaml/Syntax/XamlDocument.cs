@@ -242,6 +242,11 @@ public sealed class XamlDocument : XamlSyntaxNode
     public ImmutableArray<XamlResourceReference> GetResourceReferences() =>
         XamlResourceAnalyzer.Discover(this);
 
+    /// <summary>Finds the keyed resources this document writes, in source order.</summary>
+    /// <returns>The entries, each with the element whose resources it belongs to.</returns>
+    public ImmutableArray<XamlResourceDeclaration> GetResourceDeclarations() =>
+        XamlResourceDeclarations.Discover(this);
+
     /// <summary>Gets every diagnostic the parse produced, in source order.</summary>
     /// <returns>The document's diagnostics.</returns>
     public IEnumerable<MarkupDiagnostic> GetDiagnostics() => Diagnostics;
