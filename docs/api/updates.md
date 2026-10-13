@@ -209,6 +209,13 @@ built; and any argument not in the table. Whatever is written in place ends the 
 had first: a binding runs at local-value priority, and the next change of its source would otherwise
 write over what the document now says.
 
+A binding that reads an element by its name — `#name` at the start of its path, or `ElementName` — is
+built as a load builds one, by asking `ReflectionBindingExtension` for its binding with a service
+provider that answers `INameScope`, and the scope it is given is the one the update leaves on the root
+([The root's names](#the-roots-names)): an element the same update names is found as it is registered.
+`x:Name` and `Name` are not values. Written, changed or taken off, either builds its element again —
+Avalonia refuses a name on an element it has styled.
+
 `mc:Ignorable` that only gains namespaces nothing in the loaded document used is not a change at all:
 a reader ignores markup in an ignorable namespace, and there was none. The first design value a tool
 writes declares the design namespace and lists it — that used to cost a new session for a design
@@ -243,6 +250,18 @@ projection of just that element. What that would lose, the session puts back:
   what that element holds is rebuilt instead; a key no element declares, where an element above
   includes another file, moves it out past the outermost such element. A key neither declared nor
   possibly included is the application's or a theme's, which a part built on its own still finds.
+- **A binding is built with the element it names.** A part is a load of its own, with a name scope of
+  its own, and Avalonia's compiler refuses a compiled binding that names an element the part does not
+  hold. So a part is moved out to the nearest element whose content holds both a binding that reads an
+  element by its name and that element, wherever the part would build one and not the other — a binding
+  outside it that names an element it builds again would go on reading the object it replaced. A part
+  that rebuilds only its content counts as apart from what names it and what it names: its object may
+  stay, and a binding inside it would read the copy its content was built in. A binding the same update
+  writes in place is not the part's to hold. Where only the root holds both — the root reads a name, or
+  a part reads the root by its name — the update needs a new session (ADR 0036).
+- **What a step out brings in is answered too.** The element a part is moved out to holds markup of its
+  own, which may read another key or another name, so the reach is worked out again from there, until
+  the part answers for everything it holds.
 - **A rebuild inside another is the outer one's.** The outer rebuild builds the inner part as the
   document says, so the inner one is not built at all.
 - **A control placed with markup of its own stays itself.** When the part's root is an `x:Class`
@@ -251,9 +270,20 @@ projection of just that element. What that would lose, the session puts back:
   onto it. Avalonia, left to construct it, took the part for the control's definition and populated the
   control from markup that only places it, and wrote `null` into the hook a live registration stands on.
 
-All of it happens in one turn of the dispatcher: the writes, the map rebuilt over them, the design
-values applied again and the handlers hooked up. Cancellation is observed before that turn and never
-inside it, so an update cannot stop between writing the objects and adopting the document.
+All of it happens in one turn of the dispatcher: the writes, the map rebuilt over them, the root's
+names, the design values applied again and the handlers hooked up. Cancellation is observed before that
+turn and never inside it, so an update cannot stop between writing the objects and adopting the document.
+
+## The root's names
+
+A load registers the names of the document's own scope — its elements outside templates, whose content
+has a scope of its own — in a `NameScope` it puts on the root, and completes it; Avalonia takes no
+registration after that and takes none back. An update whose names moved — a name written or taken off,
+an element built again — gives the root a new scope holding every name with the object the map now pairs
+its element with, completed as a load leaves one, so `NameScope.GetNameScope(root)` answers with what is
+on screen. An update that moves no name leaves the scope as it is. The scope the load made is kept for the
+session's life: a style the load built makes its bindings afresh each time it applies, and they hold their
+scope weakly.
 
 ## A host that borrows the root
 

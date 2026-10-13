@@ -128,7 +128,7 @@ public sealed partial class XamlLoadSession
                 "The document offered does not parse, so nothing was written to the objects.");
         }
 
-        (ImmutableArray<XamlDocumentChange> changes, Dictionary<XamlDocumentChange, XamlInPlaceWrite> inPlace) =
+        (ImmutableArray<XamlDocumentChange> changes, Dictionary<XamlDocumentChange, XamlInPlaceWrite> inPlace, NameScope? names) =
             await SettleAsync(XamlDocumentDiff.Compare(Document, updated), cancellationToken).ConfigureAwait(false);
 
         XamlUpdateStrategy strategy = XamlDocumentDiff.Largest(changes);
@@ -148,7 +148,7 @@ public sealed partial class XamlLoadSession
                 "loaded; create a new session to load the new one.");
         }
 
-        return await ApplyAsync(updated, strategy, changes, inPlace, diagnostics, cancellationToken)
+        return await ApplyAsync(updated, strategy, changes, inPlace, names, diagnostics, cancellationToken)
             .ConfigureAwait(false);
     }
 
@@ -273,7 +273,7 @@ public sealed partial class XamlLoadSession
         }
 
         return await ApplyAsync(
-                Document, XamlUpdateStrategy.ReplaceResource, changes, [], diagnostics, cancellationToken)
+                Document, XamlUpdateStrategy.ReplaceResource, changes, [], names: null, diagnostics, cancellationToken)
             .ConfigureAwait(false);
     }
 
@@ -355,7 +355,7 @@ public sealed partial class XamlLoadSession
                 "in the session's document and ask again.");
         }
 
-        (ImmutableArray<XamlDocumentChange> changes, Dictionary<XamlDocumentChange, XamlInPlaceWrite> inPlace) =
+        (ImmutableArray<XamlDocumentChange> changes, Dictionary<XamlDocumentChange, XamlInPlaceWrite> inPlace, NameScope? names) =
             await SettleAsync(
                     [
                         .. requested.Select(element => XamlDocumentDiff.Escalate(
@@ -386,12 +386,12 @@ public sealed partial class XamlLoadSession
                 changes,
                 diagnostics,
                 XamlLoaderDiagnosticCodes.UpdateRequiresNewSession,
-                "The root element is among the elements to build again, and the session is built around " +
-                "the root. Nothing was written to the objects; create a new session from the same document " +
-                "to build the root again.");
+                "Building these elements again takes the root element — it is among them, or a binding reads " +
+                "one of the two by the other's name — and the session is built around the root. Nothing was " +
+                "written to the objects; create a new session from the same document to build the root again.");
         }
 
-        return await ApplyAsync(Document, strategy, changes, inPlace, diagnostics, cancellationToken)
+        return await ApplyAsync(Document, strategy, changes, inPlace, names, diagnostics, cancellationToken)
             .ConfigureAwait(false);
     }
 
@@ -400,17 +400,25 @@ public sealed partial class XamlLoadSession
     /// and has the element rebuilt instead where it cannot.
     /// </summary>
     /// <remarks>
+    /// <para>
     /// Before anything is projected or written, because a change rebuilt instead needs a fragment
     /// of its own, and a change found out to be unwritable once writing had begun would be a broken
     /// session rather than a rebuilt element. The answers are kept: what a binding binds and what a
     /// static member holds were worked out here, through the environment, and the writing turn is no
     /// place to resolve a type.
+    /// </para>
+    /// <para>
+    /// A binding that reads an element by its name is given a name scope here, which the update fills
+    /// and leaves on the root once its objects are written (ADR 0036). It is made only when such a
+    /// binding is, and answered with the rest.
+    /// </para>
     /// </remarks>
-    private async ValueTask<(ImmutableArray<XamlDocumentChange> Changes, Dictionary<XamlDocumentChange, XamlInPlaceWrite> InPlace)>
+    private async ValueTask<(ImmutableArray<XamlDocumentChange> Changes, Dictionary<XamlDocumentChange, XamlInPlaceWrite> InPlace, NameScope? Names)>
         SettleAsync(ImmutableArray<XamlDocumentChange> changes, CancellationToken cancellationToken)
     {
         var inPlace = new Dictionary<XamlDocumentChange, XamlInPlaceWrite>();
         var settled = new List<XamlDocumentChange>(changes.Length);
+        NameScope? names = null;
 
         foreach (XamlDocumentChange change in changes)
         {
@@ -443,7 +451,7 @@ public sealed partial class XamlLoadSession
                 continue;
             }
 
-            if (await InPlaceAsync(change, cancellationToken).ConfigureAwait(false) is { } write)
+            if (await InPlaceAsync(change, () => names ??= new NameScope(), cancellationToken).ConfigureAwait(false) is { } write)
             {
                 inPlace[change] = write;
                 settled.Add(change);
@@ -464,7 +472,8 @@ public sealed partial class XamlLoadSession
                         || rebuilt.Add((change.Strategy, change.OldElement, change.ReplacesObject)))
                     .OrderBy(static change => change.Strategy),
             ],
-            inPlace);
+            inPlace,
+            names);
     }
 
     /// <summary>Reports whether the attribute a change names is an event of the object its element produced.</summary>
@@ -509,7 +518,10 @@ public sealed partial class XamlLoadSession
     }
 
     /// <summary>Works out what a value change writes where it stands, or that it cannot be written there.</summary>
-    private async ValueTask<XamlInPlaceWrite?> InPlaceAsync(XamlDocumentChange change, CancellationToken cancellationToken)
+    private async ValueTask<XamlInPlaceWrite?> InPlaceAsync(
+        XamlDocumentChange change,
+        Func<INameScope> names,
+        CancellationToken cancellationToken)
     {
         if (change.OldElement is not { } element
             || change.MemberName is not { } name
@@ -537,7 +549,7 @@ public sealed partial class XamlLoadSession
             && AttributeOf(written, name)?.GetValue() is XamlMarkupExtensionValue extension
                 ? await XamlInPlaceValues
                     .EvaluateAsync(
-                        extension, written, member, Environment, Options.UseCompiledBindingsByDefault, cancellationToken)
+                        extension, written, member, Environment, Options.UseCompiledBindingsByDefault, names, cancellationToken)
                     .ConfigureAwait(false)
                 : null;
     }
@@ -665,6 +677,7 @@ public sealed partial class XamlLoadSession
         XamlUpdateStrategy strategy,
         ImmutableArray<XamlDocumentChange> changes,
         Dictionary<XamlDocumentChange, XamlInPlaceWrite> inPlace,
+        NameScope? names,
         List<MarkupDiagnostic> diagnostics,
         CancellationToken cancellationToken)
     {
@@ -747,7 +760,7 @@ public sealed partial class XamlLoadSession
                         // caller told to do that has to be given something to do it with.
                         try
                         {
-                            Finish(updated, projection, fragments, findings, kept, resources, diagnostics);
+                            Finish(updated, projection, fragments, findings, kept, resources, names, diagnostics);
                         }
                         catch (Exception)
                         {
@@ -821,9 +834,16 @@ public sealed partial class XamlLoadSession
         XamlAttributeFindings findings,
         List<XamlElement> kept,
         List<(XamlResourceAttribute Attribute, object? Value)> resources,
+        NameScope? names,
         List<MarkupDiagnostic> diagnostics)
     {
+        List<(string Name, object Target)> named = Named(Document);
+
         Adopt(updated, projection);
+
+        // Before anything else reads the objects: the names the update moved are registered where the
+        // root keeps them, and a binding it wrote in place finds the element it names (ADR 0036).
+        Rename(named, names);
 
         // What the rebuilt parts were built without, read before the turn: on the objects now that the
         // map knows them, and not on an element whose object was kept, which still has its own.

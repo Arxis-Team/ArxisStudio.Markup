@@ -63,11 +63,13 @@ internal static class XamlDocumentDiff
 
         CompareElements(before, after, changes);
 
+        ImmutableArray<XamlDocumentChange> compared = changes.ToImmutable();
+
         return
         [
-            .. changes
+            .. compared
                 .SelectMany(change => Consumers(change, loaded, updated))
-                .Select(Widened)
+                .Select(change => Widened(change, compared))
 
                 // Rebuilding the root object would leave nowhere to put it: the caller holds it,
                 // and a session is built around it. That is the one case a new session is for.
@@ -293,7 +295,9 @@ internal static class XamlDocumentDiff
 
         // A directive is not a value on an object. x:Key decides where a resource lives and
         // x:Name what the tree calls it; both are decided while the objects are being built.
-        if (attribute.IsDirective || attribute.IsMarkupCompatibility)
+        // So is Name, which is x:Name by another spelling — and which Avalonia refuses to set on
+        // an element that has been styled, so a write in place broke the session it ran in.
+        if (attribute.IsDirective || attribute.IsMarkupCompatibility || IsName(attribute))
         {
             return Structural(before, after);
         }
@@ -351,7 +355,7 @@ internal static class XamlDocumentDiff
             return new XamlDocumentChange(XamlUpdateStrategy.RecreateSession, change.OldElement, change.NewElement, null);
         }
 
-        XamlDocumentChange rebuilt = Widened(Structural(before, after));
+        XamlDocumentChange rebuilt = Widened(Structural(before, after), []);
 
         return rebuilt.ReplacesObject && ReferenceEquals(rebuilt.OldElement, loadedRoot)
             ? new XamlDocumentChange(XamlUpdateStrategy.RecreateSession, before, after, null)
@@ -359,7 +363,9 @@ internal static class XamlDocumentDiff
     }
 
     /// <summary>
-    /// Moves a rebuild out to the element whose dictionary a static reference inside it reads.
+    /// Moves a rebuild out to the element that answers what it reads — the dictionary of a static
+    /// reference, an element a binding names — and to the one that holds whatever reads by name an
+    /// element it builds.
     /// </summary>
     /// <remarks>
     /// <para>
@@ -377,34 +383,164 @@ internal static class XamlDocumentDiff
     /// outermost such element. A key neither declared nor possibly included is the application's
     /// or a theme's, which a part built on its own still finds.
     /// </para>
+    /// <para>
+    /// A name is the same fact (ADR 0036). A binding that reads an element by its name finds it in
+    /// the scope of the load that built the binding, and a part is a load of its own: Avalonia's
+    /// compiler refuses a compiled binding that names an element outside the part, and a reflection
+    /// binding finds nothing. A binding outside the part that names an element the part builds again
+    /// goes on reading the object it replaced. So the rebuild is moved out to the nearest element
+    /// whose content holds both the binding's element and the one it names; where that would be the
+    /// root itself, only a new session builds the two together. A binding the same update writes
+    /// where it stands, outside the part, is none of the part's: it reads the scope the update leaves
+    /// on the root, and one that cannot be written there is rebuilt and reaches out on its own.
+    /// </para>
+    /// <para>
+    /// A step out brings in markup of its own — another key, another name — so the reach is asked
+    /// again from the element stepped out to, until the part answers for everything it holds.
+    /// </para>
     /// </remarks>
-    private static XamlDocumentChange Widened(XamlDocumentChange change)
+    private static XamlDocumentChange Widened(XamlDocumentChange change, ImmutableArray<XamlDocumentChange> update)
     {
-        if (change.Strategy != XamlUpdateStrategy.ReloadSubtree
-            || change.OldElement is not { } before
-            || change.NewElement is not { } after)
+        XamlDocumentChange widened = change;
+
+        while (widened.Strategy == XamlUpdateStrategy.ReloadSubtree
+               && widened.OldElement is { } before
+               && widened.NewElement is { } after)
         {
-            return change;
+            int named = NameReach(after, widened.ReplacesObject, update);
+
+            if (named < 0)
+            {
+                return new XamlDocumentChange(
+                    XamlUpdateStrategy.RecreateSession, before.Document.Root, after.Document.Root, null);
+            }
+
+            int widest = Math.Max(KeyReach(after), named);
+
+            if (widest == 0
+                || Ancestor(before, widest) is not { } outerBefore
+                || Ancestor(after, widest) is not { } outerAfter)
+            {
+                return widened;
+            }
+
+            widened = Structural(outerBefore, outerAfter, replacesObject: false);
         }
 
+        return widened;
+    }
+
+    /// <summary>
+    /// Counts how many levels above a rebuilt part sits the element whose dictionaries answer every
+    /// static reference inside it.
+    /// </summary>
+    private static int KeyReach(XamlElement part)
+    {
         ImmutableArray<XamlElement> includes =
-            [.. after.Document.GetResourceReferences().Select(static reference => reference.Element)];
+            [.. part.Document.GetResourceReferences().Select(static reference => reference.Element)];
 
         int widest = 0;
 
-        foreach ((XamlElement reader, string key) in StaticReads(after))
+        foreach ((XamlElement reader, string key) in StaticReads(part))
         {
-            widest = Math.Max(widest, Reach(reader, key, after, includes));
+            widest = Math.Max(widest, Reach(reader, key, part, includes));
         }
 
-        if (widest == 0
-            || Ancestor(before, widest) is not { } outerBefore
-            || Ancestor(after, widest) is not { } outerAfter)
+        return widest;
+    }
+
+    /// <summary>
+    /// Counts how many levels above a rebuilt part sits the nearest element whose content holds every
+    /// binding that reads an element by its name together with that element, wherever the part
+    /// would build one of the two and not the other.
+    /// </summary>
+    /// <returns>The levels; none when the part holds both of every such pair, -1 when only the root does.</returns>
+    private static int NameReach(XamlElement part, bool replacesObject, ImmutableArray<XamlDocumentChange> update)
+    {
+        XamlDocument document = part.Document;
+        XamlElement[] above = [.. part.AncestorsAndSelf().OfType<XamlElement>()];
+        int widest = 0;
+
+        foreach ((XamlElement reader, string name, XamlAttribute? attribute) in XamlNameScopes.Reads(document))
         {
-            return change;
+            if (attribute is not null && !Within(part, reader) && Rewrites(update, reader, attribute))
+            {
+                continue;
+            }
+
+            if (XamlNameScopes.Find(document, name, reader) is not { } named
+                || !Apart(reader, named, part, replacesObject))
+            {
+                continue;
+            }
+
+            if (Holder(reader, named) is not { } holder)
+            {
+                return -1;
+            }
+
+            widest = Math.Max(widest, Array.IndexOf(above, holder));
         }
 
-        return Structural(outerBefore, outerAfter, replacesObject: false);
+        return widest;
+    }
+
+    /// <summary>
+    /// Reports whether rebuilding a part leaves a binding that reads an element by its name, and the
+    /// element it names, to two different loads.
+    /// </summary>
+    /// <remarks>
+    /// A part builds again what is inside it, and itself when it replaces its object. When it rebuilds
+    /// only its content, its object may stay or may yet be replaced — once the update finds a member
+    /// written as a property element that only a new object can take — and either way it stands apart
+    /// from whatever names it or it names: kept, it goes on reading an element the part builds again,
+    /// and a binding inside that names it reads the copy the content was built in; replaced, its own
+    /// bindings are built in the part, and one outside that names it reads what was replaced.
+    /// </remarks>
+    private static bool Apart(XamlElement reader, XamlElement named, XamlElement part, bool replacesObject)
+    {
+        if (!replacesObject && (ReferenceEquals(reader, part) || ReferenceEquals(named, part)))
+        {
+            return !ReferenceEquals(reader, named);
+        }
+
+        // A root whose object may stay is answered above; past it, a part builds again whatever is
+        // inside it, and its root along with it.
+        return Within(part, reader) != Within(part, named);
+    }
+
+    /// <summary>Reports whether an update writes an attribute as an expression where it stands, if it can.</summary>
+    private static bool Rewrites(ImmutableArray<XamlDocumentChange> update, XamlElement element, XamlAttribute attribute) =>
+        update.Any(change => change.Strategy == XamlUpdateStrategy.SetExpression
+            && ReferenceEquals(change.NewElement, element)
+            && string.Equals(change.MemberName, attribute.Name.LocalName, StringComparison.Ordinal));
+
+    /// <summary>Reports whether an element is a part, or is inside it.</summary>
+    private static bool Within(XamlElement part, XamlElement element) =>
+        element.AncestorsAndSelf().Any(ancestor => ReferenceEquals(ancestor, part));
+
+    /// <summary>
+    /// Finds the nearest element whose content holds both of two elements — so that rebuilding what it
+    /// holds builds both — or none, when only the root would, by being one of them.
+    /// </summary>
+    private static XamlElement? Holder(XamlElement one, XamlElement other)
+    {
+        XamlSyntaxNode[] around = [.. other.AncestorsAndSelf()];
+
+        foreach (XamlElement candidate in one.AncestorsAndSelf().OfType<XamlElement>())
+        {
+            // Above both, rather than one of them, whose own object a rebuild of its content keeps;
+            // and not a property element, which holds nothing of its own.
+            if (Array.Exists(around, node => ReferenceEquals(node, candidate))
+                && !ReferenceEquals(candidate, one)
+                && !ReferenceEquals(candidate, other)
+                && !candidate.IsPropertyElementSyntax)
+            {
+                return candidate;
+            }
+        }
+
+        return null;
     }
 
     /// <summary>
@@ -513,6 +649,9 @@ internal static class XamlDocumentDiff
             }
         }
     }
+
+    /// <summary>Reports whether an attribute is the <c>Name</c> an element's identity is read from.</summary>
+    private static bool IsName(XamlAttribute attribute) => attribute.Name.IsUnprefixed("Name");
 
     /// <summary>Reports whether an attribute is <c>mc:Ignorable</c>.</summary>
     private static bool IsIgnorable(XamlAttribute attribute) =>

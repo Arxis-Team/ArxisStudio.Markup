@@ -208,6 +208,38 @@ public sealed class InPlaceUpdateTests
     }
 
     [AvaloniaFact]
+    public async Task AStepOutToADictionaryReadsTheKeysOfWhatItBringsIn()
+    {
+        string Xaml(string shown) =>
+            $"<UserControl xmlns=\"{AvaloniaNamespace}\" xmlns:x=\"{XamlNamespace}\"\n" +
+            $"             x:Class=\"{typeof(CountedView).FullName}\">\n" +
+            "  <UserControl.Resources>\n" +
+            "    <SolidColorBrush x:Key=\"Accent\" Color=\"Red\" />\n" +
+            "  </UserControl.Resources>\n" +
+            "  <StackPanel>\n" +
+            "    <StackPanel.Resources>\n" +
+            "      <SolidColorBrush x:Key=\"Muted\" Color=\"Gray\" />\n" +
+            "    </StackPanel.Resources>\n" +
+            $"    <TextBlock Text=\"shown\"{shown} />\n" +
+            "    <TextBlock Text=\"beside\" Foreground=\"{StaticResource Accent}\" />\n" +
+            "  </StackPanel>\n" +
+            "</UserControl>";
+
+        await using XamlLoadSession session = await LoadAsync(Xaml(string.Empty));
+
+        // The panel answers the key the text block now reads, and rebuilding what the panel holds builds
+        // the other text block too — whose key only the root answers.
+        XamlUpdateResult result = await UpdateAsync(session, Xaml(" Foreground=\"{StaticResource Muted}\""));
+
+        Assert.True(result.Applied, Describe(result));
+
+        TextBlock[] texts = [.. ((StackPanel)session.GetRoot<UserControl>().Content!).Children.OfType<TextBlock>()];
+
+        Assert.Equal(Colors.Gray, Assert.IsAssignableFrom<ISolidColorBrush>(texts[0].Foreground).Color);
+        Assert.Equal(Colors.Red, Assert.IsAssignableFrom<ISolidColorBrush>(texts[1].Foreground).Color);
+    }
+
+    [AvaloniaFact]
     public async Task ABindingWhereBindingsCompileIsBuiltAsTheLoadWouldBuildIt()
     {
         await using XamlLoadSession session = await LoadAsync(

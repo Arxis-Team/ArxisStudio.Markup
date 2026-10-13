@@ -4,6 +4,7 @@ using System.Reflection;
 using System.Threading;
 using System.Threading.Tasks;
 using Avalonia;
+using Avalonia.Controls;
 using Avalonia.Data;
 using Avalonia.Markup.Xaml.MarkupExtensions;
 
@@ -122,6 +123,10 @@ internal static class XamlInPlaceValues
     /// Whether a <c>{Binding}</c> the document says nothing about compiles, as the session's load
     /// was told.
     /// </param>
+    /// <param name="names">
+    /// The name scope a binding that reads an element by its name finds it in: the one the update
+    /// leaves on the root. Asked for only when such a binding is written.
+    /// </param>
     /// <param name="cancellationToken">A token to observe while resolving.</param>
     /// <returns>The write, or <see langword="null"/> when the element has to be rebuilt instead.</returns>
     internal static async ValueTask<XamlInPlaceWrite?> EvaluateAsync(
@@ -130,6 +135,7 @@ internal static class XamlInPlaceValues
         XamlMemberDescriptor member,
         XamlLoadEnvironment environment,
         bool compiledByDefault,
+        Func<INameScope> names,
         CancellationToken cancellationToken)
     {
         switch (KindOf(extension, element))
@@ -148,7 +154,7 @@ internal static class XamlInPlaceValues
             case Kind.Binding:
                 return member.AvaloniaProperty is not null
                     && !Compiles(extension, element, compiledByDefault)
-                    && await BindingAsync(extension, element, member, environment, cancellationToken)
+                    && await BindingAsync(extension, element, member, environment, names, cancellationToken)
                         .ConfigureAwait(false) is { } binding
                     ? new XamlInPlaceWrite.Binding(binding)
                     : null;
@@ -240,9 +246,10 @@ internal static class XamlInPlaceValues
         XamlElement element,
         XamlMemberDescriptor member,
         XamlLoadEnvironment environment,
+        Func<INameScope> names,
         CancellationToken cancellationToken)
     {
-        var binding = new ReflectionBinding();
+        var binding = new ReflectionBindingExtension();
         int position = 0;
 
         foreach (XamlMarkupExtensionArgument argument in extension.Arguments)
@@ -295,7 +302,20 @@ internal static class XamlInPlaceValues
             }
         }
 
-        return binding;
+        // A binding that reads an element by its name looks it up in a name scope, which a load hands
+        // it through the service provider its extension is given — the binding keeps the scope out of
+        // its public surface, and one built without it fails on the first element it reads (ADR 0036).
+        // The scope is the one the update leaves on the root, so a name the same update writes is
+        // found when the update registers it.
+        return string.IsNullOrEmpty(binding.ElementName) && XamlNameScopes.NameInPath(binding.Path) is null
+            ? binding
+            : binding.ProvideValue(new NameScopeProvider(names()));
+    }
+
+    /// <summary>The services a load gives a binding's extension, as far as an in-place binding uses them: its name scope.</summary>
+    private sealed class NameScopeProvider(INameScope names) : IServiceProvider
+    {
+        public object? GetService(Type serviceType) => serviceType == typeof(INameScope) ? names : null;
     }
 
     private static async ValueTask<RelativeSource?> RelativeSourceAsync(

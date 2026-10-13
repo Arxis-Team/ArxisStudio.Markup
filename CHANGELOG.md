@@ -11,6 +11,26 @@ the source of truth, an unchanged document round-trips byte for byte, and unknow
 
 ## Unreleased
 
+### The root's names follow the document, and a part is built with the elements it names
+
+A text block bound to a slider by name in the same edit that named the slider went on showing its old text
+until the form was loaded again. The root's name scope is completed by the load, and no update registered
+a name it wrote, took back one it removed, or followed an element it built again. A binding written in place
+was built with no name scope at all: `#slider.Value` reported "NameScope not found", and `ElementName=slider`
+threw out of the write and left the session needing a new one. And a part rebuilt on its own is a load with
+a scope of its own, which Avalonia's compiler refuses a compiled binding naming an element outside it.
+
+Now an update whose names moved gives the root a new completed scope holding the document's names with the
+objects on screen; a binding written in place that reads an element by its name is built through
+`ReflectionBindingExtension.ProvideValue` with that scope, so a name the same update writes is found; and a
+rebuild is moved out to the nearest element whose content holds both a binding that reads an element by its
+name and that element — a new session where only the root holds both. The reach is asked again after every
+step out, so a key read by what a step brings in is answered too, where it used to be left to a part that
+did not declare it. `Name`, written or changed, builds its element again as `x:Name` does: Avalonia refuses
+a name on an element it has styled. ADR 0036.
+
+Nothing is added to the public surface.
+
 ### An argument is written where it stands
 
 Changing one argument of an extension meant writing the whole expression again: one built from `Arguments`
