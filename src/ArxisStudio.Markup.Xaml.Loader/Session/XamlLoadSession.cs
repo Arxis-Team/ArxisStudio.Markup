@@ -5,6 +5,8 @@ using System.Linq;
 using System.Reflection;
 using System.Threading;
 using System.Threading.Tasks;
+using Avalonia;
+using Avalonia.Controls;
 using Avalonia.Markup.Xaml;
 
 namespace ArxisStudio.Markup.Xaml.Loader;
@@ -133,6 +135,7 @@ public sealed partial class XamlLoadSession : IAsyncDisposable
         RootObject = rootObject;
         Diagnostics = diagnostics;
         _dispatcher = environment.Dispatcher;
+        _loadedNames = rootObject is StyledElement styled ? NameScope.GetNameScope(styled) : null;
     }
 
     /// <summary>

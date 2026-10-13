@@ -183,12 +183,7 @@ public sealed partial class XamlLoadSession
         Func<XamlBindingPathStatus, Type?, string?, string, XamlBindingCheck> check,
         CancellationToken cancellationToken)
     {
-        XamlElement? template = Template(element);
-        XamlElement? named = Document.DescendantElements()
-            .FirstOrDefault(candidate => string.Equals(candidate.Identity, name, StringComparison.Ordinal) &&
-                                         ReferenceEquals(Template(candidate), template));
-
-        if (named is null)
+        if (XamlNameScopes.Find(Document, name, element) is not { } named)
         {
             return (null, check(XamlBindingPathStatus.Broken, null, name, $"No element is named '{name}' where the binding can see it."));
         }
@@ -295,7 +290,7 @@ public sealed partial class XamlLoadSession
                 return (at, false);
             }
 
-            if (IsTemplate(at))
+            if (XamlNameScopes.IsTemplate(at))
             {
                 return (null, !at.Name.LocalName.EndsWith("DataTemplate", StringComparison.Ordinal));
             }
@@ -339,13 +334,6 @@ public sealed partial class XamlLoadSession
 
         return null;
     }
-
-    /// <summary>The nearest template an element stands in — its own name scope; <see langword="null"/> outside templates.</summary>
-    private static XamlElement? Template(XamlElement element) =>
-        element.AncestorsAndSelf().OfType<XamlElement>().Skip(1).FirstOrDefault(IsTemplate);
-
-    private static bool IsTemplate(XamlElement element) =>
-        !element.IsPropertyElementSyntax && element.Name.LocalName.EndsWith("Template", StringComparison.Ordinal);
 
     /// <summary>What a binding says about its source, read from the markup alone.</summary>
     /// <param name="Source">What it reads from.</param>
