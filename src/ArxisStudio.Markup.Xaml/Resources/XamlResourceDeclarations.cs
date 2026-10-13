@@ -79,7 +79,7 @@ public static class XamlResourceDeclarations
         {
             foreach (XamlResourceDeclaration declaration in all)
             {
-                if (ReferenceEquals(declaration.Owner, at) || ReferenceEquals(StyleHost(declaration.Owner), at))
+                if (ReferenceEquals(declaration.Scope, at))
                 {
                     reached.Add(declaration);
                 }
@@ -115,7 +115,7 @@ public static class XamlResourceDeclarations
                 switch (parent.MemberName)
                 {
                     case ResourcesMember when parent.Parent is XamlElement owner:
-                        declaration = new XamlResourceDeclaration(element, key, owner, theme);
+                        declaration = new XamlResourceDeclaration(element, key, owner, ScopeOf(owner), theme);
 
                         return true;
 
@@ -149,13 +149,20 @@ public static class XamlResourceDeclarations
         // Up to the root through dictionaries alone: the entries of a dictionary document.
         if (!ReferenceEquals(current, element) && IsDictionary(current))
         {
-            declaration = new XamlResourceDeclaration(element, key, current, theme);
+            declaration = new XamlResourceDeclaration(element, key, current, ScopeOf(current), theme);
 
             return true;
         }
 
         return false;
     }
+
+    /// <summary>
+    /// The element whose reach an owner's entries are in: the owner itself, or for a style its host — unless the style
+    /// is the document's root, which everything in the document is inside.
+    /// </summary>
+    private static XamlElement? ScopeOf(XamlElement owner) =>
+        IsStyle(owner) && owner.Parent is XamlElement ? StyleHost(owner) : owner;
 
     /// <summary>
     /// The element whose <c>Styles</c> a style is written in — through the styles it is nested in — or

@@ -30,7 +30,9 @@ in. The theme dictionary's own key names its variant and is not an entry; a key 
 
 **`XamlResourceDeclarations.InScope` answers what an element reaches**: its own entries, then each ancestor's,
 nearest first, each with the resources of the styles it writes — whatever the order of the text. An element in a
-property element belongs to the element that writes it.
+property element belongs to the element that writes it. Each entry says whose reach it is in (`Scope`): its
+owner's, or for a style's resources the element whose `Styles` hold the style; a control theme's own resources are
+in no element's reach, because they reach only what the theme styles.
 
 ## Consequences
 

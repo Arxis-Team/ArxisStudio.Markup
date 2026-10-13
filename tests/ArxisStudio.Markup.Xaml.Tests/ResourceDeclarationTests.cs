@@ -93,6 +93,23 @@ public sealed class ResourceDeclarationTests
             """);
 
         Assert.Empty(stray.GetResourceDeclarations());
+
+        // A control theme among resources owns its own; they reach what it styles, not the document around it.
+        XamlDocument themed = XamlDocument.Parse($$"""
+            <UserControl {{Namespaces}}>
+              <UserControl.Resources>
+                <ControlTheme x:Key="Card" TargetType="Border">
+                  <ControlTheme.Resources>
+                    <x:Double x:Key="Inner">4</x:Double>
+                  </ControlTheme.Resources>
+                </ControlTheme>
+              </UserControl.Resources>
+              <Border />
+            </UserControl>
+            """);
+
+        Assert.Null(themed.GetResourceDeclarations().Single(static entry => entry.Key == "Inner").Scope);
+        Assert.Equal(["Card"], XamlResourceDeclarations.InScope(themed.Root!.ContentElements.Single()).Select(static entry => entry.Key));
     }
 
     [Fact]
@@ -131,6 +148,12 @@ public sealed class ResourceDeclarationTests
         XamlElement used = XamlElementPath.Parse("/0/1").Resolve(document)!;
 
         Assert.Equal(["Own", "Later", "FromStyle", "Root"], XamlResourceDeclarations.InScope(used).Select(static entry => entry.Key));
+
+        // A style's resources are in the reach of the element whose Styles hold it.
+        XamlResourceDeclaration fromStyle = document.GetResourceDeclarations().Single(static entry => entry.Key == "FromStyle");
+
+        Assert.Equal("Style", fromStyle.Owner.Name.LocalName);
+        Assert.Same(document.Root, fromStyle.Scope);
     }
 
     [Fact]

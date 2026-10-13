@@ -18,11 +18,12 @@ namespace ArxisStudio.Markup.Xaml;
 /// </remarks>
 public sealed class XamlResourceDeclaration
 {
-    internal XamlResourceDeclaration(XamlElement element, XamlAttribute keyAttribute, XamlElement owner, string? themeVariant)
+    internal XamlResourceDeclaration(XamlElement element, XamlAttribute keyAttribute, XamlElement owner, XamlElement? scope, string? themeVariant)
     {
         Element = element;
         KeyAttribute = keyAttribute;
         Owner = owner;
+        Scope = scope;
         ThemeVariant = themeVariant;
     }
 
@@ -52,6 +53,13 @@ public sealed class XamlResourceDeclaration
     /// <c>Resources</c>, or the root of a dictionary document.
     /// </summary>
     public XamlElement Owner { get; }
+
+    /// <summary>
+    /// Gets the element whose reach the entry is in — it and everything inside it can name the key: the owner, or the
+    /// element whose <c>Styles</c> the owning style is written in; <see langword="null"/> for a style written anywhere
+    /// else, such as a control theme among resources, whose resources reach only what it styles.
+    /// </summary>
+    public XamlElement? Scope { get; }
 
     /// <summary>
     /// Gets the key of the theme dictionary the entry is in — <c>Light</c>, <c>Dark</c>, a variant of the

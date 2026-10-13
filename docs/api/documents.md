@@ -267,6 +267,8 @@ An entry is an element with an `x:Key` inside a dictionary: a `Resources` proper
 `ResourceDictionary` there or at the root, one merged in (`MergedDictionaries`) or a theme dictionary
 (`ThemeDictionaries`, whose own key is the `ThemeVariant` of its entries). `IsTextKey` tells a key written as
 text from one written as an expression, `{x:Type Button}`; `KeySpan` is where the key is written.
+`Scope` is the element whose reach the entry is in — the owner, or the element whose `Styles` hold the owning
+style; none for a control theme's own resources.
 
 Reach is the element and its ancestors — with the styles each writes — nearest first, whatever the order of the
 text: Avalonia finds an ancestor's key written after the use and not a sibling's. Whether a `StaticResource`
