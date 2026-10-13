@@ -119,8 +119,9 @@ public static class XamlResourceDeclarations
 
                         return true;
 
-                    // Only a dictionary sits in these: the walk came up through one.
-                    case MergedMember or ThemeMember when IsDictionary(current) && !ReferenceEquals(current, element):
+                    // Only a dictionary sits in these, and never the entry itself (left out above): the walk came up
+                    // through one.
+                    case MergedMember or ThemeMember when IsDictionary(current):
                         current = parent;
 
                         continue;
